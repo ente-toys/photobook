@@ -208,7 +208,7 @@ export default function PageStrip({
                       color: "#666",
                     }}
                   >
-                    {spread.left! + 1}
+                    {spread.left! === 0 ? "Cover" : spread.left! === pages.length - 1 ? "Back Cover" : spread.left!}
                   </Typography>
                 )}
                 {rightPage && (
@@ -219,7 +219,7 @@ export default function PageStrip({
                       color: "#666",
                     }}
                   >
-                    {spread.right! + 1}
+                    {spread.right! === 0 ? "Cover" : spread.right! === pages.length - 1 ? "Back Cover" : spread.right!}
                   </Typography>
                 )}
               </Box>

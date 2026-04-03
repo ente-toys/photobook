@@ -45,19 +45,16 @@ export default function ResultsPage() {
   // The flip event gives us the 0-based index of the page being shown.
   //
   // Page display logic:
-  //   index 0          → "1"          (front cover, shown alone)
-  //   index 1          → "2-3"        (first interior spread)
-  //   index 3          → "4-5"
-  //   index N-1        → "N"          (back cover, shown alone)
-  //   For interior: left page = index, right = index+1 → display (index+1)-(index+2)
+  //   index 0          → "Cover"
+  //   index 1          → "1-2"        (first interior spread, counting from 1 after cover)
+  //   index 3          → "3-4"
+  //   index N-1        → "Back Cover"
   const pageLabel = useMemo(() => {
     if (totalPages === 0) return "";
-    // Front cover
-    if (pageIndex === 0) return "1";
-    // Back cover (last page, shown alone)
-    if (pageIndex >= totalPages - 1) return String(totalPages);
-    // Interior spread: the left page is pageIndex, right is pageIndex+1
-    return `${pageIndex + 1}-${pageIndex + 2}`;
+    if (pageIndex === 0) return "Cover";
+    if (pageIndex >= totalPages - 1) return "Back Cover";
+    // Interior spread: pages count from 1 after the cover
+    return `${pageIndex}-${pageIndex + 1}`;
   }, [pageIndex, totalPages]);
 
   const isAtStart = pageIndex === 0;
