@@ -527,7 +527,7 @@ export default function EditPage() {
             );
           })}
           {/* Delete button on hover */}
-          {isHovered && totalPages > 2 && (
+          {totalPages > 2 && (
             <IconButton
               size="small"
               onClick={(e) => {
@@ -537,17 +537,20 @@ export default function EditPage() {
               }}
               sx={{
                 position: "absolute",
-                top: 8,
-                ...(pageIndex % 2 === 1 ? { left: 8 } : { right: 8 }),
+                top: 6,
+                ...(pageIndex % 2 === 1 ? { left: 6 } : { right: 6 }),
                 zIndex: 10,
-                bgcolor: "rgba(0,0,0,0.55)",
-                color: "white",
-                width: 28,
-                height: 28,
-                "&:hover": { bgcolor: "rgba(0,0,0,0.8)" },
+                bgcolor: "rgba(0,0,0,0.35)",
+                color: "rgba(255,255,255,0.8)",
+                width: 24,
+                height: 24,
+                opacity: isHovered ? 1 : 0,
+                transition: "opacity 0.2s, background-color 0.2s",
+                pointerEvents: isHovered ? "auto" : "none",
+                "&:hover": { bgcolor: "rgba(0,0,0,0.6)", color: "white" },
               }}
             >
-              <CloseIcon sx={{ fontSize: 16 }} />
+              <CloseIcon sx={{ fontSize: 14 }} />
             </IconButton>
           )}
         </Box>
