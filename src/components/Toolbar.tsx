@@ -6,6 +6,7 @@ import AddCircleIcon from "@mui/icons-material/AddCircle";
 import AddPhotoAlternateIcon from "@mui/icons-material/AddPhotoAlternate";
 import PhotoLibraryIcon from "@mui/icons-material/PhotoLibrary";
 import TextFieldsIcon from "@mui/icons-material/TextFields";
+import NotesIcon from "@mui/icons-material/Notes";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import ZoomOutIcon from "@mui/icons-material/ZoomOut";
@@ -15,6 +16,7 @@ import { useBook } from "@/context/BookContext";
 interface ToolbarProps {
   onAddPhotos: () => void;
   onTogglePhotoPool: () => void;
+  onEditCaptions: (anchor: HTMLElement) => void;
   selectedSlotId: string | null;
   selectedPageId: string | null;
   selectedTextId: string | null;
@@ -26,6 +28,7 @@ interface ToolbarProps {
 export default function Toolbar({
   onAddPhotos,
   onTogglePhotoPool,
+  onEditCaptions,
   selectedSlotId,
   selectedPageId,
   selectedTextId,
@@ -173,6 +176,22 @@ export default function Toolbar({
           }}
         >
           <TextFieldsIcon />
+        </IconButton>
+      </Tooltip>
+
+      <Tooltip title="Edit Page Captions" placement="right">
+        <IconButton
+          onClick={(e) => onEditCaptions(e.currentTarget)}
+          sx={{
+            width: 44,
+            height: 44,
+            color: "#999",
+            "&:hover": { color: "#08C225", bgcolor: "white" },
+            borderRadius: 2,
+            transition: "all 0.2s",
+          }}
+        >
+          <NotesIcon />
         </IconButton>
       </Tooltip>
 

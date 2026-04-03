@@ -12,6 +12,7 @@ import PageStrip from "./PageStrip";
 import Toolbar from "./Toolbar";
 import TextEditDialog from "./TextEditDialog";
 import PhotoPool from "./PhotoPool";
+import CaptionEditor from "./CaptionEditor";
 import Footer from "./Footer";
 import type { TextBlock } from "@/lib/types";
 
@@ -43,6 +44,8 @@ export default function EditPage() {
     null
   );
   const [photoPoolOpen, setPhotoPoolOpen] = useState(false);
+  const [captionAnchor, setCaptionAnchor] = useState<HTMLElement | null>(null);
+  const [captionPageId, setCaptionPageId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -146,6 +149,14 @@ export default function EditPage() {
       <Toolbar
         onAddPhotos={handleAddPhotos}
         onTogglePhotoPool={() => setPhotoPoolOpen((v) => !v)}
+        onEditCaptions={(anchor) => {
+          // Edit captions for the left page of current spread (or selected page)
+          const pageId = selectedPageId || leftPage?.id;
+          if (pageId) {
+            setCaptionPageId(pageId);
+            setCaptionAnchor(anchor);
+          }
+        }}
         selectedSlotId={selectedSlotId}
         selectedPageId={selectedPageId}
         selectedTextId={selectedTextId}
@@ -378,6 +389,32 @@ export default function EditPage() {
         onClose={() => setPhotoPoolOpen(false)}
         selectedSlotId={selectedSlotId}
         selectedPageId={selectedPageId}
+      />
+
+      {/* Caption Editor */}
+      <CaptionEditor
+        anchorEl={captionAnchor}
+        open={Boolean(captionAnchor) && Boolean(captionPageId)}
+        onClose={() => {
+          setCaptionAnchor(null);
+          setCaptionPageId(null);
+        }}
+        topCaption={
+          captionPageId
+            ? pages.find((p) => p.id === captionPageId)?.topCaption || ""
+            : ""
+        }
+        bottomCaption={
+          captionPageId
+            ? pages.find((p) => p.id === captionPageId)?.bottomCaption || ""
+            : ""
+        }
+        onChangeTop={(val) => {
+          if (captionPageId) updatePage(captionPageId, { topCaption: val });
+        }}
+        onChangeBottom={(val) => {
+          if (captionPageId) updatePage(captionPageId, { bottomCaption: val });
+        }}
       />
 
       {/* Text Edit Dialog */}
