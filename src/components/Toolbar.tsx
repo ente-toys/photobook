@@ -42,6 +42,7 @@ export default function Toolbar({
     addPage,
     removePage,
     removeTextBlock,
+    removeSlot,
     updateSlot,
     currentSpreadIndex,
     book,
@@ -59,7 +60,7 @@ export default function Toolbar({
     if (selectedTextId && selectedPageId) {
       removeTextBlock(selectedPageId, selectedTextId);
     } else if (selectedSlotId && selectedPageId) {
-      updateSlot(selectedPageId, selectedSlotId, { photoId: null });
+      removeSlot(selectedPageId, selectedSlotId);
     }
   };
 

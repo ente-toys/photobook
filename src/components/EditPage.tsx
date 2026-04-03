@@ -1,9 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
-import { Box, Typography, IconButton } from "@mui/material";
-import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
-import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import { Box, Typography } from "@mui/material";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import { Stage, Layer } from "react-konva";
 import { useBook } from "@/context/BookContext";
@@ -50,15 +48,38 @@ export default function EditPage() {
   const [captionPageId, setCaptionPageId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const sidebarScrollRef = useRef<HTMLDivElement>(null);
 
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 
   const pages = book.pages;
-  const leftPage = pages[currentSpreadIndex];
-  const rightPage = pages[currentSpreadIndex + 1];
+  const leftPage = pages[currentSpreadIndex]; // for toolbar context
   const totalPages = pages.length;
 
   const PAGE_GAP = 2;
+
+  // Group pages into spread rows: cover alone on right, interior paired, back cover alone on left
+  const spreads = useMemo(() => {
+    const result: { left: number | null; right: number | null }[] = [];
+    if (pages.length === 0) return result;
+    if (pages.length === 1) return [{ left: null, right: 0 }];
+
+    // Cover (page 0) alone on right
+    result.push({ left: null, right: 0 });
+
+    // Interior pages (1 to N-2) paired
+    for (let i = 1; i <= pages.length - 2; i += 2) {
+      result.push({
+        left: i,
+        right: i + 1 <= pages.length - 2 ? i + 1 : null,
+      });
+    }
+
+    // Back cover (last page) alone on left
+    result.push({ left: pages.length - 1, right: null });
+
+    return result;
+  }, [pages.length]);
 
   // Observe container size for responsive layout
   useEffect(() => {
@@ -72,48 +93,53 @@ export default function EditPage() {
     return () => observer.disconnect();
   }, []);
 
-  // Calculate page dimensions to fit two pages side-by-side within the container
-  // Reserve space for padding (64px each side) and gap
+  // Calculate page dimensions based on container width (height is scrollable)
   const { pageWidth, pageHeight } = useMemo(() => {
-    const availW = containerSize.width - 128 - PAGE_GAP; // subtract horizontal padding + gap
-    const availH = containerSize.height - 160; // subtract vertical padding + nav bar
+    const availW = containerSize.width - 128 - PAGE_GAP;
 
-    if (availW <= 0 || availH <= 0) {
+    if (availW <= 0) {
       return { pageWidth: 380, pageHeight: Math.round(380 / PAGE_ASPECT) };
     }
 
-    // Two pages side by side
-    const maxPageW = availW / 2;
-    const maxPageH = availH;
-
-    // Constrain by aspect ratio
-    let pw = maxPageW;
-    let ph = pw / PAGE_ASPECT;
-
-    if (ph > maxPageH) {
-      ph = maxPageH;
-      pw = ph * PAGE_ASPECT;
-    }
-
-    // Clamp minimum and maximum
-    pw = Math.max(200, Math.min(pw, 500));
-    ph = Math.round(pw / PAGE_ASPECT);
+    let pw = Math.max(200, Math.min(availW / 2, 500));
+    const ph = Math.round(pw / PAGE_ASPECT);
 
     return { pageWidth: Math.round(pw), pageHeight: ph };
-  }, [containerSize.width, containerSize.height]);
+  }, [containerSize.width]);
 
-  const goToSpread = useCallback(
-    (idx: number) => {
-      const clamped = Math.max(0, Math.min(idx, totalPages - 1));
-      // Ensure even index
-      const even = clamped % 2 === 0 ? clamped : clamped - 1;
-      setCurrentSpreadIndex(even);
-      setSelectedSlotId(null);
-      setSelectedPageId(null);
-      setSelectedTextId(null);
-    },
-    [totalPages, setCurrentSpreadIndex]
-  );
+  // Sync sidebar scroll with main area scroll
+  const handleMainScroll = useCallback(() => {
+    const main = containerRef.current;
+    const sidebar = sidebarScrollRef.current;
+    if (!main || !sidebar) return;
+
+    const maxMainScroll = main.scrollHeight - main.clientHeight;
+    if (maxMainScroll <= 0) return;
+
+    const fraction = main.scrollTop / maxMainScroll;
+    const maxSidebarScroll = sidebar.scrollHeight - sidebar.clientHeight;
+    sidebar.scrollTop = fraction * maxSidebarScroll;
+
+    // Update currentSpreadIndex based on visible spread
+    const visibleIdx = Math.round(fraction * Math.max(0, spreads.length - 1));
+    const spread = spreads[visibleIdx];
+    if (spread) {
+      const newIndex = spread.left ?? spread.right ?? 0;
+      if (newIndex !== currentSpreadIndex) {
+        setCurrentSpreadIndex(newIndex);
+      }
+    }
+  }, [spreads, currentSpreadIndex, setCurrentSpreadIndex]);
+
+  // Scroll main area to a specific spread row (called from sidebar click)
+  const handleSidebarSpreadClick = useCallback((spreadIdx: number) => {
+    const main = containerRef.current;
+    if (!main) return;
+    const spreadEl = main.querySelector(`[data-spread-index="${spreadIdx}"]`);
+    if (spreadEl) {
+      spreadEl.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, []);
 
   const handleSlotClick = useCallback(
     (pageId: string, slotId: string) => {
@@ -226,9 +252,10 @@ export default function EditPage() {
         }}
       />
 
-      {/* Main Canvas Area */}
+      {/* Main Canvas Area - scrollable */}
       <Box
         ref={containerRef}
+        onScroll={handleMainScroll}
         sx={{
           flex: 1,
           display: "flex",
@@ -237,14 +264,11 @@ export default function EditPage() {
           overflow: "auto",
         }}
       >
-        {/* Spread Editor */}
         <Box
           sx={{
-            flex: 1,
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            justifyContent: "center",
             px: 4,
             py: 4,
             gap: 4,
@@ -254,6 +278,9 @@ export default function EditPage() {
           {swapSourceSlotId && (
             <Box
               sx={{
+                position: "sticky",
+                top: 16,
+                zIndex: 10,
                 bgcolor: "rgba(8, 194, 37, 0.1)",
                 border: "1px solid #08C225",
                 borderRadius: 999,
@@ -271,160 +298,133 @@ export default function EditPage() {
             </Box>
           )}
 
-          {/* Spread container */}
-          <Box sx={{ display: "flex", gap: `${PAGE_GAP}px`, alignItems: "start" }}>
-            {/* Left page */}
-            {leftPage && (
+          {/* All spreads */}
+          {spreads.map((spread, spreadIdx) => {
+            const lp = spread.left !== null ? pages[spread.left] : null;
+            const rp = spread.right !== null ? pages[spread.right] : null;
+
+            return (
               <Box
+                key={spreadIdx}
+                data-spread-index={spreadIdx}
                 sx={{
-                  boxShadow: "0px 12px 32px rgba(26, 28, 29, 0.06)",
-                  borderRadius: 0.5,
-                  overflow: "hidden",
+                  display: "flex",
+                  gap: `${PAGE_GAP}px`,
+                  alignItems: "start",
+                  width: pageWidth * 2 + PAGE_GAP,
+                  justifyContent: lp ? "flex-start" : "flex-end",
                 }}
               >
-                <Stage
-                  width={pageWidth}
-                  height={pageHeight}
-                  onClick={handleStageClick}
-                >
-                  <Layer>
-                    <PageCanvas
-                      page={leftPage}
-                      pageWidth={pageWidth}
-                      pageHeight={pageHeight}
-                      isInteractive
-                      selectedSlotId={
-                        selectedPageId === leftPage.id ? selectedSlotId : null
-                      }
-                      selectedTextId={
-                        selectedPageId === leftPage.id ? selectedTextId : null
-                      }
-                      swapSourceSlotId={swapSourceSlotId}
-                      onSlotClick={(slotId) =>
-                        handleSlotClick(leftPage.id, slotId)
-                      }
-                      onTextClick={(textId) =>
-                        handleTextClick(leftPage.id, textId)
-                      }
-                      onTextDblClick={(textId) =>
-                        handleTextDblClick(leftPage.id, textId)
-                      }
-                    />
-                  </Layer>
-                </Stage>
-                <Box sx={{ textAlign: "center", py: 0.5 }}>
-                  <Typography
-                    sx={{ fontSize: "0.6rem", color: "#ccc", fontWeight: 600 }}
-                  >
-                    {currentSpreadIndex + 1}
-                  </Typography>
-                </Box>
-              </Box>
-            )}
+                {/* Left page */}
+                {lp && (
+                  <Box>
+                    <Box
+                      sx={{
+                        boxShadow: "0px 12px 32px rgba(26, 28, 29, 0.06)",
+                        borderRadius: 0.5,
+                        overflow: "hidden",
+                      }}
+                    >
+                      <Stage
+                        width={pageWidth}
+                        height={pageHeight}
+                        onClick={handleStageClick}
+                      >
+                        <Layer>
+                          <PageCanvas
+                            page={lp}
+                            pageWidth={pageWidth}
+                            pageHeight={pageHeight}
+                            isInteractive
+                            selectedSlotId={
+                              selectedPageId === lp.id ? selectedSlotId : null
+                            }
+                            selectedTextId={
+                              selectedPageId === lp.id ? selectedTextId : null
+                            }
+                            swapSourceSlotId={swapSourceSlotId}
+                            onSlotClick={(slotId) =>
+                              handleSlotClick(lp.id, slotId)
+                            }
+                            onTextClick={(textId) =>
+                              handleTextClick(lp.id, textId)
+                            }
+                            onTextDblClick={(textId) =>
+                              handleTextDblClick(lp.id, textId)
+                            }
+                          />
+                        </Layer>
+                      </Stage>
+                    </Box>
+                    <Typography
+                      sx={{ fontSize: "0.6rem", color: "#aaa", fontWeight: 600, textAlign: "center", mt: 0.5 }}
+                    >
+                      {spread.left! + 1}
+                    </Typography>
+                  </Box>
+                )}
 
-            {/* Right page */}
-            {rightPage && (
-              <Box
-                sx={{
-                  boxShadow: "0px 12px 32px rgba(26, 28, 29, 0.06)",
-                  borderRadius: 0.5,
-                  overflow: "hidden",
-                }}
-              >
-                <Stage
-                  width={pageWidth}
-                  height={pageHeight}
-                  onClick={handleStageClick}
-                >
-                  <Layer>
-                    <PageCanvas
-                      page={rightPage}
-                      pageWidth={pageWidth}
-                      pageHeight={pageHeight}
-                      isInteractive
-                      selectedSlotId={
-                        selectedPageId === rightPage.id ? selectedSlotId : null
-                      }
-                      selectedTextId={
-                        selectedPageId === rightPage.id ? selectedTextId : null
-                      }
-                      swapSourceSlotId={swapSourceSlotId}
-                      onSlotClick={(slotId) =>
-                        handleSlotClick(rightPage.id, slotId)
-                      }
-                      onTextClick={(textId) =>
-                        handleTextClick(rightPage.id, textId)
-                      }
-                      onTextDblClick={(textId) =>
-                        handleTextDblClick(rightPage.id, textId)
-                      }
-                    />
-                  </Layer>
-                </Stage>
-                <Box sx={{ textAlign: "center", py: 0.5 }}>
-                  <Typography
-                    sx={{ fontSize: "0.6rem", color: "#ccc", fontWeight: 600 }}
-                  >
-                    {currentSpreadIndex + 2}
-                  </Typography>
-                </Box>
+                {/* Right page */}
+                {rp && (
+                  <Box>
+                    <Box
+                      sx={{
+                        boxShadow: "0px 12px 32px rgba(26, 28, 29, 0.06)",
+                        borderRadius: 0.5,
+                        overflow: "hidden",
+                      }}
+                    >
+                      <Stage
+                        width={pageWidth}
+                        height={pageHeight}
+                        onClick={handleStageClick}
+                      >
+                        <Layer>
+                          <PageCanvas
+                            page={rp}
+                            pageWidth={pageWidth}
+                            pageHeight={pageHeight}
+                            isInteractive
+                            selectedSlotId={
+                              selectedPageId === rp.id ? selectedSlotId : null
+                            }
+                            selectedTextId={
+                              selectedPageId === rp.id ? selectedTextId : null
+                            }
+                            swapSourceSlotId={swapSourceSlotId}
+                            onSlotClick={(slotId) =>
+                              handleSlotClick(rp.id, slotId)
+                            }
+                            onTextClick={(textId) =>
+                              handleTextClick(rp.id, textId)
+                            }
+                            onTextDblClick={(textId) =>
+                              handleTextDblClick(rp.id, textId)
+                            }
+                          />
+                        </Layer>
+                      </Stage>
+                    </Box>
+                    <Typography
+                      sx={{ fontSize: "0.6rem", color: "#aaa", fontWeight: 600, textAlign: "center", mt: 0.5 }}
+                    >
+                      {spread.right! + 1}
+                    </Typography>
+                  </Box>
+                )}
               </Box>
-            )}
-          </Box>
-        </Box>
-
-        {/* Bottom Navigation Bar */}
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 3,
-            py: 2,
-            mx: "auto",
-            mb: 2,
-            px: 3,
-            bgcolor: "rgba(226, 226, 228, 0.7)",
-            backdropFilter: "blur(24px)",
-            borderRadius: 999,
-            boxShadow: "0px 12px 32px rgba(26, 28, 29, 0.06)",
-          }}
-        >
-          <IconButton
-            size="small"
-            onClick={() => goToSpread(currentSpreadIndex - 2)}
-            disabled={currentSpreadIndex === 0}
-            sx={{ color: "#999" }}
-          >
-            <ChevronLeftIcon />
-          </IconButton>
-          <Typography
-            sx={{
-              fontSize: "0.7rem",
-              fontWeight: 900,
-              letterSpacing: "0.1em",
-              color: "#666",
-              userSelect: "none",
-            }}
-          >
-            PAGE {currentSpreadIndex + 1}-
-            {Math.min(currentSpreadIndex + 2, totalPages)} OF {totalPages}
-          </Typography>
-          <IconButton
-            size="small"
-            onClick={() => goToSpread(currentSpreadIndex + 2)}
-            disabled={currentSpreadIndex + 2 >= totalPages}
-            sx={{ color: "#999" }}
-          >
-            <ChevronRightIcon />
-          </IconButton>
+            );
+          })}
         </Box>
 
         <Footer />
       </Box>
 
       {/* Right Sidebar - Page Strip */}
-      <PageStrip />
+      <PageStrip
+        scrollContainerRef={sidebarScrollRef}
+        onSpreadClick={handleSidebarSpreadClick}
+      />
 
       {/* Hidden file input */}
       <input

@@ -65,6 +65,7 @@ interface BookContextValue {
     slotId: string,
     updates: Partial<PhotoSlot>
   ) => void;
+  removeSlot: (pageId: string, slotId: string) => void;
   swapPhotos: (
     fromPageId: string,
     fromSlotId: string,
@@ -318,6 +319,20 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  const removeSlot = useCallback(
+    (pageId: string, slotId: string) => {
+      setBook((prev) => ({
+        ...prev,
+        pages: prev.pages.map((p) =>
+          p.id === pageId
+            ? { ...p, slots: p.slots.filter((s) => s.id !== slotId) }
+            : p
+        ),
+      }));
+    },
+    []
+  );
+
   const swapPhotos = useCallback(
     (
       fromPageId: string,
@@ -440,6 +455,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
         reorderPages,
         updatePage,
         updateSlot,
+        removeSlot,
         swapPhotos,
         addTextBlock,
         updateTextBlock,
