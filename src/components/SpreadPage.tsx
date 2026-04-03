@@ -291,10 +291,9 @@ export default function SpreadPage({
                 border: "none",
                 outline: "none",
                 background: "white",
-                fontFamily: "'Noto Serif', serif",
-                fontStyle: "italic",
+                fontFamily: "'Manrope', sans-serif",
                 fontSize: captionFontSize,
-                color: "#666",
+                color: "#1a1c1d",
                 textAlign: "center" as const,
                 padding: 0,
                 borderRadius: 2,
@@ -324,8 +323,7 @@ export default function SpreadPage({
               {!page.topCaption && topCaptionHovered && (
                 <span
                   style={{
-                    fontFamily: "'Noto Serif', serif",
-                    fontStyle: "italic",
+                    fontFamily: "'Manrope', sans-serif",
                     fontSize: captionFontSize,
                     color: "#aaa",
                     pointerEvents: "none",
@@ -358,10 +356,9 @@ export default function SpreadPage({
                 border: "none",
                 outline: "none",
                 background: "white",
-                fontFamily: "'Noto Serif', serif",
-                fontStyle: "italic",
+                fontFamily: "'Manrope', sans-serif",
                 fontSize: captionFontSize,
-                color: "#666",
+                color: "#1a1c1d",
                 textAlign: "center" as const,
                 padding: 0,
                 borderRadius: 2,
@@ -391,8 +388,7 @@ export default function SpreadPage({
               {!page.bottomCaption && bottomCaptionHovered && (
                 <span
                   style={{
-                    fontFamily: "'Noto Serif', serif",
-                    fontStyle: "italic",
+                    fontFamily: "'Manrope', sans-serif",
                     fontSize: captionFontSize,
                     color: "#aaa",
                     pointerEvents: "none",

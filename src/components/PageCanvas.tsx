@@ -276,9 +276,8 @@ function CaptionText({
       width={pageWidth}
       text={text}
       fontSize={fontSize}
-      fontFamily="'Noto Serif', serif"
-      fontStyle="italic"
-      fill="#666"
+      fontFamily="'Manrope', sans-serif"
+      fill="#1a1c1d"
       align="center"
     />
   );
