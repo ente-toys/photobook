@@ -30,7 +30,7 @@ import {
   getAppView,
   clearAll,
 } from "@/lib/db";
-import { generateAutoLayout, chooseBestLayout } from "@/lib/layouts";
+import { generateAutoLayout, chooseBestLayout, applyVariant } from "@/lib/layouts";
 import { extractExifDate, createThumbnail } from "@/lib/images";
 
 interface BookContextValue {
@@ -77,6 +77,7 @@ interface BookContextValue {
     fromSlotId: string,
     toPageId: string
   ) => void;
+  setPageLayout: (pageId: string, variantKey: string) => void;
   addTextBlock: (pageId: string) => TextBlock;
   updateTextBlock: (
     pageId: string,
@@ -488,6 +489,29 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
     [photos]
   );
 
+  const setPageLayout = useCallback(
+    (pageId: string, variantKey: string) => {
+      setBook((prev) => {
+        const page = prev.pages.find((p) => p.id === pageId);
+        if (!page) return prev;
+        const photoIds = page.slots
+          .map((s) => s.photoId)
+          .filter((id): id is string => id !== null);
+        const newSlots = applyVariant(variantKey, photoIds);
+        if (newSlots.length === 0) return prev;
+        return {
+          ...prev,
+          pages: prev.pages.map((p) =>
+            p.id === pageId
+              ? { ...p, slots: newSlots, layoutVariant: variantKey }
+              : p
+          ),
+        };
+      });
+    },
+    []
+  );
+
   const addTextBlock = useCallback((pageId: string): TextBlock => {
     const block: TextBlock = {
       id: uuid(),
@@ -581,6 +605,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
         removeSlot,
         swapPhotos,
         movePhotoToPage,
+        setPageLayout,
         addTextBlock,
         updateTextBlock,
         removeTextBlock,

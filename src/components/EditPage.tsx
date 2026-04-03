@@ -8,6 +8,7 @@ import { useBook } from "@/context/BookContext";
 import PageCanvas from "./PageCanvas";
 import PageStrip from "./PageStrip";
 import Toolbar from "./Toolbar";
+import LayoutPicker from "./LayoutPicker";
 import TextEditDialog from "./TextEditDialog";
 import PhotoPool from "./PhotoPool";
 import CaptionEditor from "./CaptionEditor";
@@ -32,6 +33,7 @@ export default function EditPage() {
     addTextBlock,
     removePage,
     reorderPages,
+    setPageLayout,
     thumbnailUrls,
   } = bookCtx;
 
@@ -67,6 +69,7 @@ export default function EditPage() {
   const totalPages = pages.length;
 
   const PAGE_GAP = 2;
+  const PICKER_WIDTH = 60; // space reserved for layout picker on each side
 
   // Group pages into spread rows: cover alone on right, interior paired, back cover alone on left
   const spreads = useMemo(() => {
@@ -110,7 +113,7 @@ export default function EditPage() {
 
   // Calculate page dimensions based on container width (height is scrollable)
   const { pageWidth, pageHeight } = useMemo(() => {
-    const availW = containerSize.width - 128 - PAGE_GAP;
+    const availW = containerSize.width - 128 - PAGE_GAP - PICKER_WIDTH * 2;
 
     if (availW <= 0) {
       return { pageWidth: 380, pageHeight: Math.round(380 / PAGE_ASPECT) };
@@ -418,17 +421,16 @@ export default function EditPage() {
     [addPhotos]
   );
 
-  const renderPageBlock = (page: typeof pages[number], pageIndex: number) => {
+  const renderPageBlock = (page: typeof pages[number], pageIndex: number, pickerSide: "left" | "right") => {
     const isInterior = pageIndex > 0 && pageIndex < totalPages - 1;
     const isHovered = hoveredPageId === page.id;
     const isDragTarget = pageDragTarget === pageIndex && pageDragSource !== null;
     const isDragSource = pageDragSource === pageIndex;
+    const photoCount = page.slots.filter((s) => s.photoId !== null).length;
+    const hasSelectedSlotOnPage = selectedPageId === page.id && selectedSlotId !== null;
 
-    return (
-      <Box
-        onMouseEnter={() => setHoveredPageId(page.id)}
-        onMouseLeave={() => setHoveredPageId(null)}
-      >
+    const pageBlock = (
+      <Box>
         <Box
           sx={{
             position: "relative",
@@ -492,6 +494,7 @@ export default function EditPage() {
               inset: 0,
               zIndex: 1,
               cursor: isInterior ? "grab" : "default",
+              pointerEvents: hasSelectedSlotOnPage && pageDragSource === null ? "none" : "auto",
             }}
           />
           {/* Drag-and-drop overlay divs for photo slots */}
@@ -501,11 +504,14 @@ export default function EditPage() {
               <div
                 key={slot.id}
                 draggable={!!slot.photoId && !isSelected}
-                onDragStart={(e) =>
-                  slot.photoId
-                    ? handleDragStart(e, page.id, slot.id, slot.photoId)
-                    : e.preventDefault()
-                }
+                onDragStart={(e) => {
+                  if (slot.photoId) {
+                    e.stopPropagation();
+                    handleDragStart(e, page.id, slot.id, slot.photoId);
+                  } else {
+                    e.preventDefault();
+                  }
+                }}
                 onDragOver={(e) => handleSlotDragOver(e, page.id, slot.id)}
                 onDrop={(e) => handleDrop(e, page.id, slot.id)}
                 onDragEnd={handleDragEnd}
@@ -559,6 +565,51 @@ export default function EditPage() {
         >
           {pageIndex === 0 ? "Cover" : pageIndex === totalPages - 1 ? "Back Cover" : pageIndex}
         </Typography>
+      </Box>
+    );
+
+    const slotThumbnails = page.slots
+      .filter((s) => s.photoId !== null)
+      .map((s) => thumbnailUrls.get(s.photoId!) ?? "");
+
+    const pickerContainer = (
+      <Box
+        sx={{
+          width: PICKER_WIDTH,
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: pickerSide === "left" ? "flex-end" : "flex-start",
+          opacity: isHovered && photoCount > 0 ? 1 : 0,
+          transition: "opacity 0.2s",
+          pointerEvents: isHovered && photoCount > 0 ? "auto" : "none",
+        }}
+      >
+        {photoCount > 0 && (
+          <LayoutPicker
+            photoCount={photoCount}
+            currentVariant={page.layoutVariant}
+            thumbnailUrls={slotThumbnails}
+            onSelect={(key) => setPageLayout(page.id, key)}
+            side={pickerSide}
+          />
+        )}
+      </Box>
+    );
+
+    return (
+      <Box
+        onMouseEnter={() => setHoveredPageId(page.id)}
+        onMouseLeave={() => setHoveredPageId(null)}
+        sx={{
+          display: "flex",
+          flexDirection: "row",
+          alignItems: "start",
+        }}
+      >
+        {pickerSide === "left" && pickerContainer}
+        {pageBlock}
+        {pickerSide === "right" && pickerContainer}
       </Box>
     );
   };
@@ -620,12 +671,12 @@ export default function EditPage() {
                   display: "flex",
                   gap: `${PAGE_GAP}px`,
                   alignItems: "start",
-                  width: pageWidth * 2 + PAGE_GAP,
+                  width: PICKER_WIDTH + pageWidth * 2 + PAGE_GAP + PICKER_WIDTH,
                   justifyContent: lp ? "flex-start" : "flex-end",
                 }}
               >
-                {lp && renderPageBlock(lp, spread.left!)}
-                {rp && renderPageBlock(rp, spread.right!)}
+                {lp && renderPageBlock(lp, spread.left!, "left")}
+                {rp && renderPageBlock(rp, spread.right!, "right")}
               </Box>
             );
           })}

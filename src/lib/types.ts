@@ -40,6 +40,7 @@ export interface BookPage {
   textBlocks: TextBlock[];
   topCaption: string;
   bottomCaption: string;
+  layoutVariant?: string;
 }
 
 export interface BookState {
