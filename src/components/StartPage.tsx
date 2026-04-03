@@ -284,7 +284,7 @@ export default function StartPage() {
             >
               <Box
                 component="img"
-                src={`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/hero-photo.jpg`}
+                src="/hero-photo.jpg"
                 alt="A wooden boat on a turquoise alpine lake"
                 draggable={false}
                 onDragStart={(e: React.DragEvent) => e.preventDefault()}
