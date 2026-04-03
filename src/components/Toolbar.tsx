@@ -4,6 +4,7 @@ import React from "react";
 import { Box, IconButton, Tooltip, Divider } from "@mui/material";
 import AddCircleIcon from "@mui/icons-material/AddCircle";
 import AddPhotoAlternateIcon from "@mui/icons-material/AddPhotoAlternate";
+import PhotoLibraryIcon from "@mui/icons-material/PhotoLibrary";
 import TextFieldsIcon from "@mui/icons-material/TextFields";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import ZoomInIcon from "@mui/icons-material/ZoomIn";
@@ -13,6 +14,7 @@ import { useBook } from "@/context/BookContext";
 
 interface ToolbarProps {
   onAddPhotos: () => void;
+  onTogglePhotoPool: () => void;
   selectedSlotId: string | null;
   selectedPageId: string | null;
   selectedTextId: string | null;
@@ -23,6 +25,7 @@ interface ToolbarProps {
 
 export default function Toolbar({
   onAddPhotos,
+  onTogglePhotoPool,
   selectedSlotId,
   selectedPageId,
   selectedTextId,
@@ -125,7 +128,7 @@ export default function Toolbar({
 
       <Divider sx={{ width: 32, my: 0.5 }} />
 
-      <Tooltip title="Add Photos" placement="right">
+      <Tooltip title="Import Photos from Device" placement="right">
         <IconButton
           onClick={onAddPhotos}
           sx={{
@@ -138,6 +141,22 @@ export default function Toolbar({
           }}
         >
           <AddPhotoAlternateIcon />
+        </IconButton>
+      </Tooltip>
+
+      <Tooltip title="Browse Photo Library" placement="right">
+        <IconButton
+          onClick={onTogglePhotoPool}
+          sx={{
+            width: 44,
+            height: 44,
+            color: "#999",
+            "&:hover": { color: "#08C225", bgcolor: "white" },
+            borderRadius: 2,
+            transition: "all 0.2s",
+          }}
+        >
+          <PhotoLibraryIcon />
         </IconButton>
       </Tooltip>
 

@@ -11,6 +11,7 @@ import PageCanvas from "./PageCanvas";
 import PageStrip from "./PageStrip";
 import Toolbar from "./Toolbar";
 import TextEditDialog from "./TextEditDialog";
+import PhotoPool from "./PhotoPool";
 import Footer from "./Footer";
 import type { TextBlock } from "@/lib/types";
 
@@ -41,6 +42,7 @@ export default function EditPage() {
   const [editingTextPageId, setEditingTextPageId] = useState<string | null>(
     null
   );
+  const [photoPoolOpen, setPhotoPoolOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -143,6 +145,7 @@ export default function EditPage() {
       {/* Left Toolbar */}
       <Toolbar
         onAddPhotos={handleAddPhotos}
+        onTogglePhotoPool={() => setPhotoPoolOpen((v) => !v)}
         selectedSlotId={selectedSlotId}
         selectedPageId={selectedPageId}
         selectedTextId={selectedTextId}
@@ -367,6 +370,14 @@ export default function EditPage() {
         multiple
         style={{ display: "none" }}
         onChange={handleFileChange}
+      />
+
+      {/* Photo Pool Drawer */}
+      <PhotoPool
+        open={photoPoolOpen}
+        onClose={() => setPhotoPoolOpen(false)}
+        selectedSlotId={selectedSlotId}
+        selectedPageId={selectedPageId}
       />
 
       {/* Text Edit Dialog */}
