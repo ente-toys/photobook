@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef, useMemo } from "react";
 import {
   Box,
   Button,
@@ -19,7 +19,7 @@ import DownloadIcon from "@mui/icons-material/Download";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import FolderZipIcon from "@mui/icons-material/FolderZip";
 import { useBook } from "@/context/BookContext";
-import BookViewer from "./BookViewer";
+import BookViewer, { type BookViewerHandle } from "./BookViewer";
 import Footer from "./Footer";
 import {
   exportPdfA5,
@@ -30,7 +30,9 @@ import {
 
 export default function ResultsPage() {
   const { book, setAppView, photoUrls } = useBook();
-  const [currentSpread, setCurrentSpread] = useState(0);
+  const viewerRef = useRef<BookViewerHandle>(null);
+  // pageIndex is the 0-based page-flip index of the current left-most visible page
+  const [pageIndex, setPageIndex] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [downloadAnchor, setDownloadAnchor] = useState<null | HTMLElement>(
@@ -39,14 +41,32 @@ export default function ResultsPage() {
   const pages = book.pages;
   const totalPages = pages.length;
 
-  const goToSpread = useCallback(
-    (idx: number) => {
-      const clamped = Math.max(0, Math.min(idx, totalPages - 1));
-      const even = clamped % 2 === 0 ? clamped : clamped - 1;
-      setCurrentSpread(even);
-    },
-    [totalPages]
-  );
+  // With showCover: true, page-flip treats page 0 as front cover (single),
+  // last page as back cover (single), and everything in between as spreads.
+  // The flip event gives us the 0-based index of the page being shown.
+  //
+  // Page display logic:
+  //   index 0          → "1"          (front cover, shown alone)
+  //   index 1          → "2-3"        (first interior spread)
+  //   index 3          → "4-5"
+  //   index N-1        → "N"          (back cover, shown alone)
+  //   For interior: left page = index, right = index+1 → display (index+1)-(index+2)
+  const pageLabel = useMemo(() => {
+    if (totalPages === 0) return "";
+    // Front cover
+    if (pageIndex === 0) return "1";
+    // Back cover (last page, shown alone)
+    if (pageIndex >= totalPages - 1) return String(totalPages);
+    // Interior spread: the left page is pageIndex, right is pageIndex+1
+    return `${pageIndex + 1}-${pageIndex + 2}`;
+  }, [pageIndex, totalPages]);
+
+  const isAtStart = pageIndex === 0;
+  const isAtEnd = pageIndex >= totalPages - 1;
+
+  const handlePageChange = useCallback((idx: number) => {
+    setPageIndex(idx);
+  }, []);
 
   const handleExport = useCallback(
     async (type: "pdf-a5" | "pdf-a4" | "png-zip") => {
@@ -126,8 +146,8 @@ export default function ResultsPage() {
         >
           {/* Left arrow */}
           <IconButton
-            onClick={() => goToSpread(currentSpread - 2)}
-            disabled={currentSpread === 0}
+            onClick={() => viewerRef.current?.flipPrev()}
+            disabled={isAtStart}
             sx={{
               position: "absolute",
               left: 24,
@@ -146,15 +166,15 @@ export default function ResultsPage() {
 
           {/* Book viewer */}
           <BookViewer
+            ref={viewerRef}
             pages={pages}
-            currentSpread={currentSpread}
-            onSpreadChange={setCurrentSpread}
+            onPageChange={handlePageChange}
           />
 
           {/* Right arrow */}
           <IconButton
-            onClick={() => goToSpread(currentSpread + 2)}
-            disabled={currentSpread + 2 >= totalPages}
+            onClick={() => viewerRef.current?.flipNext()}
+            disabled={isAtEnd}
             sx={{
               position: "absolute",
               right: 24,
@@ -210,7 +230,7 @@ export default function ResultsPage() {
             <Typography
               sx={{ color: "#08C225", fontWeight: 700, fontSize: "0.85rem" }}
             >
-              {currentSpread + 1}-{Math.min(currentSpread + 2, totalPages)}
+              {pageLabel}
             </Typography>
             <Typography sx={{ color: "rgba(255,255,255,0.2)" }}>/</Typography>
             <Typography
@@ -265,9 +285,7 @@ export default function ResultsPage() {
                 },
               }}
             >
-              {exporting
-                ? `Exporting ${exportProgress}%`
-                : "Download"}
+              {exporting ? `Exporting ${exportProgress}%` : "Download"}
             </Button>
 
             <Menu
