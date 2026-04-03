@@ -78,6 +78,7 @@ export default function StartPage() {
       <Box
         sx={{
           minHeight: "100vh",
+          bgcolor: "#1a1c1d",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
@@ -92,6 +93,7 @@ export default function StartPage() {
             fontFamily: "'Manrope', sans-serif",
             fontWeight: 700,
             fontSize: "1.25rem",
+            color: "#E2E2E4",
           }}
         >
           Processing your photos...
@@ -103,7 +105,7 @@ export default function StartPage() {
             sx={{
               height: 6,
               borderRadius: 3,
-              bgcolor: "#E8E8EA",
+              bgcolor: "#2a2c2d",
               "& .MuiLinearProgress-bar": {
                 background:
                   "linear-gradient(135deg, #006E0F 0%, #08C225 100%)",
@@ -112,7 +114,7 @@ export default function StartPage() {
             }}
           />
         </Box>
-        <Typography sx={{ color: "#999", fontSize: "0.9rem" }}>
+        <Typography sx={{ color: "#888", fontSize: "0.9rem" }}>
           {processingProgress}% complete
         </Typography>
       </Box>
@@ -123,6 +125,7 @@ export default function StartPage() {
     <Box
       sx={{
         minHeight: "100vh",
+        bgcolor: "#1a1c1d",
         display: "flex",
         flexDirection: "column",
         pt: 8,
@@ -153,7 +156,7 @@ export default function StartPage() {
             inset: 0,
             zIndex: 0,
             pointerEvents: "none",
-            opacity: 0.2,
+            opacity: 0.15,
             overflow: "hidden",
           }}
         >
@@ -230,6 +233,7 @@ export default function StartPage() {
               letterSpacing: "-0.02em",
               mb: 2,
               lineHeight: 1.1,
+              color: "#fff",
             }}
           >
             Your memories deserve a book
@@ -271,7 +275,7 @@ export default function StartPage() {
                 bgcolor: "white",
                 p: 4,
                 borderRadius: 2,
-                boxShadow: "0px 12px 32px rgba(26, 28, 29, 0.06)",
+                boxShadow: "0px 12px 32px rgba(0, 0, 0, 0.3)",
                 transform: "rotate(-3deg)",
                 position: "relative",
                 zIndex: 20,
@@ -302,7 +306,7 @@ export default function StartPage() {
                 }}
               >
                 <Typography
-                  sx={{ fontWeight: 700, fontSize: "1rem", color: "#333" }}
+                  sx={{ fontWeight: 700, fontSize: "1rem", color: "#1a1c1d" }}
                 >
                   Weekend in the Mountains
                 </Typography>
@@ -323,7 +327,7 @@ export default function StartPage() {
               sx={{
                 position: "absolute",
                 inset: 0,
-                bgcolor: "#E8E8EA",
+                bgcolor: "rgba(255,255,255,0.06)",
                 borderRadius: 2,
                 transform: "rotate(3deg) translate(16px, 16px)",
                 zIndex: -1,
@@ -346,7 +350,7 @@ export default function StartPage() {
               px: 6,
               py: 2,
               mb: 3,
-              boxShadow: "0px 12px 32px rgba(26, 28, 29, 0.06)",
+              boxShadow: "0px 12px 32px rgba(0, 0, 0, 0.3)",
               "&:hover": {
                 transform: "scale(1.02)",
                 background:
@@ -377,7 +381,7 @@ export default function StartPage() {
             sx={{
               display: "flex",
               gap: 4,
-              color: "#999",
+              color: "#777",
               fontSize: "0.85rem",
             }}
           >
@@ -410,17 +414,17 @@ export default function StartPage() {
       >
         {[
           {
-            icon: <AutoStoriesIcon sx={{ fontSize: 28, color: "#006E0F" }} />,
+            icon: <AutoStoriesIcon sx={{ fontSize: 28, color: "#08C225" }} />,
             title: "Automatic Layouts",
             desc: "Drop in your photos and get beautifully arranged pages instantly — landscape, portrait, or mixed, it just works.",
           },
           {
-            icon: <HistoryEduIcon sx={{ fontSize: 28, color: "#006E0F" }} />,
+            icon: <HistoryEduIcon sx={{ fontSize: 28, color: "#08C225" }} />,
             title: "Add Your Story",
             desc: "Add captions, quotes, and titles to tell the story behind your photos in elegant typography.",
           },
           {
-            icon: <ShieldIcon sx={{ fontSize: 28, color: "#006E0F" }} />,
+            icon: <ShieldIcon sx={{ fontSize: 28, color: "#08C225" }} />,
             title: "Completely Private",
             desc: "Everything happens in your browser. No uploads, no accounts — just your memories turned into a PDF you can print anywhere.",
           },
@@ -439,7 +443,7 @@ export default function StartPage() {
             >
               {feat.icon}
             </Box>
-            <Typography sx={{ fontWeight: 700, fontSize: "1.15rem" }}>
+            <Typography sx={{ fontWeight: 700, fontSize: "1.15rem", color: "#E2E2E4" }}>
               {feat.title}
             </Typography>
             <Typography

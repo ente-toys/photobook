@@ -11,9 +11,9 @@ export default function Footer({ showPrivacyPolicy = false }: { showPrivacyPolic
     <Box
       component="footer"
       sx={{
-        bgcolor: "#F5F5F7",
+        bgcolor: "#141617",
         py: 4,
-        borderTop: "1px solid rgba(0,0,0,0.04)",
+        borderTop: "1px solid rgba(255,255,255,0.06)",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -29,7 +29,7 @@ export default function Footer({ showPrivacyPolicy = false }: { showPrivacyPolic
             fontFamily: "'Noto Serif', serif",
             fontStyle: "italic",
             fontSize: "0.85rem",
-            color: "#999",
+            color: "#777",
             border: "none",
             background: "none",
             cursor: "pointer",
@@ -43,7 +43,7 @@ export default function Footer({ showPrivacyPolicy = false }: { showPrivacyPolic
           fontFamily: "'Noto Serif', serif",
           fontStyle: "italic",
           fontSize: "0.75rem",
-          color: "#aaa",
+          color: "#666",
         }}
       >
         &copy; 2026 Ente Photobook. Handcrafted for your memories.

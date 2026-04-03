@@ -4,7 +4,7 @@ import { createTheme } from "@mui/material/styles";
 
 const theme = createTheme({
   palette: {
-    mode: "light",
+    mode: "dark",
     primary: {
       main: "#08C225",
       dark: "#006E0F",
@@ -14,12 +14,12 @@ const theme = createTheme({
       main: "#1E6D1D",
     },
     background: {
-      default: "#F5F5F7",
-      paper: "#ffffff",
+      default: "#1a1c1d",
+      paper: "#242627",
     },
     text: {
-      primary: "#1a1c1d",
-      secondary: "#6d7b67",
+      primary: "#E2E2E4",
+      secondary: "#888",
     },
     error: {
       main: "#ba1a1a",
@@ -67,7 +67,7 @@ const theme = createTheme({
         },
         containedPrimary: {
           background: "linear-gradient(135deg, #006E0F 0%, #08C225 100%)",
-          boxShadow: "0px 12px 32px rgba(26, 28, 29, 0.06)",
+          boxShadow: "0px 12px 32px rgba(0, 0, 0, 0.3)",
           "&:hover": {
             background: "linear-gradient(135deg, #005309 0%, #06A81F 100%)",
           },
