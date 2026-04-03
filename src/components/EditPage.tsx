@@ -465,7 +465,7 @@ export default function EditPage() {
                               cursor: slot.photoId
                                 ? isSelected ? "default" : "grab"
                                 : "default",
-                              pointerEvents: isSelected ? "none" : "auto",
+                              pointerEvents: isSelected && !dragSourceInfo ? "none" : "auto",
                               zIndex: 2,
                             }}
                           />
@@ -551,7 +551,7 @@ export default function EditPage() {
                               cursor: slot.photoId
                                 ? isSelected ? "default" : "grab"
                                 : "default",
-                              pointerEvents: isSelected ? "none" : "auto",
+                              pointerEvents: isSelected && !dragSourceInfo ? "none" : "auto",
                               zIndex: 2,
                             }}
                           />
