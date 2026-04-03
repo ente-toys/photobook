@@ -26,11 +26,7 @@ export default function NavBar() {
     >
       <Box
         sx={{ display: "flex", alignItems: "center", gap: 1, cursor: "pointer" }}
-        onClick={() => {
-          if (book.pages.length > 0) {
-            setAppView("edit");
-          }
-        }}
+        onClick={() => setAppView("start")}
       >
         <Typography
           sx={{
