@@ -110,6 +110,7 @@ export default function StartPage() {
                 background:
                   "linear-gradient(135deg, #006E0F 0%, #08C225 100%)",
                 borderRadius: 3,
+                transition: "none",
               },
             }}
           />
