@@ -217,16 +217,20 @@ export default function ResultsPage() {
             >
               {pageLabel}
             </Typography>
-            <Typography sx={{ color: "rgba(255,255,255,0.2)" }}>/</Typography>
-            <Typography
-              sx={{
-                color: "rgba(255,255,255,0.6)",
-                fontWeight: 500,
-                fontSize: "0.85rem",
-              }}
-            >
-              {totalPages}
-            </Typography>
+            {pageIndex > 0 && pageIndex < totalPages - 1 && (
+              <>
+                <Typography sx={{ color: "rgba(255,255,255,0.2)" }}>/</Typography>
+                <Typography
+                  sx={{
+                    color: "rgba(255,255,255,0.6)",
+                    fontWeight: 500,
+                    fontSize: "0.85rem",
+                  }}
+                >
+                  {totalPages - 2}
+                </Typography>
+              </>
+            )}
           </Box>
 
           {/* Action buttons */}
