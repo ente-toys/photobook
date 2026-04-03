@@ -523,7 +523,7 @@ export default function EditPage() {
                       })}
                     </Box>
                     <Typography
-                      sx={{ fontSize: "0.75rem", color: "#aaa", fontWeight: 600, textAlign: "center", mt: 0.5 }}
+                      sx={{ fontSize: "0.85rem", color: "#aaa", fontWeight: 600, textAlign: "center", mt: 0.5 }}
                     >
                       {spread.left! === 0 ? "Cover" : spread.left! === totalPages - 1 ? "Back Cover" : spread.left!}
                     </Typography>
@@ -619,7 +619,7 @@ export default function EditPage() {
                       })}
                     </Box>
                     <Typography
-                      sx={{ fontSize: "0.75rem", color: "#aaa", fontWeight: 600, textAlign: "center", mt: 0.5 }}
+                      sx={{ fontSize: "0.85rem", color: "#aaa", fontWeight: 600, textAlign: "center", mt: 0.5 }}
                     >
                       {spread.right! === 0 ? "Cover" : spread.right! === totalPages - 1 ? "Back Cover" : spread.right!}
                     </Typography>

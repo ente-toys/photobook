@@ -80,21 +80,11 @@ export default function PageStrip({
     >
       <Typography
         sx={{
-          fontSize: "0.6rem",
+          fontSize: "0.75rem",
+          fontWeight: 700,
           textTransform: "uppercase",
-          letterSpacing: "0.05em",
-          color: "#08C225",
-          mb: 0.5,
-          fontWeight: 500,
-        }}
-      >
-        Preview
-      </Typography>
-      <Typography
-        sx={{
-          fontSize: "0.85rem",
-          fontWeight: 900,
-          color: "#ddd",
+          letterSpacing: "0.08em",
+          color: "rgba(255,255,255,0.5)",
           mb: 2,
         }}
       >
@@ -194,18 +184,18 @@ export default function PageStrip({
               <Box
                 sx={{
                   display: "flex",
-                  justifyContent: leftPage && rightPage ? "space-between" : leftPage ? "flex-start" : "flex-end",
                   width: THUMB_PAGE_W * 2 + 2,
-                  px: 0.5,
                   mt: 0.5,
                 }}
               >
                 {leftPage && (
                   <Typography
                     sx={{
-                      fontSize: "0.5rem",
-                      fontWeight: 700,
-                      color: "#666",
+                      width: THUMB_PAGE_W,
+                      fontSize: "0.75rem",
+                      fontWeight: 600,
+                      color: "rgba(255,255,255,0.45)",
+                      textAlign: "center",
                     }}
                   >
                     {spread.left! === 0 ? "Cover" : spread.left! === pages.length - 1 ? "Back Cover" : spread.left!}
@@ -214,9 +204,12 @@ export default function PageStrip({
                 {rightPage && (
                   <Typography
                     sx={{
-                      fontSize: "0.5rem",
-                      fontWeight: 700,
-                      color: "#666",
+                      width: THUMB_PAGE_W,
+                      fontSize: "0.75rem",
+                      fontWeight: 600,
+                      color: "rgba(255,255,255,0.45)",
+                      textAlign: "center",
+                      ml: leftPage ? "2px" : "auto",
                     }}
                   >
                     {spread.right! === 0 ? "Cover" : spread.right! === pages.length - 1 ? "Back Cover" : spread.right!}
