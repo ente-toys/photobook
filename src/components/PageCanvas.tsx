@@ -7,6 +7,8 @@ import type { BookPage, PhotoSlot, TextBlock } from "@/lib/types";
 import { A5_ASPECT } from "@/lib/types";
 import { useBook } from "@/context/BookContext";
 
+export type CaptionPosition = "top" | "bottom";
+
 interface PageCanvasProps {
   page: BookPage;
   pageWidth: number;
@@ -17,6 +19,7 @@ interface PageCanvasProps {
   selectedTextId?: string | null;
   onTextClick?: (textId: string) => void;
   onTextDblClick?: (textId: string) => void;
+  editingCaption?: CaptionPosition | null;
   dragOverSlotId?: string | null;
   dragSourceSlotId?: string | null;
   useFullRes?: boolean;
@@ -255,12 +258,16 @@ function CaptionText({
   y,
   pageWidth,
   fontSize,
+  isEditing,
 }: {
   text: string;
   y: number;
   pageWidth: number;
   fontSize: number;
+  isEditing?: boolean;
 }) {
+  // Hide rendered text while editing (HTML overlay replaces it)
+  if (isEditing) return null;
   if (!text) return null;
   return (
     <Text
@@ -290,6 +297,7 @@ export default function PageCanvas({
   onSlotClick,
   onTextClick,
   onTextDblClick,
+  editingCaption,
   onDropPhoto,
 }: PageCanvasProps) {
   const { thumbnailUrls, photoUrls } = useBook();
@@ -325,12 +333,14 @@ export default function PageCanvas({
         y={pageHeight * 0.02}
         pageWidth={pageWidth}
         fontSize={captionFontSize}
+        isEditing={editingCaption === "top"}
       />
       <CaptionText
         text={page.bottomCaption}
         y={pageHeight * 0.96}
         pageWidth={pageWidth}
         fontSize={captionFontSize}
+        isEditing={editingCaption === "bottom"}
       />
 
       {/* Text blocks */}

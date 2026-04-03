@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Box, IconButton, Typography } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { Stage, Layer } from "react-konva";
@@ -8,6 +8,7 @@ import { useBook } from "@/context/BookContext";
 import PageCanvas from "./PageCanvas";
 import LayoutPicker from "./LayoutPicker";
 import type { BookPage } from "@/lib/types";
+import type { CaptionPosition } from "./PageCanvas";
 import type { DragInfo } from "@/hooks/usePhotoDrag";
 
 export const PICKER_WIDTH = 60;
@@ -94,7 +95,47 @@ export default function SpreadPage({
   onPageDropOnPage,
   onPageDragEndCleanup,
 }: SpreadPageProps) {
-  const { thumbnailUrls, removePage, setPageLayout } = useBook();
+  const { thumbnailUrls, removePage, setPageLayout, updatePage } = useBook();
+
+  // Caption editing
+  const [editingCaption, setEditingCaption] = useState<CaptionPosition | null>(null);
+  const [captionValue, setCaptionValue] = useState("");
+  const [topCaptionHovered, setTopCaptionHovered] = useState(false);
+  const [bottomCaptionHovered, setBottomCaptionHovered] = useState(false);
+  const captionInputRef = useRef<HTMLInputElement>(null);
+
+  const hasTopSpace =
+    page.slots.length === 0 || page.slots.every((s) => s.y > 0);
+  const hasBottomSpace =
+    page.slots.length === 0 || page.slots.every((s) => s.y + s.height < 100);
+
+  const captionFontSize = Math.round(pageHeight * 0.025);
+  const captionZoneHeight = pageHeight * 0.055;
+
+  const handleCaptionClick = (position: CaptionPosition) => {
+    const val = position === "top" ? page.topCaption : page.bottomCaption;
+    setCaptionValue(val);
+    setEditingCaption(position);
+  };
+
+  const handleCaptionSave = () => {
+    if (editingCaption) {
+      const key = editingCaption === "top" ? "topCaption" : "bottomCaption";
+      updatePage(page.id, { [key]: captionValue });
+      setEditingCaption(null);
+    }
+  };
+
+  const handleCaptionCancel = () => {
+    setEditingCaption(null);
+  };
+
+  useEffect(() => {
+    if (editingCaption && captionInputRef.current) {
+      captionInputRef.current.focus();
+      captionInputRef.current.select();
+    }
+  }, [editingCaption]);
 
   const isInterior = pageIndex > 0 && pageIndex < totalPages - 1;
   const isDragTarget = pageDragTarget === pageIndex && pageDragSource !== null;
@@ -134,6 +175,7 @@ export default function SpreadPage({
               selectedTextId={
                 selectedPageId === page.id ? selectedTextId : null
               }
+              editingCaption={editingCaption}
               dragOverSlotId={
                 dragOverInfo?.pageId === page.id ? dragOverInfo.slotId : null
               }
@@ -227,6 +269,141 @@ export default function SpreadPage({
             />
           );
         })}
+        {/* Caption zones */}
+        {hasTopSpace && (
+          editingCaption === "top" ? (
+            <input
+              ref={captionInputRef}
+              value={captionValue}
+              onChange={(e) => setCaptionValue(e.target.value)}
+              onBlur={handleCaptionSave}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleCaptionSave();
+                if (e.key === "Escape") handleCaptionCancel();
+              }}
+              style={{
+                position: "absolute",
+                top: pageHeight * 0.01,
+                left: pageWidth * 0.05,
+                width: pageWidth * 0.9,
+                height: captionFontSize * 1.6,
+                zIndex: 5,
+                border: "none",
+                outline: "none",
+                background: "white",
+                fontFamily: "'Noto Serif', serif",
+                fontStyle: "italic",
+                fontSize: captionFontSize,
+                color: "#666",
+                textAlign: "center" as const,
+                padding: 0,
+                borderRadius: 2,
+              }}
+            />
+          ) : (
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                handleCaptionClick("top");
+              }}
+              onMouseEnter={() => setTopCaptionHovered(true)}
+              onMouseLeave={() => setTopCaptionHovered(false)}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: pageWidth,
+                height: captionZoneHeight,
+                zIndex: 4,
+                cursor: "text",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {!page.topCaption && topCaptionHovered && (
+                <span
+                  style={{
+                    fontFamily: "'Noto Serif', serif",
+                    fontStyle: "italic",
+                    fontSize: captionFontSize,
+                    color: "#aaa",
+                    pointerEvents: "none",
+                  }}
+                >
+                  Add caption...
+                </span>
+              )}
+            </div>
+          )
+        )}
+        {hasBottomSpace && (
+          editingCaption === "bottom" ? (
+            <input
+              ref={captionInputRef}
+              value={captionValue}
+              onChange={(e) => setCaptionValue(e.target.value)}
+              onBlur={handleCaptionSave}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleCaptionSave();
+                if (e.key === "Escape") handleCaptionCancel();
+              }}
+              style={{
+                position: "absolute",
+                bottom: pageHeight * 0.01,
+                left: pageWidth * 0.05,
+                width: pageWidth * 0.9,
+                height: captionFontSize * 1.6,
+                zIndex: 5,
+                border: "none",
+                outline: "none",
+                background: "white",
+                fontFamily: "'Noto Serif', serif",
+                fontStyle: "italic",
+                fontSize: captionFontSize,
+                color: "#666",
+                textAlign: "center" as const,
+                padding: 0,
+                borderRadius: 2,
+              }}
+            />
+          ) : (
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                handleCaptionClick("bottom");
+              }}
+              onMouseEnter={() => setBottomCaptionHovered(true)}
+              onMouseLeave={() => setBottomCaptionHovered(false)}
+              style={{
+                position: "absolute",
+                bottom: 0,
+                left: 0,
+                width: pageWidth,
+                height: captionZoneHeight,
+                zIndex: 4,
+                cursor: "text",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {!page.bottomCaption && bottomCaptionHovered && (
+                <span
+                  style={{
+                    fontFamily: "'Noto Serif', serif",
+                    fontStyle: "italic",
+                    fontSize: captionFontSize,
+                    color: "#aaa",
+                    pointerEvents: "none",
+                  }}
+                >
+                  Add caption...
+                </span>
+              )}
+            </div>
+          )
+        )}
         {/* Delete button on hover */}
         {totalPages > 2 && isInterior && (
           <IconButton

@@ -8,7 +8,6 @@ import Toolbar from "./Toolbar";
 import SpreadPage, { PICKER_WIDTH } from "./SpreadPage";
 import TextEditDialog from "./TextEditDialog";
 import PhotoPool from "./PhotoPool";
-import CaptionEditor from "./CaptionEditor";
 import { useAutoScroll } from "@/hooks/useAutoScroll";
 import { usePhotoDrag } from "@/hooks/usePhotoDrag";
 import { usePageDrag } from "@/hooks/usePageDrag";
@@ -24,7 +23,6 @@ export default function EditPage() {
     currentSpreadIndex,
     setCurrentSpreadIndex,
     addPhotos,
-    updatePage,
     updateTextBlock,
     removeTextBlock,
     addTextBlock,
@@ -42,8 +40,6 @@ export default function EditPage() {
   // Hover & UI state
   const [hoveredPageId, setHoveredPageId] = useState<string | null>(null);
   const [photoPoolOpen, setPhotoPoolOpen] = useState(false);
-  const [captionAnchor, setCaptionAnchor] = useState<HTMLElement | null>(null);
-  const [captionPageId, setCaptionPageId] = useState<string | null>(null);
 
   // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -215,13 +211,6 @@ export default function EditPage() {
         onAddPhotos={handleAddPhotos}
         onTogglePhotoPool={() => setPhotoPoolOpen((v) => !v)}
         onAddText={handleAddText}
-        onEditCaptions={(anchor) => {
-          const pageId = selectedPageId || leftPage?.id;
-          if (pageId) {
-            setCaptionPageId(pageId);
-            setCaptionAnchor(anchor);
-          }
-        }}
         selectedSlotId={selectedSlotId}
         selectedPageId={selectedPageId}
         selectedTextId={selectedTextId}
@@ -367,32 +356,6 @@ export default function EditPage() {
         onClose={() => setPhotoPoolOpen(false)}
         selectedSlotId={selectedSlotId}
         selectedPageId={selectedPageId}
-      />
-
-      {/* Caption Editor */}
-      <CaptionEditor
-        anchorEl={captionAnchor}
-        open={Boolean(captionAnchor) && Boolean(captionPageId)}
-        onClose={() => {
-          setCaptionAnchor(null);
-          setCaptionPageId(null);
-        }}
-        topCaption={
-          captionPageId
-            ? pages.find((p) => p.id === captionPageId)?.topCaption || ""
-            : ""
-        }
-        bottomCaption={
-          captionPageId
-            ? pages.find((p) => p.id === captionPageId)?.bottomCaption || ""
-            : ""
-        }
-        onChangeTop={(val) => {
-          if (captionPageId) updatePage(captionPageId, { topCaption: val });
-        }}
-        onChangeBottom={(val) => {
-          if (captionPageId) updatePage(captionPageId, { bottomCaption: val });
-        }}
       />
 
       {/* Text Edit Dialog */}
