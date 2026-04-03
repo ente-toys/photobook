@@ -93,14 +93,14 @@ export default function Toolbar({
     <Box
       sx={{
         width: 72,
-        bgcolor: "#F3F3F5",
+        bgcolor: "#141617",
         display: "flex",
         flexDirection: "column",
         py: 3,
         alignItems: "center",
         gap: 1.5,
         height: "100%",
-        borderRight: "1px solid rgba(0,0,0,0.04)",
+        borderRight: "1px solid rgba(255,255,255,0.06)",
       }}
     >
       <Tooltip title="Add Page" placement="right">
@@ -109,10 +109,10 @@ export default function Toolbar({
           sx={{
             width: 44,
             height: 44,
-            color: "#006E0F",
-            bgcolor: "white",
+            color: "#08C225",
+            bgcolor: "rgba(8, 194, 37, 0.12)",
             borderRadius: 2,
-            boxShadow: "0px 12px 32px rgba(26, 28, 29, 0.06)",
+            boxShadow: "none",
             "&:hover": { transform: "scale(1.05)" },
             transition: "all 0.2s",
           }}
@@ -121,7 +121,7 @@ export default function Toolbar({
         </IconButton>
       </Tooltip>
 
-      <Divider sx={{ width: 32, my: 0.5 }} />
+      <Divider sx={{ width: 32, my: 0.5, borderColor: "rgba(255,255,255,0.1)" }} />
 
       <Tooltip title="Import Photos from Device" placement="right">
         <IconButton
@@ -129,8 +129,8 @@ export default function Toolbar({
           sx={{
             width: 44,
             height: 44,
-            color: "#999",
-            "&:hover": { color: "#08C225", bgcolor: "white" },
+            color: "#888",
+            "&:hover": { color: "#08C225", bgcolor: "rgba(255,255,255,0.08)" },
             borderRadius: 2,
             transition: "all 0.2s",
           }}
@@ -145,8 +145,8 @@ export default function Toolbar({
           sx={{
             width: 44,
             height: 44,
-            color: "#999",
-            "&:hover": { color: "#08C225", bgcolor: "white" },
+            color: "#888",
+            "&:hover": { color: "#08C225", bgcolor: "rgba(255,255,255,0.08)" },
             borderRadius: 2,
             transition: "all 0.2s",
           }}
@@ -161,8 +161,8 @@ export default function Toolbar({
           sx={{
             width: 44,
             height: 44,
-            color: "#999",
-            "&:hover": { color: "#08C225", bgcolor: "white" },
+            color: "#888",
+            "&:hover": { color: "#08C225", bgcolor: "rgba(255,255,255,0.08)" },
             borderRadius: 2,
             transition: "all 0.2s",
           }}
@@ -177,8 +177,8 @@ export default function Toolbar({
           sx={{
             width: 44,
             height: 44,
-            color: "#999",
-            "&:hover": { color: "#08C225", bgcolor: "white" },
+            color: "#888",
+            "&:hover": { color: "#08C225", bgcolor: "rgba(255,255,255,0.08)" },
             borderRadius: 2,
             transition: "all 0.2s",
           }}
@@ -189,15 +189,15 @@ export default function Toolbar({
 
       {selectedSlotId && (
         <>
-          <Divider sx={{ width: 32, my: 0.5 }} />
+          <Divider sx={{ width: 32, my: 0.5, borderColor: "rgba(255,255,255,0.1)" }} />
           <Tooltip title="Zoom In" placement="right">
             <IconButton
               onClick={handleZoomIn}
               sx={{
                 width: 44,
                 height: 44,
-                color: "#999",
-                "&:hover": { color: "#08C225", bgcolor: "white" },
+                color: "#888",
+                "&:hover": { color: "#08C225", bgcolor: "rgba(255,255,255,0.08)" },
                 borderRadius: 2,
               }}
             >
@@ -210,8 +210,8 @@ export default function Toolbar({
               sx={{
                 width: 44,
                 height: 44,
-                color: "#999",
-                "&:hover": { color: "#08C225", bgcolor: "white" },
+                color: "#888",
+                "&:hover": { color: "#08C225", bgcolor: "rgba(255,255,255,0.08)" },
                 borderRadius: 2,
               }}
             >
@@ -223,15 +223,15 @@ export default function Toolbar({
 
       {(selectedSlotId || selectedTextId) && (
         <>
-          <Divider sx={{ width: 32, my: 0.5 }} />
+          <Divider sx={{ width: 32, my: 0.5, borderColor: "rgba(255,255,255,0.1)" }} />
           <Tooltip title="Delete Selected" placement="right">
             <IconButton
               onClick={handleDeleteSelected}
               sx={{
                 width: 44,
                 height: 44,
-                color: "#999",
-                "&:hover": { color: "#ba1a1a", bgcolor: "white" },
+                color: "#888",
+                "&:hover": { color: "#ba1a1a", bgcolor: "rgba(255,255,255,0.08)" },
                 borderRadius: 2,
               }}
             >
@@ -250,7 +250,7 @@ export default function Toolbar({
           sx={{
             width: 44,
             height: 44,
-            color: "#ccc",
+            color: "#555",
             "&:hover": { color: "#ba1a1a" },
             borderRadius: 2,
           }}

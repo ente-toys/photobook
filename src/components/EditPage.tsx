@@ -403,7 +403,7 @@ export default function EditPage() {
           flex: 1,
           display: "flex",
           flexDirection: "column",
-          bgcolor: "#F3F3F5",
+          bgcolor: "#1a1c1d",
           overflow: "auto",
         }}
       >
@@ -440,7 +440,7 @@ export default function EditPage() {
                     <Box
                       sx={{
                         position: "relative",
-                        boxShadow: "0px 12px 32px rgba(26, 28, 29, 0.06)",
+                        boxShadow: "0px 12px 32px rgba(0, 0, 0, 0.3)",
                         borderRadius: 0.5,
                         overflow: "hidden",
                       }}
@@ -523,7 +523,7 @@ export default function EditPage() {
                       })}
                     </Box>
                     <Typography
-                      sx={{ fontSize: "0.6rem", color: "#aaa", fontWeight: 600, textAlign: "center", mt: 0.5 }}
+                      sx={{ fontSize: "0.6rem", color: "#666", fontWeight: 600, textAlign: "center", mt: 0.5 }}
                     >
                       {spread.left! + 1}
                     </Typography>
@@ -536,7 +536,7 @@ export default function EditPage() {
                     <Box
                       sx={{
                         position: "relative",
-                        boxShadow: "0px 12px 32px rgba(26, 28, 29, 0.06)",
+                        boxShadow: "0px 12px 32px rgba(0, 0, 0, 0.3)",
                         borderRadius: 0.5,
                         overflow: "hidden",
                       }}
@@ -619,7 +619,7 @@ export default function EditPage() {
                       })}
                     </Box>
                     <Typography
-                      sx={{ fontSize: "0.6rem", color: "#aaa", fontWeight: 600, textAlign: "center", mt: 0.5 }}
+                      sx={{ fontSize: "0.6rem", color: "#666", fontWeight: 600, textAlign: "center", mt: 0.5 }}
                     >
                       {spread.right! + 1}
                     </Typography>

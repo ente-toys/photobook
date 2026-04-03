@@ -68,14 +68,14 @@ export default function PageStrip({
       ref={scrollContainerRef}
       sx={{
         width: 192,
-        bgcolor: "#F3F3F5",
+        bgcolor: "#141617",
         display: "flex",
         flexDirection: "column",
         py: 3,
         px: 2,
         height: "100%",
         overflowY: "auto",
-        borderLeft: "1px solid rgba(0,0,0,0.04)",
+        borderLeft: "1px solid rgba(255,255,255,0.06)",
       }}
     >
       <Typography
@@ -94,7 +94,7 @@ export default function PageStrip({
         sx={{
           fontSize: "0.85rem",
           fontWeight: 900,
-          color: "#333",
+          color: "#ddd",
           mb: 2,
         }}
       >
@@ -119,7 +119,7 @@ export default function PageStrip({
                 borderRadius: 1.5,
                 p: 1,
                 "&:hover": {
-                  bgcolor: "rgba(255,255,255,0.4)",
+                  bgcolor: "rgba(255,255,255,0.06)",
                 },
                 transition: "all 0.2s",
               }}
@@ -140,7 +140,7 @@ export default function PageStrip({
                       width: THUMB_PAGE_W,
                       aspectRatio: `${148}/${210}`,
                       bgcolor: "white",
-                      border: "1px solid #ddd",
+                      border: "1px solid rgba(255,255,255,0.1)",
                       borderRadius: 0.5,
                       overflow: "hidden",
                     }}
@@ -169,7 +169,7 @@ export default function PageStrip({
                       width: THUMB_PAGE_W,
                       aspectRatio: `${148}/${210}`,
                       bgcolor: "white",
-                      border: "1px solid #ddd",
+                      border: "1px solid rgba(255,255,255,0.1)",
                       borderRadius: 0.5,
                       overflow: "hidden",
                     }}
@@ -205,7 +205,7 @@ export default function PageStrip({
                     sx={{
                       fontSize: "0.5rem",
                       fontWeight: 700,
-                      color: "#999",
+                      color: "#666",
                     }}
                   >
                     {spread.left! + 1}
@@ -216,7 +216,7 @@ export default function PageStrip({
                     sx={{
                       fontSize: "0.5rem",
                       fontWeight: 700,
-                      color: "#999",
+                      color: "#666",
                     }}
                   >
                     {spread.right! + 1}

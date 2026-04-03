@@ -15,13 +15,13 @@ export default function NavBar() {
         left: 0,
         right: 0,
         zIndex: 50,
-        bgcolor: "#F5F5F7",
+        bgcolor: appView === "start" ? "#F5F5F7" : "#141617",
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
         px: 4,
         height: 64,
-        borderBottom: "1px solid rgba(0,0,0,0.04)",
+        borderBottom: appView === "start" ? "1px solid rgba(0,0,0,0.04)" : "1px solid rgba(255,255,255,0.06)",
       }}
     >
       <Box
@@ -37,7 +37,7 @@ export default function NavBar() {
             fontSize: "1.25rem",
             fontWeight: 700,
             fontFamily: "'Manrope', sans-serif",
-            color: "#1a1c1d",
+            color: appView === "start" ? "#1a1c1d" : "#E2E2E4",
           }}
         >
           Ente Photobook
