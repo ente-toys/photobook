@@ -217,12 +217,8 @@ function TextBlockRenderer({
         width={bw}
         text={block.text}
         fontSize={fontSize}
-        fontFamily={
-          block.style === "title"
-            ? "'Noto Serif', serif"
-            : "'Noto Serif', serif"
-        }
-        fontStyle={block.style === "title" ? "bold italic" : "italic"}
+        fontFamily="'Manrope', sans-serif"
+        fontStyle={block.style === "title" ? "bold" : "normal"}
         fill="#1a1c1d"
         align={block.alignment}
         draggable={isInteractive}

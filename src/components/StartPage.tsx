@@ -241,8 +241,7 @@ export default function StartPage() {
           </Typography>
           <Typography
             sx={{
-              fontFamily: "'Noto Serif', serif",
-              fontStyle: "italic",
+              fontFamily: "'Manrope', sans-serif",
               fontSize: "1.15rem",
               color: "#888",
               maxWidth: 560,
@@ -449,7 +448,7 @@ export default function StartPage() {
             </Typography>
             <Typography
               sx={{
-                fontFamily: "'Noto Serif', serif",
+                fontFamily: "'Manrope', sans-serif",
                 color: "#888",
                 lineHeight: 1.7,
                 fontSize: "0.95rem",

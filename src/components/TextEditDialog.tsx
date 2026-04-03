@@ -66,7 +66,7 @@ export default function TextEditDialog({
             fullWidth
             sx={{
               "& .MuiInputBase-root": {
-                fontFamily: "'Noto Serif', serif",
+                fontFamily: "'Manrope', sans-serif",
                 fontStyle: style === "title" ? "italic" : "normal",
                 fontWeight: style === "title" ? 700 : 400,
                 fontSize: style === "title" ? "1.5rem" : "1rem",

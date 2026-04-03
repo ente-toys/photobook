@@ -79,14 +79,14 @@ export async function renderPageToCanvas(
   // Draw captions
   if (page.topCaption) {
     ctx.fillStyle = "#1a1c1d";
-    ctx.font = `${Math.round(height * 0.025)}px 'Noto Serif', serif`;
+    ctx.font = `${Math.round(height * 0.025)}px 'Manrope', sans-serif`;
     ctx.textAlign = "center";
     ctx.fillText(page.topCaption, width / 2, height * 0.04);
   }
 
   if (page.bottomCaption) {
     ctx.fillStyle = "#1a1c1d";
-    ctx.font = `${Math.round(height * 0.025)}px 'Noto Serif', serif`;
+    ctx.font = `${Math.round(height * 0.025)}px 'Manrope', sans-serif`;
     ctx.textAlign = "center";
     ctx.fillText(page.bottomCaption, width / 2, height * 0.97);
   }
@@ -103,8 +103,8 @@ export async function renderPageToCanvas(
     ctx.fillStyle = "#1a1c1d";
     ctx.font =
       block.style === "title"
-        ? `bold italic ${fontSize}px 'Noto Serif', serif`
-        : `${fontSize}px 'Noto Serif', serif`;
+        ? `bold ${fontSize}px 'Manrope', sans-serif`
+        : `${fontSize}px 'Manrope', sans-serif`;
     ctx.textAlign = block.alignment;
 
     const textX =

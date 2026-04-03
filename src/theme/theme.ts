@@ -40,14 +40,13 @@ const theme = createTheme({
       fontWeight: 700,
     },
     h4: {
-      fontFamily: "'Noto Serif', serif",
-      fontStyle: "italic",
+      fontFamily: "'Manrope', sans-serif",
     },
     body1: {
-      fontFamily: "'Noto Serif', serif",
+      fontFamily: "'Manrope', sans-serif",
     },
     body2: {
-      fontFamily: "'Noto Serif', serif",
+      fontFamily: "'Manrope', sans-serif",
     },
     button: {
       fontFamily: "'Manrope', sans-serif",

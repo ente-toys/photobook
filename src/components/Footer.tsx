@@ -26,8 +26,7 @@ export default function Footer({ showPrivacyPolicy = false }: { showPrivacyPolic
           underline="hover"
           onClick={() => setPrivacyOpen(true)}
           sx={{
-            fontFamily: "'Noto Serif', serif",
-            fontStyle: "italic",
+            fontFamily: "'Manrope', sans-serif",
             fontSize: "0.85rem",
             color: "#777",
             border: "none",
@@ -40,8 +39,7 @@ export default function Footer({ showPrivacyPolicy = false }: { showPrivacyPolic
       )}
       <Typography
         sx={{
-          fontFamily: "'Noto Serif', serif",
-          fontStyle: "italic",
+          fontFamily: "'Manrope', sans-serif",
           fontSize: "0.75rem",
           color: "#666",
         }}
