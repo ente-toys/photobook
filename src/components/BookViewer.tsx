@@ -39,6 +39,7 @@ export default function BookViewer({
     return () => window.removeEventListener("resize", updateSize);
   }, []);
 
+  // Single page dimensions — page-flip doubles the width for spreads
   const pageHeight = Math.min(dimensions.height * 0.85, 600);
   const pageWidth = Math.round(pageHeight * PAGE_ASPECT);
 
@@ -58,10 +59,8 @@ export default function BookViewer({
   useEffect(() => {
     if (!bookRef.current || pages.length === 0 || pageWidth <= 0) return;
 
-    // Destroy previous instance
     safeDestroy();
 
-    // Use a microtask to ensure React has flushed the page elements to the DOM
     const timerId = setTimeout(() => {
       if (!bookRef.current) return;
 
@@ -73,10 +72,6 @@ export default function BookViewer({
           width: pageWidth,
           height: pageHeight,
           size: "fixed",
-          minWidth: 200,
-          maxWidth: 500,
-          minHeight: 280,
-          maxHeight: 710,
           showCover: true,
           maxShadowOpacity: 0.3,
           mobileScrollSupport: false,
@@ -85,9 +80,8 @@ export default function BookViewer({
           swipeDistance: 30,
           startPage: currentSpread,
           drawShadow: true,
-          autoSize: false,
-          startZIndex: 0,
           showPageCorners: true,
+          usePortrait: false,
         });
 
         pf.loadFromHTML(Array.from(pageElements) as HTMLElement[]);
@@ -103,7 +97,7 @@ export default function BookViewer({
       } catch (e) {
         console.warn("PageFlip initialization failed:", e);
       }
-    }, 50);
+    }, 100);
 
     return () => {
       clearTimeout(timerId);
@@ -133,9 +127,13 @@ export default function BookViewer({
         minHeight: 400,
       }}
     >
+      {/* Container must be sized for a full spread (2 pages wide) */}
       <Box
         ref={bookRef}
         sx={{
+          width: pageWidth * 2,
+          height: pageHeight,
+          position: "relative",
           boxShadow: "0 40px 100px -20px rgba(0,0,0,0.6)",
           borderRadius: 0.5,
         }}
