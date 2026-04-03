@@ -341,7 +341,19 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
       toSlotId: string
     ) => {
       setBook((prev) => {
-        const pages = prev.pages.map((p) => ({ ...p, slots: [...p.slots] }));
+        const pages = prev.pages.map((p) => ({
+          ...p,
+          slots: p.slots.map((s) => {
+            if (p.id === fromPageId && s.id === fromSlotId) {
+              return { ...s };
+            }
+            if (p.id === toPageId && s.id === toSlotId) {
+              return { ...s };
+            }
+            return s;
+          }),
+        }));
+
         let fromSlot: PhotoSlot | undefined;
         let toSlot: PhotoSlot | undefined;
 
