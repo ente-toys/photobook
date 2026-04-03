@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
+const basePath = process.env.GITHUB_ACTIONS ? "/photobook" : "";
+
 const nextConfig = {
-  basePath: process.env.GITHUB_ACTIONS ? "/photobook" : "",
+  basePath,
+  env: { NEXT_PUBLIC_BASE_PATH: basePath },
   output: "export",
   images: {
     unoptimized: true,
