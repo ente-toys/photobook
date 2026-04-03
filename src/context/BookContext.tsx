@@ -213,7 +213,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
         const url = URL.createObjectURL(blob);
         const img = await loadImage(url);
         const dateTaken = await extractExifDate(file);
-        const thumb = await createThumbnail(img, 300);
+        const thumb = await createThumbnail(img, 512);
 
         const photo: Photo = {
           id: uuid(),
