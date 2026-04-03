@@ -4,8 +4,8 @@ import type { BookPage, Photo, PhotoSlot } from "./types";
 // Margin as percentage of page
 const MARGIN = 6;
 // Separate horizontal/vertical gaps to produce equal absolute spacing on A5 portrait pages
-const H_GAP = 2.13; // horizontal gap (% of page width)
-const V_GAP = 1.5; // vertical gap (% of page height)
+const H_GAP = 1.28; // horizontal gap (% of page width)
+const V_GAP = 0.9; // vertical gap (% of page height)
 
 type Orientation = "landscape" | "portrait" | "square";
 
