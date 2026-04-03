@@ -2,7 +2,6 @@
 
 import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { Box, Typography } from "@mui/material";
-import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import { Stage, Layer } from "react-konva";
 import { useBook } from "@/context/BookContext";
 import PageCanvas from "./PageCanvas";
@@ -30,13 +29,14 @@ export default function EditPage() {
     swapPhotos,
     updateSlot,
     addTextBlock,
+    thumbnailUrls,
   } = bookCtx;
 
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
   const [selectedTextId, setSelectedTextId] = useState<string | null>(null);
-  const [swapSourceSlotId, setSwapSourceSlotId] = useState<string | null>(null);
-  const [swapSourcePageId, setSwapSourcePageId] = useState<string | null>(null);
+  const [dragSourceInfo, setDragSourceInfo] = useState<{ pageId: string; slotId: string } | null>(null);
+  const [dragOverInfo, setDragOverInfo] = useState<{ pageId: string; slotId: string } | null>(null);
   const [editingTextBlock, setEditingTextBlock] = useState<TextBlock | null>(
     null
   );
@@ -49,6 +49,7 @@ export default function EditPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const sidebarScrollRef = useRef<HTMLDivElement>(null);
+  const dragGhostRef = useRef<HTMLCanvasElement>(null);
 
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 
@@ -143,25 +144,11 @@ export default function EditPage() {
 
   const handleSlotClick = useCallback(
     (pageId: string, slotId: string) => {
-      // If we have a swap source and click a different slot, perform swap
-      if (swapSourceSlotId && swapSourcePageId) {
-        if (swapSourceSlotId !== slotId || swapSourcePageId !== pageId) {
-          swapPhotos(swapSourcePageId, swapSourceSlotId, pageId, slotId);
-          setSwapSourceSlotId(null);
-          setSwapSourcePageId(null);
-          setSelectedSlotId(null);
-          setSelectedPageId(null);
-          return;
-        }
-        // Clicked same slot again — cancel swap mode
-        setSwapSourceSlotId(null);
-        setSwapSourcePageId(null);
-      }
       setSelectedSlotId(slotId);
       setSelectedPageId(pageId);
       setSelectedTextId(null);
     },
-    [swapSourceSlotId, swapSourcePageId, swapPhotos]
+    []
   );
 
   const handleTextClick = useCallback(
@@ -186,14 +173,79 @@ export default function EditPage() {
   );
 
   const handleStageClick = useCallback((e: any) => {
-    // Clicked on empty area - deselect and cancel swap
     if (e.target === e.target.getStage()) {
       setSelectedSlotId(null);
       setSelectedPageId(null);
       setSelectedTextId(null);
-      setSwapSourceSlotId(null);
-      setSwapSourcePageId(null);
     }
+  }, []);
+
+  // --- Drag-and-drop handlers for photo reordering ---
+  const handleDragStart = useCallback(
+    (e: React.DragEvent, pageId: string, slotId: string, photoId: string) => {
+      setDragSourceInfo({ pageId, slotId });
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", JSON.stringify({ pageId, slotId }));
+      // Create a small drag ghost from the thumbnail
+      const thumbUrl = thumbnailUrls.get(photoId);
+      if (thumbUrl && dragGhostRef.current) {
+        const canvas = dragGhostRef.current;
+        const ctx = canvas.getContext("2d");
+        const img = new window.Image();
+        img.src = thumbUrl;
+        const size = 200;
+        canvas.width = size;
+        canvas.height = size;
+        if (ctx) {
+          const aspect = img.naturalWidth / img.naturalHeight || 1;
+          const dw = aspect >= 1 ? size : size * aspect;
+          const dh = aspect >= 1 ? size / aspect : size;
+          ctx.clearRect(0, 0, size, size);
+          ctx.drawImage(img, (size - dw) / 2, (size - dh) / 2, dw, dh);
+        }
+        e.dataTransfer.setDragImage(canvas, size / 2, size / 2);
+      }
+    },
+    [thumbnailUrls]
+  );
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  }, []);
+
+  const handleDragEnter = useCallback(
+    (e: React.DragEvent, pageId: string, slotId: string) => {
+      e.preventDefault();
+      setDragOverInfo({ pageId, slotId });
+    },
+    []
+  );
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setDragOverInfo(null);
+    }
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent, toPageId: string, toSlotId: string) => {
+      e.preventDefault();
+      setDragOverInfo(null);
+      if (dragSourceInfo) {
+        const { pageId: fromPageId, slotId: fromSlotId } = dragSourceInfo;
+        if (fromPageId !== toPageId || fromSlotId !== toSlotId) {
+          swapPhotos(fromPageId, fromSlotId, toPageId, toSlotId);
+        }
+        setDragSourceInfo(null);
+      }
+    },
+    [dragSourceInfo, swapPhotos]
+  );
+
+  const handleDragEnd = useCallback(() => {
+    setDragSourceInfo(null);
+    setDragOverInfo(null);
   }, []);
 
   const handleAddText = useCallback(() => {
@@ -239,17 +291,6 @@ export default function EditPage() {
         selectedSlotId={selectedSlotId}
         selectedPageId={selectedPageId}
         selectedTextId={selectedTextId}
-        isSwapMode={swapSourceSlotId !== null}
-        onStartSwap={() => {
-          if (selectedSlotId && selectedPageId) {
-            setSwapSourceSlotId(selectedSlotId);
-            setSwapSourcePageId(selectedPageId);
-          }
-        }}
-        onCancelSwap={() => {
-          setSwapSourceSlotId(null);
-          setSwapSourcePageId(null);
-        }}
       />
 
       {/* Main Canvas Area - scrollable */}
@@ -274,30 +315,6 @@ export default function EditPage() {
             gap: 4,
           }}
         >
-          {/* Swap mode indicator */}
-          {swapSourceSlotId && (
-            <Box
-              sx={{
-                position: "sticky",
-                top: 16,
-                zIndex: 10,
-                bgcolor: "rgba(8, 194, 37, 0.1)",
-                border: "1px solid #08C225",
-                borderRadius: 999,
-                px: 3,
-                py: 0.75,
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
-              }}
-            >
-              <SwapHorizIcon sx={{ fontSize: 18, color: "#006E0F" }} />
-              <Typography sx={{ fontSize: "0.8rem", fontWeight: 600, color: "#006E0F" }}>
-                Click another photo slot to swap
-              </Typography>
-            </Box>
-          )}
-
           {/* All spreads */}
           {spreads.map((spread, spreadIdx) => {
             const lp = spread.left !== null ? pages[spread.left] : null;
@@ -320,6 +337,7 @@ export default function EditPage() {
                   <Box>
                     <Box
                       sx={{
+                        position: "relative",
                         boxShadow: "0px 12px 32px rgba(26, 28, 29, 0.06)",
                         borderRadius: 0.5,
                         overflow: "hidden",
@@ -342,7 +360,12 @@ export default function EditPage() {
                             selectedTextId={
                               selectedPageId === lp.id ? selectedTextId : null
                             }
-                            swapSourceSlotId={swapSourceSlotId}
+                            dragOverSlotId={
+                              dragOverInfo?.pageId === lp.id ? dragOverInfo.slotId : null
+                            }
+                            dragSourceSlotId={
+                              dragSourceInfo?.pageId === lp.id ? dragSourceInfo.slotId : null
+                            }
                             onSlotClick={(slotId) =>
                               handleSlotClick(lp.id, slotId)
                             }
@@ -355,6 +378,39 @@ export default function EditPage() {
                           />
                         </Layer>
                       </Stage>
+                      {/* Drag-and-drop overlay divs */}
+                      {lp.slots.map((slot) => {
+                        const isSelected = selectedPageId === lp.id && selectedSlotId === slot.id;
+                        return (
+                          <div
+                            key={slot.id}
+                            draggable={!!slot.photoId && !isSelected}
+                            onDragStart={(e) =>
+                              slot.photoId
+                                ? handleDragStart(e, lp.id, slot.id, slot.photoId)
+                                : e.preventDefault()
+                            }
+                            onDragOver={handleDragOver}
+                            onDragEnter={(e) => handleDragEnter(e, lp.id, slot.id)}
+                            onDragLeave={handleDragLeave}
+                            onDrop={(e) => handleDrop(e, lp.id, slot.id)}
+                            onDragEnd={handleDragEnd}
+                            onClick={() => handleSlotClick(lp.id, slot.id)}
+                            style={{
+                              position: "absolute",
+                              left: (slot.x / 100) * pageWidth,
+                              top: (slot.y / 100) * pageHeight,
+                              width: (slot.width / 100) * pageWidth,
+                              height: (slot.height / 100) * pageHeight,
+                              cursor: slot.photoId
+                                ? isSelected ? "default" : "grab"
+                                : "default",
+                              pointerEvents: isSelected ? "none" : "auto",
+                              zIndex: 2,
+                            }}
+                          />
+                        );
+                      })}
                     </Box>
                     <Typography
                       sx={{ fontSize: "0.6rem", color: "#aaa", fontWeight: 600, textAlign: "center", mt: 0.5 }}
@@ -369,6 +425,7 @@ export default function EditPage() {
                   <Box>
                     <Box
                       sx={{
+                        position: "relative",
                         boxShadow: "0px 12px 32px rgba(26, 28, 29, 0.06)",
                         borderRadius: 0.5,
                         overflow: "hidden",
@@ -391,7 +448,12 @@ export default function EditPage() {
                             selectedTextId={
                               selectedPageId === rp.id ? selectedTextId : null
                             }
-                            swapSourceSlotId={swapSourceSlotId}
+                            dragOverSlotId={
+                              dragOverInfo?.pageId === rp.id ? dragOverInfo.slotId : null
+                            }
+                            dragSourceSlotId={
+                              dragSourceInfo?.pageId === rp.id ? dragSourceInfo.slotId : null
+                            }
                             onSlotClick={(slotId) =>
                               handleSlotClick(rp.id, slotId)
                             }
@@ -404,6 +466,39 @@ export default function EditPage() {
                           />
                         </Layer>
                       </Stage>
+                      {/* Drag-and-drop overlay divs */}
+                      {rp.slots.map((slot) => {
+                        const isSelected = selectedPageId === rp.id && selectedSlotId === slot.id;
+                        return (
+                          <div
+                            key={slot.id}
+                            draggable={!!slot.photoId && !isSelected}
+                            onDragStart={(e) =>
+                              slot.photoId
+                                ? handleDragStart(e, rp.id, slot.id, slot.photoId)
+                                : e.preventDefault()
+                            }
+                            onDragOver={handleDragOver}
+                            onDragEnter={(e) => handleDragEnter(e, rp.id, slot.id)}
+                            onDragLeave={handleDragLeave}
+                            onDrop={(e) => handleDrop(e, rp.id, slot.id)}
+                            onDragEnd={handleDragEnd}
+                            onClick={() => handleSlotClick(rp.id, slot.id)}
+                            style={{
+                              position: "absolute",
+                              left: (slot.x / 100) * pageWidth,
+                              top: (slot.y / 100) * pageHeight,
+                              width: (slot.width / 100) * pageWidth,
+                              height: (slot.height / 100) * pageHeight,
+                              cursor: slot.photoId
+                                ? isSelected ? "default" : "grab"
+                                : "default",
+                              pointerEvents: isSelected ? "none" : "auto",
+                              zIndex: 2,
+                            }}
+                          />
+                        );
+                      })}
                     </Box>
                     <Typography
                       sx={{ fontSize: "0.6rem", color: "#aaa", fontWeight: 600, textAlign: "center", mt: 0.5 }}
@@ -425,6 +520,9 @@ export default function EditPage() {
         scrollContainerRef={sidebarScrollRef}
         onSpreadClick={handleSidebarSpreadClick}
       />
+
+      {/* Offscreen canvas for drag ghost */}
+      <canvas ref={dragGhostRef} style={{ position: "fixed", left: -9999 }} />
 
       {/* Hidden file input */}
       <input

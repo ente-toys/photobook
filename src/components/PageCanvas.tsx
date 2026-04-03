@@ -17,7 +17,8 @@ interface PageCanvasProps {
   selectedTextId?: string | null;
   onTextClick?: (textId: string) => void;
   onTextDblClick?: (textId: string) => void;
-  swapSourceSlotId?: string | null;
+  dragOverSlotId?: string | null;
+  dragSourceSlotId?: string | null;
   useFullRes?: boolean;
   onDropPhoto?: (photoId: string, slotId: string) => void;
 }
@@ -28,8 +29,8 @@ function PhotoSlotRenderer({
   pageHeight,
   photoUrl,
   isSelected,
-  isSwapSource,
-  isSwapTarget,
+  isDragOver,
+  isDragSource,
   onClick,
   isInteractive,
   pageId,
@@ -39,14 +40,14 @@ function PhotoSlotRenderer({
   pageHeight: number;
   photoUrl?: string;
   isSelected: boolean;
-  isSwapSource: boolean;
-  isSwapTarget: boolean;
+  isDragOver: boolean;
+  isDragSource: boolean;
   onClick: () => void;
   isInteractive: boolean;
   pageId: string;
 }) {
   const [image, setImage] = useState<HTMLImageElement | null>(null);
-  const { updateSlot, swapPhotos } = useBook();
+  const { updateSlot } = useBook();
 
   const sx = (slot.x / 100) * pageWidth;
   const sy = (slot.y / 100) * pageHeight;
@@ -125,21 +126,19 @@ function PhotoSlotRenderer({
           }}
         />
       )}
-      {/* Swap source indicator */}
-      {isSwapSource && (
+      {/* Drag source dimming */}
+      {isDragSource && (
         <Rect
           x={sx}
           y={sy}
           width={sw}
           height={sh}
-          stroke="#006E0F"
-          strokeWidth={3}
-          dash={[8, 4]}
+          fill="rgba(255, 255, 255, 0.5)"
           listening={false}
         />
       )}
-      {/* Swap target indicator */}
-      {isSwapTarget && !isSwapSource && (
+      {/* Drag over indicator */}
+      {isDragOver && !isDragSource && (
         <Rect
           x={sx}
           y={sy}
@@ -148,12 +147,12 @@ function PhotoSlotRenderer({
           stroke="#08C225"
           strokeWidth={2}
           dash={[6, 3]}
-          fill="rgba(8, 194, 37, 0.08)"
+          fill="rgba(8, 194, 37, 0.1)"
           listening={false}
         />
       )}
       {/* Selection border */}
-      {isSelected && !isSwapSource && (
+      {isSelected && !isDragSource && (
         <Rect
           x={sx}
           y={sy}
@@ -170,10 +169,10 @@ function PhotoSlotRenderer({
           x={sx}
           y={sy + sh / 2 - 8}
           width={sw}
-          text={isSwapTarget ? "Drop here" : "Empty slot"}
+          text={isDragOver ? "Drop here" : "Empty slot"}
           fontSize={12}
-          fill={isSwapTarget ? "#08C225" : "#999"}
-          fontStyle={isSwapTarget ? "bold" : "normal"}
+          fill={isDragOver ? "#08C225" : "#999"}
+          fontStyle={isDragOver ? "bold" : "normal"}
           align="center"
         />
       )}
@@ -285,7 +284,8 @@ export default function PageCanvas({
   isInteractive = false,
   selectedSlotId,
   selectedTextId,
-  swapSourceSlotId,
+  dragOverSlotId,
+  dragSourceSlotId,
   useFullRes = false,
   onSlotClick,
   onTextClick,
@@ -311,8 +311,8 @@ export default function PageCanvas({
           pageHeight={pageHeight}
           photoUrl={slot.photoId ? urls.get(slot.photoId) : undefined}
           isSelected={selectedSlotId === slot.id}
-          isSwapSource={swapSourceSlotId === slot.id}
-          isSwapTarget={!!swapSourceSlotId && swapSourceSlotId !== slot.id}
+          isDragOver={dragOverSlotId === slot.id}
+          isDragSource={dragSourceSlotId === slot.id}
           onClick={() => onSlotClick?.(slot.id)}
           isInteractive={isInteractive}
           pageId={page.id}

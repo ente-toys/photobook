@@ -10,7 +10,6 @@ import NotesIcon from "@mui/icons-material/Notes";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import ZoomOutIcon from "@mui/icons-material/ZoomOut";
-import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import { useBook } from "@/context/BookContext";
 
 interface ToolbarProps {
@@ -21,9 +20,6 @@ interface ToolbarProps {
   selectedSlotId: string | null;
   selectedPageId: string | null;
   selectedTextId: string | null;
-  isSwapMode: boolean;
-  onStartSwap: () => void;
-  onCancelSwap: () => void;
 }
 
 export default function Toolbar({
@@ -34,9 +30,6 @@ export default function Toolbar({
   selectedSlotId,
   selectedPageId,
   selectedTextId,
-  isSwapMode,
-  onStartSwap,
-  onCancelSwap,
 }: ToolbarProps) {
   const {
     addPage,
@@ -197,25 +190,6 @@ export default function Toolbar({
       {selectedSlotId && (
         <>
           <Divider sx={{ width: 32, my: 0.5 }} />
-          <Tooltip title={isSwapMode ? "Cancel Swap" : "Swap Photo"} placement="right">
-            <IconButton
-              onClick={isSwapMode ? onCancelSwap : onStartSwap}
-              sx={{
-                width: 44,
-                height: 44,
-                color: isSwapMode ? "white" : "#999",
-                bgcolor: isSwapMode ? "#08C225" : "transparent",
-                "&:hover": {
-                  color: isSwapMode ? "white" : "#08C225",
-                  bgcolor: isSwapMode ? "#006E0F" : "white",
-                },
-                borderRadius: 2,
-                transition: "all 0.2s",
-              }}
-            >
-              <SwapHorizIcon />
-            </IconButton>
-          </Tooltip>
           <Tooltip title="Zoom In" placement="right">
             <IconButton
               onClick={handleZoomIn}
