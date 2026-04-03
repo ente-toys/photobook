@@ -3,7 +3,9 @@ import type { BookPage, Photo, PhotoSlot } from "./types";
 
 // Margin as percentage of page
 const MARGIN = 6;
-const GAP = 3;
+// Separate horizontal/vertical gaps to produce equal absolute spacing on A5 portrait pages
+const H_GAP = 2.13; // horizontal gap (% of page width)
+const V_GAP = 1.5; // vertical gap (% of page height)
 
 type Orientation = "landscape" | "portrait" | "square";
 
@@ -52,43 +54,43 @@ function layout1(photos: Photo[]): PhotoSlot[] {
 }
 
 function layout2Stacked(photos: Photo[]): PhotoSlot[] {
-  const halfH = (CH - GAP) / 2;
+  const halfH = (CH - V_GAP) / 2;
   return [
     makeSlot(photos[0].id, LEFT, TOP, CW, halfH),
-    makeSlot(photos[1].id, LEFT, TOP + halfH + GAP, CW, halfH),
+    makeSlot(photos[1].id, LEFT, TOP + halfH + V_GAP, CW, halfH),
   ];
 }
 
 function layout2SideBySide(photos: Photo[]): PhotoSlot[] {
-  const halfW = (CW - GAP) / 2;
+  const halfW = (CW - H_GAP) / 2;
   return [
     makeSlot(photos[0].id, LEFT, TOP, halfW, CH),
-    makeSlot(photos[1].id, LEFT + halfW + GAP, TOP, halfW, CH),
+    makeSlot(photos[1].id, LEFT + halfW + H_GAP, TOP, halfW, CH),
   ];
 }
 
 function layout3TopOneBottomTwo(photos: Photo[]): PhotoSlot[] {
   const topH = CH * 0.55;
-  const botH = CH - topH - GAP;
-  const halfW = (CW - GAP) / 2;
+  const botH = CH - topH - V_GAP;
+  const halfW = (CW - H_GAP) / 2;
   return [
     makeSlot(photos[0].id, LEFT, TOP, CW, topH),
-    makeSlot(photos[1].id, LEFT, TOP + topH + GAP, halfW, botH),
-    makeSlot(photos[2].id, LEFT + halfW + GAP, TOP + topH + GAP, halfW, botH),
+    makeSlot(photos[1].id, LEFT, TOP + topH + V_GAP, halfW, botH),
+    makeSlot(photos[2].id, LEFT + halfW + H_GAP, TOP + topH + V_GAP, halfW, botH),
   ];
 }
 
 function layout3LeftOneTwoRight(photos: Photo[]): PhotoSlot[] {
   const leftW = CW * 0.55;
-  const rightW = CW - leftW - GAP;
-  const halfH = (CH - GAP) / 2;
+  const rightW = CW - leftW - H_GAP;
+  const halfH = (CH - V_GAP) / 2;
   return [
     makeSlot(photos[0].id, LEFT, TOP, leftW, CH),
-    makeSlot(photos[1].id, LEFT + leftW + GAP, TOP, rightW, halfH),
+    makeSlot(photos[1].id, LEFT + leftW + H_GAP, TOP, rightW, halfH),
     makeSlot(
       photos[2].id,
-      LEFT + leftW + GAP,
-      TOP + halfH + GAP,
+      LEFT + leftW + H_GAP,
+      TOP + halfH + V_GAP,
       rightW,
       halfH
     ),
@@ -96,28 +98,28 @@ function layout3LeftOneTwoRight(photos: Photo[]): PhotoSlot[] {
 }
 
 function layout4Grid(photos: Photo[]): PhotoSlot[] {
-  const halfW = (CW - GAP) / 2;
-  const halfH = (CH - GAP) / 2;
+  const halfW = (CW - H_GAP) / 2;
+  const halfH = (CH - V_GAP) / 2;
   return [
     makeSlot(photos[0].id, LEFT, TOP, halfW, halfH),
-    makeSlot(photos[1].id, LEFT + halfW + GAP, TOP, halfW, halfH),
-    makeSlot(photos[2].id, LEFT, TOP + halfH + GAP, halfW, halfH),
-    makeSlot(photos[3].id, LEFT + halfW + GAP, TOP + halfH + GAP, halfW, halfH),
+    makeSlot(photos[1].id, LEFT + halfW + H_GAP, TOP, halfW, halfH),
+    makeSlot(photos[2].id, LEFT, TOP + halfH + V_GAP, halfW, halfH),
+    makeSlot(photos[3].id, LEFT + halfW + H_GAP, TOP + halfH + V_GAP, halfW, halfH),
   ];
 }
 
 function layout4TopOneBotThree(photos: Photo[]): PhotoSlot[] {
   const topH = CH * 0.5;
-  const botH = CH - topH - GAP;
-  const thirdW = (CW - GAP * 2) / 3;
+  const botH = CH - topH - V_GAP;
+  const thirdW = (CW - H_GAP * 2) / 3;
   return [
     makeSlot(photos[0].id, LEFT, TOP, CW, topH),
-    makeSlot(photos[1].id, LEFT, TOP + topH + GAP, thirdW, botH),
-    makeSlot(photos[2].id, LEFT + thirdW + GAP, TOP + topH + GAP, thirdW, botH),
+    makeSlot(photos[1].id, LEFT, TOP + topH + V_GAP, thirdW, botH),
+    makeSlot(photos[2].id, LEFT + thirdW + H_GAP, TOP + topH + V_GAP, thirdW, botH),
     makeSlot(
       photos[3].id,
-      LEFT + thirdW * 2 + GAP * 2,
-      TOP + topH + GAP,
+      LEFT + thirdW * 2 + H_GAP * 2,
+      TOP + topH + V_GAP,
       thirdW,
       botH
     ),
