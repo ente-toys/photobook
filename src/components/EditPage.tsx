@@ -527,7 +527,7 @@ export default function EditPage() {
             );
           })}
           {/* Delete button on hover */}
-          {totalPages > 2 && (
+          {totalPages > 2 && isInterior && (
             <IconButton
               size="small"
               onClick={(e) => {

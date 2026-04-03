@@ -311,15 +311,29 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
       const filtered = prev.pages.filter((p) => p.id !== pageId);
       // Prevent deleting below 2 pages
       if (filtered.length < 2) return prev;
-      // Ensure even page count
+      // Ensure even page count for spreads
       if (filtered.length % 2 !== 0) {
-        filtered.push({
-          id: uuid(),
-          slots: [],
-          textBlocks: [],
-          topCaption: "",
-          bottomCaption: "",
-        });
+        // Check if there's already an empty interior page we can remove instead of appending
+        const isBlank = (p: typeof filtered[number]) =>
+          p.slots.length === 0 &&
+          p.textBlocks.length === 0 &&
+          !p.topCaption &&
+          !p.bottomCaption;
+        // Look for a blank interior page (not cover or back cover)
+        const blankIdx = filtered.findIndex(
+          (p, i) => i > 0 && i < filtered.length - 1 && isBlank(p)
+        );
+        if (blankIdx !== -1 && filtered.length - 1 >= 2) {
+          filtered.splice(blankIdx, 1);
+        } else {
+          filtered.push({
+            id: uuid(),
+            slots: [],
+            textBlocks: [],
+            topCaption: "",
+            bottomCaption: "",
+          });
+        }
       }
       return { ...prev, pages: filtered };
     });
