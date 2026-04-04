@@ -301,9 +301,40 @@ const ALL_VARIANTS: LayoutVariant[] = [
 
 const VARIANT_MAP = new Map(ALL_VARIANTS.map((v) => [v.key, v]));
 
-/** Get all available layout variants for a given photo count */
+/** Mirror pairs: each key maps to its mirrored variant */
+const MIRROR_MAP = new Map<string, string>([
+  ["2-big-top", "2-big-bottom"],
+  ["2-big-bottom", "2-big-top"],
+  ["2-big-left", "2-big-right"],
+  ["2-big-right", "2-big-left"],
+  ["3-top1-bot2", "3-bot1-top2"],
+  ["3-bot1-top2", "3-top1-bot2"],
+  ["3-left1-right2", "3-right1-left2"],
+  ["3-right1-left2", "3-left1-right2"],
+  ["4-top1-bot3", "4-bot1-top3"],
+  ["4-bot1-top3", "4-top1-bot3"],
+  ["4-left1-right3", "4-right1-left3"],
+  ["4-right1-left3", "4-left1-right3"],
+]);
+
+/** Variants hidden from the picker (mirrors of a primary variant) */
+const HIDDEN_MIRRORS = new Set([
+  "2-big-bottom",
+  "2-big-right",
+  "3-bot1-top2",
+  "3-right1-left2",
+  "4-bot1-top3",
+  "4-right1-left3",
+]);
+
+/** Get the mirror variant key, if one exists */
+export function getMirrorVariant(key: string): string | undefined {
+  return MIRROR_MAP.get(key);
+}
+
+/** Get all available layout variants for a given photo count (excluding hidden mirrors) */
 export function getVariantsForCount(count: number): LayoutVariant[] {
-  return ALL_VARIANTS.filter((v) => v.photoCount === count);
+  return ALL_VARIANTS.filter((v) => v.photoCount === count && !HIDDEN_MIRRORS.has(v.key));
 }
 
 /** Get the slot positions for a variant (for thumbnail previews) */

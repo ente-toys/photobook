@@ -5,6 +5,7 @@ import { Box } from "@mui/material";
 import {
   getVariantsForCount,
   getVariantPreview,
+  getMirrorVariant,
   type LayoutVariant,
 } from "@/lib/layouts";
 
@@ -120,15 +121,28 @@ export default function LayoutPicker({
         ...(side === "left" ? { pr: 1 } : { pl: 1 }),
       }}
     >
-      {variants.map((v) => (
-        <VariantThumbnail
-          key={v.key}
-          variant={v}
-          isActive={v.key === currentVariant}
-          thumbnailUrls={thumbnailUrls}
-          onClick={() => onSelect(v.key)}
-        />
-      ))}
+      {variants.map((v) => {
+        // A hidden mirror's primary should show as active
+        const mirrorOfCurrent = currentVariant ? getMirrorVariant(currentVariant) : undefined;
+        const isActive = v.key === currentVariant || v.key === mirrorOfCurrent;
+        return (
+          <VariantThumbnail
+            key={v.key}
+            variant={v}
+            isActive={isActive}
+            thumbnailUrls={thumbnailUrls}
+            onClick={() => {
+              if (isActive) {
+                // Toggle to mirror variant if one exists
+                const mirror = getMirrorVariant(currentVariant!);
+                if (mirror) onSelect(mirror);
+              } else {
+                onSelect(v.key);
+              }
+            }}
+          />
+        );
+      })}
     </Box>
   );
 }
