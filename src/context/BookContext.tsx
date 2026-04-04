@@ -23,7 +23,6 @@ import {
   savePhotos,
   getPhotos,
   savePhotoBlob,
-  getPhotoBlob,
   saveThumbnail,
   getThumbnail,
   saveAppView,
@@ -43,7 +42,6 @@ interface BookContextValue {
 
   // Photos
   photos: Photo[];
-  photoUrls: Map<string, string>; // id -> objectURL (full)
   thumbnailUrls: Map<string, string>; // id -> objectURL (thumb)
   addPhotos: (files: File[], replace?: boolean) => Promise<void>;
   processingPhotos: boolean;
@@ -119,7 +117,6 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [restored, setRestored] = useState(false);
   const [photos, setPhotos] = useState<Photo[]>([]);
-  const [photoUrls, setPhotoUrls] = useState<Map<string, string>>(new Map());
   const [thumbnailUrls, setThumbnailUrls] = useState<Map<string, string>>(
     new Map()
   );
@@ -197,19 +194,12 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
         ]);
 
         if (savedPhotos && savedPhotos.length > 0 && savedBook) {
-          // Restore photo URLs from IndexedDB
-          const fullUrls = new Map<string, string>();
+          // Restore thumbnail URLs from IndexedDB (full-res loaded on demand for export)
           const thumbUrls = new Map<string, string>();
 
           await Promise.all(
             savedPhotos.map(async (photo) => {
-              const [blob, thumb] = await Promise.all([
-                getPhotoBlob(photo.id),
-                getThumbnail(photo.id),
-              ]);
-              if (blob) {
-                fullUrls.set(photo.id, URL.createObjectURL(blob));
-              }
+              const thumb = await getThumbnail(photo.id);
               if (thumb) {
                 thumbUrls.set(photo.id, URL.createObjectURL(thumb));
               }
@@ -217,7 +207,6 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
           );
 
           setPhotos(savedPhotos);
-          setPhotoUrls(fullUrls);
           setThumbnailUrls(thumbUrls);
           setBookRaw(savedBook);
           setCurrentSpreadIndex(savedBook.currentSpreadIndex);
@@ -250,13 +239,11 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
 
       if (replace) {
         // Clear previous session when starting fresh from start page
-        photoUrls.forEach((url) => URL.revokeObjectURL(url));
         thumbnailUrls.forEach((url) => URL.revokeObjectURL(url));
         await clearAll();
       }
 
       const newPhotos: Photo[] = [];
-      const newFullUrls = replace ? new Map<string, string>() : new Map(photoUrls);
       const newThumbUrls = replace ? new Map<string, string>() : new Map(thumbnailUrls);
 
       // Flush progress to state only on animation frames
@@ -271,7 +258,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
       };
 
       // Process each photo: HEIC conversion, dimensions, thumbnail, IndexedDB save
-      type PhotoResult = { photo: Photo; url: string; thumbUrl: string };
+      type PhotoResult = { photo: Photo; thumbUrl: string };
       const results: (PhotoResult | null)[] = new Array(files.length).fill(null);
       let completed = 0;
 
@@ -301,9 +288,10 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        // Get dimensions
-        const url = URL.createObjectURL(blob);
-        const img = await loadImage(url);
+        // Get dimensions (temporary URL, revoked after use to save memory)
+        const tempUrl = URL.createObjectURL(blob);
+        const img = await loadImage(tempUrl);
+        URL.revokeObjectURL(tempUrl);
         const dateTaken = await extractExifDate(file);
         const thumb = await createThumbnail(img, 1080);
 
@@ -320,7 +308,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
         await saveThumbnail(photo.id, thumb);
 
         const thumbUrl = URL.createObjectURL(thumb);
-        results[index] = { photo, url, thumbUrl };
+        results[index] = { photo, thumbUrl };
         completed++;
         scheduleProgressUpdate(Math.round((completed / files.length) * 100));
       };
@@ -342,7 +330,6 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
       // Collect results in original file order
       for (const result of results) {
         if (result) {
-          newFullUrls.set(result.photo.id, result.url);
           newThumbUrls.set(result.photo.id, result.thumbUrl);
           newPhotos.push(result.photo);
         }
@@ -357,7 +344,6 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
 
       const allPhotos = replace ? newPhotos : [...photos, ...newPhotos];
       setPhotos(allPhotos);
-      setPhotoUrls(newFullUrls);
       setThumbnailUrls(newThumbUrls);
 
       // Generate auto layout (bypass undo tracking — this is not a user action)
@@ -372,7 +358,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
       setProcessingPhotos(false);
       setAppViewState("edit");
     },
-    [photos, photoUrls, thumbnailUrls]
+    [photos, thumbnailUrls]
   );
 
   const addPage = useCallback(
@@ -720,12 +706,10 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
 
   const startOver = useCallback(async () => {
     // Revoke all URLs
-    photoUrls.forEach((url) => URL.revokeObjectURL(url));
     thumbnailUrls.forEach((url) => URL.revokeObjectURL(url));
 
     await clearAll();
     setPhotos([]);
-    setPhotoUrls(new Map());
     setThumbnailUrls(new Map());
     setBookRaw(emptyBook);
     undoStackRef.current = [];
@@ -735,7 +719,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
     setCurrentSpreadIndex(0);
     setAppViewState("start");
     setRestored(false);
-  }, [photoUrls, thumbnailUrls]);
+  }, [thumbnailUrls]);
 
   return (
     <BookContext.Provider
@@ -746,7 +730,6 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
         restored,
         setRestored,
         photos,
-        photoUrls,
         thumbnailUrls,
         addPhotos,
         processingPhotos,

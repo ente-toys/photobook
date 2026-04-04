@@ -2,6 +2,7 @@ import { jsPDF } from "jspdf";
 import JSZip from "jszip";
 import type { BookPage, Photo } from "./types";
 import { A5_WIDTH_MM, A5_HEIGHT_MM } from "./types";
+import { getPhotoBlob } from "./db";
 
 const DPI = 300;
 const A5_WIDTH_PX = Math.round((A5_WIDTH_MM / 25.4) * DPI);
@@ -17,9 +18,29 @@ async function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
+/** Lazily loads full-res photo URLs from IndexedDB, caching for the duration of an export. */
+function createPhotoUrlResolver() {
+  const cache = new Map<string, string>();
+
+  return {
+    async resolve(photoId: string): Promise<string | null> {
+      if (cache.has(photoId)) return cache.get(photoId)!;
+      const blob = await getPhotoBlob(photoId);
+      if (!blob) return null;
+      const url = URL.createObjectURL(blob);
+      cache.set(photoId, url);
+      return url;
+    },
+    revokeAll() {
+      cache.forEach((url) => URL.revokeObjectURL(url));
+      cache.clear();
+    },
+  };
+}
+
 export async function renderPageToCanvas(
   page: BookPage,
-  photoUrls: Map<string, string>,
+  resolvePhotoUrl: (photoId: string) => Promise<string | null>,
   width: number,
   height: number,
   isBackCover = false
@@ -36,7 +57,7 @@ export async function renderPageToCanvas(
   // Draw photo slots
   for (const slot of page.slots) {
     if (!slot.photoId) continue;
-    const url = photoUrls.get(slot.photoId);
+    const url = await resolvePhotoUrl(slot.photoId);
     if (!url) continue;
 
     try {
@@ -160,126 +181,138 @@ export async function renderPageToCanvas(
 
 export async function exportPdfA5(
   pages: BookPage[],
-  photoUrls: Map<string, string>,
   onProgress?: (pct: number) => void
 ): Promise<Blob> {
-  const pdf = new jsPDF({
-    orientation: "portrait",
-    unit: "mm",
-    format: [A5_WIDTH_MM, A5_HEIGHT_MM],
-  });
+  const resolver = createPhotoUrlResolver();
+  try {
+    const pdf = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: [A5_WIDTH_MM, A5_HEIGHT_MM],
+    });
 
-  for (let i = 0; i < pages.length; i++) {
-    if (i > 0) pdf.addPage([A5_WIDTH_MM, A5_HEIGHT_MM], "portrait");
+    for (let i = 0; i < pages.length; i++) {
+      if (i > 0) pdf.addPage([A5_WIDTH_MM, A5_HEIGHT_MM], "portrait");
 
-    const canvas = await renderPageToCanvas(
-      pages[i],
-      photoUrls,
-      A5_WIDTH_PX,
-      A5_HEIGHT_PX,
-      i === pages.length - 1
-    );
-    const imgData = canvas.toDataURL("image/jpeg", 0.95);
-    pdf.addImage(imgData, "JPEG", 0, 0, A5_WIDTH_MM, A5_HEIGHT_MM);
+      const canvas = await renderPageToCanvas(
+        pages[i],
+        resolver.resolve,
+        A5_WIDTH_PX,
+        A5_HEIGHT_PX,
+        i === pages.length - 1
+      );
+      const imgData = canvas.toDataURL("image/jpeg", 0.95);
+      pdf.addImage(imgData, "JPEG", 0, 0, A5_WIDTH_MM, A5_HEIGHT_MM);
 
-    onProgress?.(Math.round(((i + 1) / pages.length) * 100));
+      onProgress?.(Math.round(((i + 1) / pages.length) * 100));
+    }
+
+    return pdf.output("blob");
+  } finally {
+    resolver.revokeAll();
   }
-
-  return pdf.output("blob");
 }
 
 export async function exportPdfA4Spreads(
   pages: BookPage[],
-  photoUrls: Map<string, string>,
   onProgress?: (pct: number) => void
 ): Promise<Blob> {
-  const A4W = A5_HEIGHT_MM * 2; // 420mm
-  const A4H = A5_WIDTH_MM; // actually A5_HEIGHT for landscape... let me recalculate
-  // A4 landscape = 297mm x 210mm, but we want two A5 pages side by side
-  // Two A5 portrait pages = 148*2 x 210 = 296mm x 210mm
-  const spreadW = A5_WIDTH_MM * 2;
-  const spreadH = A5_HEIGHT_MM;
+  const resolver = createPhotoUrlResolver();
+  try {
+    const A4W = A5_HEIGHT_MM * 2; // 420mm
+    const A4H = A5_WIDTH_MM; // actually A5_HEIGHT for landscape... let me recalculate
+    // A4 landscape = 297mm x 210mm, but we want two A5 pages side by side
+    // Two A5 portrait pages = 148*2 x 210 = 296mm x 210mm
+    const spreadW = A5_WIDTH_MM * 2;
+    const spreadH = A5_HEIGHT_MM;
 
-  const pdf = new jsPDF({
-    orientation: "landscape",
-    unit: "mm",
-    format: [spreadW, spreadH],
-  });
+    const pdf = new jsPDF({
+      orientation: "landscape",
+      unit: "mm",
+      format: [spreadW, spreadH],
+    });
 
-  const totalSpreads = Math.ceil(pages.length / 2);
+    const totalSpreads = Math.ceil(pages.length / 2);
 
-  for (let s = 0; s < totalSpreads; s++) {
-    if (s > 0) pdf.addPage([spreadW, spreadH], "landscape");
+    for (let s = 0; s < totalSpreads; s++) {
+      if (s > 0) pdf.addPage([spreadW, spreadH], "landscape");
 
-    const leftIdx = s * 2;
-    const rightIdx = s * 2 + 1;
+      const leftIdx = s * 2;
+      const rightIdx = s * 2 + 1;
 
-    // Left page
-    if (leftIdx < pages.length) {
-      const canvas = await renderPageToCanvas(
-        pages[leftIdx],
-        photoUrls,
-        A5_WIDTH_PX,
-        A5_HEIGHT_PX,
-        leftIdx === pages.length - 1
-      );
-      const imgData = canvas.toDataURL("image/jpeg", 0.95);
-      pdf.addImage(imgData, "JPEG", 0, 0, A5_WIDTH_MM, A5_HEIGHT_MM);
+      // Left page
+      if (leftIdx < pages.length) {
+        const canvas = await renderPageToCanvas(
+          pages[leftIdx],
+          resolver.resolve,
+          A5_WIDTH_PX,
+          A5_HEIGHT_PX,
+          leftIdx === pages.length - 1
+        );
+        const imgData = canvas.toDataURL("image/jpeg", 0.95);
+        pdf.addImage(imgData, "JPEG", 0, 0, A5_WIDTH_MM, A5_HEIGHT_MM);
+      }
+
+      // Right page
+      if (rightIdx < pages.length) {
+        const canvas = await renderPageToCanvas(
+          pages[rightIdx],
+          resolver.resolve,
+          A5_WIDTH_PX,
+          A5_HEIGHT_PX,
+          rightIdx === pages.length - 1
+        );
+        const imgData = canvas.toDataURL("image/jpeg", 0.95);
+        pdf.addImage(
+          imgData,
+          "JPEG",
+          A5_WIDTH_MM,
+          0,
+          A5_WIDTH_MM,
+          A5_HEIGHT_MM
+        );
+      }
+
+      onProgress?.(Math.round(((s + 1) / totalSpreads) * 100));
     }
 
-    // Right page
-    if (rightIdx < pages.length) {
-      const canvas = await renderPageToCanvas(
-        pages[rightIdx],
-        photoUrls,
-        A5_WIDTH_PX,
-        A5_HEIGHT_PX,
-        rightIdx === pages.length - 1
-      );
-      const imgData = canvas.toDataURL("image/jpeg", 0.95);
-      pdf.addImage(
-        imgData,
-        "JPEG",
-        A5_WIDTH_MM,
-        0,
-        A5_WIDTH_MM,
-        A5_HEIGHT_MM
-      );
-    }
-
-    onProgress?.(Math.round(((s + 1) / totalSpreads) * 100));
+    return pdf.output("blob");
+  } finally {
+    resolver.revokeAll();
   }
-
-  return pdf.output("blob");
 }
 
 export async function exportPngZip(
   pages: BookPage[],
-  photoUrls: Map<string, string>,
   onProgress?: (pct: number) => void
 ): Promise<Blob> {
-  const zip = new JSZip();
+  const resolver = createPhotoUrlResolver();
+  try {
+    const zip = new JSZip();
 
-  for (let i = 0; i < pages.length; i++) {
-    const canvas = await renderPageToCanvas(
-      pages[i],
-      photoUrls,
-      A5_WIDTH_PX,
-      A5_HEIGHT_PX,
-      i === pages.length - 1
-    );
+    for (let i = 0; i < pages.length; i++) {
+      const canvas = await renderPageToCanvas(
+        pages[i],
+        resolver.resolve,
+        A5_WIDTH_PX,
+        A5_HEIGHT_PX,
+        i === pages.length - 1
+      );
 
-    const blob = await new Promise<Blob>((resolve) =>
-      canvas.toBlob((b) => resolve(b!), "image/png")
-    );
+      const blob = await new Promise<Blob>((resolve) =>
+        canvas.toBlob((b) => resolve(b!), "image/png")
+      );
 
-    const pageNum = String(i + 1).padStart(3, "0");
-    zip.file(`page_${pageNum}.png`, blob);
+      const pageNum = String(i + 1).padStart(3, "0");
+      zip.file(`page_${pageNum}.png`, blob);
 
-    onProgress?.(Math.round(((i + 1) / pages.length) * 100));
+      onProgress?.(Math.round(((i + 1) / pages.length) * 100));
+    }
+
+    return zip.generateAsync({ type: "blob" });
+  } finally {
+    resolver.revokeAll();
   }
-
-  return zip.generateAsync({ type: "blob" });
 }
 
 export function downloadBlob(blob: Blob, filename: string) {

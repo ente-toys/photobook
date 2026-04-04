@@ -28,7 +28,7 @@ import {
 } from "@/lib/export";
 
 export default function ResultsPage() {
-  const { book, setAppView, photoUrls } = useBook();
+  const { book, setAppView } = useBook();
   const viewerRef = useRef<BookViewerHandle>(null);
   // pageIndex is the 0-based page-flip index of the current left-most visible page
   const [pageIndex, setPageIndex] = useState(0);
@@ -76,19 +76,18 @@ export default function ResultsPage() {
 
         switch (type) {
           case "pdf-a5":
-            blob = await exportPdfA5(pages, photoUrls, setExportProgress);
+            blob = await exportPdfA5(pages, setExportProgress);
             filename = "photobook-A5.pdf";
             break;
           case "pdf-a4":
             blob = await exportPdfA4Spreads(
               pages,
-              photoUrls,
               setExportProgress
             );
             filename = "photobook-A4-spreads.pdf";
             break;
           case "png-zip":
-            blob = await exportPngZip(pages, photoUrls, setExportProgress);
+            blob = await exportPngZip(pages, setExportProgress);
             filename = "photobook-pages.zip";
             break;
         }
@@ -100,7 +99,7 @@ export default function ResultsPage() {
         setExporting(false);
       }
     },
-    [pages, photoUrls]
+    [pages]
   );
 
   return (
