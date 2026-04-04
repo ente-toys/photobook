@@ -3,7 +3,7 @@ import JSZip from "jszip";
 import type { BookPage, Photo } from "./types";
 import { A5_WIDTH_MM, A5_HEIGHT_MM } from "./types";
 
-const DPI = 200;
+const DPI = 300;
 const A5_WIDTH_PX = Math.round((A5_WIDTH_MM / 25.4) * DPI);
 const A5_HEIGHT_PX = Math.round((A5_HEIGHT_MM / 25.4) * DPI);
 
