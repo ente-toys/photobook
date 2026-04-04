@@ -63,9 +63,18 @@ function PhotoSlotRenderer({
       setImage(null);
       return;
     }
+    let cancelled = false;
     const img = new window.Image();
+    img.onload = () => {
+      if (!cancelled) setImage(img);
+    };
+    img.onerror = () => {
+      if (!cancelled) setImage(null);
+    };
     img.src = photoUrl;
-    img.onload = () => setImage(img);
+    return () => {
+      cancelled = true;
+    };
   }, [photoUrl]);
 
   const clipFunc = (ctx: Konva.Context) => {
