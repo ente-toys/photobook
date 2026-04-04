@@ -198,6 +198,50 @@ function gen3EqualCols(ids: string[]): PhotoSlot[] {
   ];
 }
 
+function gen3DominantTop(ids: string[]): PhotoSlot[] {
+  const bigH = CH * 0.75;
+  const smallH = CH - bigH - V_GAP;
+  const halfW = (CW - H_GAP) / 2;
+  return [
+    makeSlot(ids[0], LEFT, TOP, CW, bigH),
+    makeSlot(ids[1], LEFT, TOP + bigH + V_GAP, halfW, smallH),
+    makeSlot(ids[2], LEFT + halfW + H_GAP, TOP + bigH + V_GAP, halfW, smallH),
+  ];
+}
+
+function gen3DominantBottom(ids: string[]): PhotoSlot[] {
+  const bigH = CH * 0.75;
+  const smallH = CH - bigH - V_GAP;
+  const halfW = (CW - H_GAP) / 2;
+  return [
+    makeSlot(ids[0], LEFT, TOP, halfW, smallH),
+    makeSlot(ids[1], LEFT + halfW + H_GAP, TOP, halfW, smallH),
+    makeSlot(ids[2], LEFT, TOP + smallH + V_GAP, CW, bigH),
+  ];
+}
+
+function gen3DominantLeft(ids: string[]): PhotoSlot[] {
+  const bigW = CW * 0.75;
+  const smallW = CW - bigW - H_GAP;
+  const halfH = (CH - V_GAP) / 2;
+  return [
+    makeSlot(ids[0], LEFT, TOP, bigW, CH),
+    makeSlot(ids[1], LEFT + bigW + H_GAP, TOP, smallW, halfH),
+    makeSlot(ids[2], LEFT + bigW + H_GAP, TOP + halfH + V_GAP, smallW, halfH),
+  ];
+}
+
+function gen3DominantRight(ids: string[]): PhotoSlot[] {
+  const bigW = CW * 0.75;
+  const smallW = CW - bigW - H_GAP;
+  const halfH = (CH - V_GAP) / 2;
+  return [
+    makeSlot(ids[0], LEFT, TOP, smallW, halfH),
+    makeSlot(ids[1], LEFT, TOP + halfH + V_GAP, smallW, halfH),
+    makeSlot(ids[2], LEFT + smallW + H_GAP, TOP, bigW, CH),
+  ];
+}
+
 // ── 4-photo variants ──────────────────────────────────────────────
 
 function gen4Grid(ids: string[]): PhotoSlot[] {
@@ -269,6 +313,64 @@ function gen4EqualRows(ids: string[]): PhotoSlot[] {
   ];
 }
 
+function gen4WideLeft(ids: string[]): PhotoSlot[] {
+  const bigW = CW * 0.62;
+  const smallW = CW - bigW - H_GAP;
+  const halfH = (CH - V_GAP) / 2;
+  return [
+    makeSlot(ids[0], LEFT, TOP, bigW, halfH),
+    makeSlot(ids[1], LEFT + bigW + H_GAP, TOP, smallW, halfH),
+    makeSlot(ids[2], LEFT, TOP + halfH + V_GAP, bigW, halfH),
+    makeSlot(ids[3], LEFT + bigW + H_GAP, TOP + halfH + V_GAP, smallW, halfH),
+  ];
+}
+
+function gen4WideRight(ids: string[]): PhotoSlot[] {
+  const bigW = CW * 0.62;
+  const smallW = CW - bigW - H_GAP;
+  const halfH = (CH - V_GAP) / 2;
+  return [
+    makeSlot(ids[0], LEFT, TOP, smallW, halfH),
+    makeSlot(ids[1], LEFT + smallW + H_GAP, TOP, bigW, halfH),
+    makeSlot(ids[2], LEFT, TOP + halfH + V_GAP, smallW, halfH),
+    makeSlot(ids[3], LEFT + smallW + H_GAP, TOP + halfH + V_GAP, bigW, halfH),
+  ];
+}
+
+function gen4TallTop(ids: string[]): PhotoSlot[] {
+  const bigH = CH * 0.62;
+  const smallH = CH - bigH - V_GAP;
+  const halfW = (CW - H_GAP) / 2;
+  return [
+    makeSlot(ids[0], LEFT, TOP, halfW, bigH),
+    makeSlot(ids[1], LEFT + halfW + H_GAP, TOP, halfW, bigH),
+    makeSlot(ids[2], LEFT, TOP + bigH + V_GAP, halfW, smallH),
+    makeSlot(ids[3], LEFT + halfW + H_GAP, TOP + bigH + V_GAP, halfW, smallH),
+  ];
+}
+
+function gen4TallBottom(ids: string[]): PhotoSlot[] {
+  const bigH = CH * 0.62;
+  const smallH = CH - bigH - V_GAP;
+  const halfW = (CW - H_GAP) / 2;
+  return [
+    makeSlot(ids[0], LEFT, TOP, halfW, smallH),
+    makeSlot(ids[1], LEFT + halfW + H_GAP, TOP, halfW, smallH),
+    makeSlot(ids[2], LEFT, TOP + smallH + V_GAP, halfW, bigH),
+    makeSlot(ids[3], LEFT + halfW + H_GAP, TOP + smallH + V_GAP, halfW, bigH),
+  ];
+}
+
+function gen4EqualCols(ids: string[]): PhotoSlot[] {
+  const colW = (CW - H_GAP * 3) / 4;
+  return [
+    makeSlot(ids[0], LEFT, TOP, colW, CH),
+    makeSlot(ids[1], LEFT + colW + H_GAP, TOP, colW, CH),
+    makeSlot(ids[2], LEFT + (colW + H_GAP) * 2, TOP, colW, CH),
+    makeSlot(ids[3], LEFT + (colW + H_GAP) * 3, TOP, colW, CH),
+  ];
+}
+
 // ── Variant registry ──────────────────────────────────────────────
 
 const ALL_VARIANTS: LayoutVariant[] = [
@@ -288,6 +390,10 @@ const ALL_VARIANTS: LayoutVariant[] = [
   { key: "3-left1-right2", photoCount: 3, generate: gen3Left1Right2 },
   { key: "3-bot1-top2", photoCount: 3, generate: gen3Bot1Top2 },
   { key: "3-right1-left2", photoCount: 3, generate: gen3Right1Left2 },
+  { key: "3-dominant-top", photoCount: 3, generate: gen3DominantTop },
+  { key: "3-dominant-bottom", photoCount: 3, generate: gen3DominantBottom },
+  { key: "3-dominant-left", photoCount: 3, generate: gen3DominantLeft },
+  { key: "3-dominant-right", photoCount: 3, generate: gen3DominantRight },
   { key: "3-equal-rows", photoCount: 3, generate: gen3EqualRows },
   { key: "3-equal-cols", photoCount: 3, generate: gen3EqualCols },
   // 4 photos
@@ -296,7 +402,11 @@ const ALL_VARIANTS: LayoutVariant[] = [
   { key: "4-bot1-top3", photoCount: 4, generate: gen4Bot1Top3 },
   { key: "4-left1-right3", photoCount: 4, generate: gen4Left1Right3 },
   { key: "4-right1-left3", photoCount: 4, generate: gen4Right1Left3 },
-  { key: "4-equal-rows", photoCount: 4, generate: gen4EqualRows },
+  { key: "4-wide-left", photoCount: 4, generate: gen4WideLeft },
+  { key: "4-wide-right", photoCount: 4, generate: gen4WideRight },
+  { key: "4-tall-top", photoCount: 4, generate: gen4TallTop },
+  { key: "4-tall-bottom", photoCount: 4, generate: gen4TallBottom },
+  { key: "4-equal-cols", photoCount: 4, generate: gen4EqualCols },
 ];
 
 const VARIANT_MAP = new Map(ALL_VARIANTS.map((v) => [v.key, v]));
@@ -311,10 +421,18 @@ const MIRROR_MAP = new Map<string, string>([
   ["3-bot1-top2", "3-top1-bot2"],
   ["3-left1-right2", "3-right1-left2"],
   ["3-right1-left2", "3-left1-right2"],
+  ["3-dominant-top", "3-dominant-bottom"],
+  ["3-dominant-bottom", "3-dominant-top"],
+  ["3-dominant-left", "3-dominant-right"],
+  ["3-dominant-right", "3-dominant-left"],
   ["4-top1-bot3", "4-bot1-top3"],
   ["4-bot1-top3", "4-top1-bot3"],
   ["4-left1-right3", "4-right1-left3"],
   ["4-right1-left3", "4-left1-right3"],
+  ["4-wide-left", "4-wide-right"],
+  ["4-wide-right", "4-wide-left"],
+  ["4-tall-top", "4-tall-bottom"],
+  ["4-tall-bottom", "4-tall-top"],
 ]);
 
 /** Variants hidden from the picker (mirrors of a primary variant) */
@@ -323,8 +441,12 @@ const HIDDEN_MIRRORS = new Set([
   "2-big-right",
   "3-bot1-top2",
   "3-right1-left2",
+  "3-dominant-bottom",
+  "3-dominant-right",
   "4-bot1-top3",
   "4-right1-left3",
+  "4-wide-right",
+  "4-tall-bottom",
 ]);
 
 /** Get the mirror variant key, if one exists */
