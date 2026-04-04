@@ -11,6 +11,165 @@ import type { BookPage } from "@/lib/types";
 import type { CaptionPosition } from "./PageCanvas";
 import type { DragInfo } from "@/hooks/usePhotoDrag";
 
+function SlotControls({
+  pageId,
+  slotId,
+  slot,
+  pageWidth,
+  pageHeight,
+  visible,
+}: {
+  pageId: string;
+  slotId: string;
+  slot: { x: number; y: number; width: number; height: number; cropZoom: number };
+  pageWidth: number;
+  pageHeight: number;
+  visible: boolean;
+}) {
+  const { updateSlot, removeSlot } = useBook();
+
+  const handleZoomIn = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    updateSlot(pageId, slotId, {
+      cropZoom: Math.min(slot.cropZoom + 0.2, 3),
+    });
+  };
+
+  const handleZoomOut = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    updateSlot(pageId, slotId, {
+      cropZoom: Math.max(slot.cropZoom - 0.2, 1),
+    });
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    removeSlot(pageId, slotId);
+  };
+
+  const btnSize = Math.max(22, Math.min(28, pageWidth * 0.06));
+  const iconSize = btnSize * 0.58;
+  const padding = Math.max(4, pageWidth * 0.012);
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: (slot.x / 100) * pageWidth,
+        top: (slot.y / 100) * pageHeight,
+        width: (slot.width / 100) * pageWidth,
+        height: (slot.height / 100) * pageHeight,
+        zIndex: 3,
+        pointerEvents: "none",
+      }}
+    >
+      {/* Delete — top right */}
+      <div
+        onClick={handleDelete}
+        style={{
+          position: "absolute",
+          top: padding,
+          right: padding,
+          width: btnSize,
+          height: btnSize,
+          borderRadius: btnSize / 2,
+          background: "rgba(0,0,0,0.45)",
+          backdropFilter: "blur(8px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: "pointer",
+          opacity: visible ? 1 : 0,
+          transition: "opacity 0.15s ease",
+          pointerEvents: visible ? "auto" : "none",
+        }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLDivElement).style.background = "rgba(186,26,26,0.7)";
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLDivElement).style.background = "rgba(0,0,0,0.45)";
+        }}
+      >
+        <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none">
+          <path
+            d="M7 4V2h10v2h5v2h-2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6H2V4h5zm2 4v10h2V8H9zm4 0v10h2V8h-2z"
+            fill="rgba(255,255,255,0.9)"
+          />
+        </svg>
+      </div>
+
+      {/* Zoom controls — bottom right */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: padding,
+          right: padding,
+          display: "flex",
+          gap: 2,
+          borderRadius: btnSize / 2,
+          background: "rgba(0,0,0,0.45)",
+          backdropFilter: "blur(8px)",
+          padding: 2,
+          opacity: visible ? 1 : 0,
+          transition: "opacity 0.15s ease",
+          pointerEvents: visible ? "auto" : "none",
+        }}
+      >
+        <div
+          onClick={handleZoomOut}
+          style={{
+            width: btnSize,
+            height: btnSize,
+            borderRadius: btnSize / 2,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            transition: "background 0.15s",
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLDivElement).style.background = "rgba(255,255,255,0.15)";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLDivElement).style.background = "transparent";
+          }}
+        >
+          <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none">
+            <circle cx="11" cy="11" r="7" stroke="rgba(255,255,255,0.9)" strokeWidth="2" />
+            <path d="M8 11h6" stroke="rgba(255,255,255,0.9)" strokeWidth="2" strokeLinecap="round" />
+            <path d="M16.5 16.5L21 21" stroke="rgba(255,255,255,0.9)" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        </div>
+        <div
+          onClick={handleZoomIn}
+          style={{
+            width: btnSize,
+            height: btnSize,
+            borderRadius: btnSize / 2,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            transition: "background 0.15s",
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLDivElement).style.background = "rgba(255,255,255,0.15)";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLDivElement).style.background = "transparent";
+          }}
+        >
+          <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none">
+            <circle cx="11" cy="11" r="7" stroke="rgba(255,255,255,0.9)" strokeWidth="2" />
+            <path d="M11 8v6M8 11h6" stroke="rgba(255,255,255,0.9)" strokeWidth="2" strokeLinecap="round" />
+            <path d="M16.5 16.5L21 21" stroke="rgba(255,255,255,0.9)" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export const PICKER_WIDTH = 60;
 
 interface SpreadPageProps {
@@ -266,6 +425,23 @@ export default function SpreadPage({
                     : "auto",
                 zIndex: 2,
               }}
+            />
+          );
+        })}
+        {/* Photo slot controls (zoom/delete) on selected slots */}
+        {page.slots.map((slot) => {
+          const isSelected =
+            selectedPageId === page.id && selectedSlotId === slot.id;
+          if (!isSelected || !slot.photoId) return null;
+          return (
+            <SlotControls
+              key={`ctrl-${slot.id}`}
+              pageId={page.id}
+              slotId={slot.id}
+              slot={slot}
+              pageWidth={pageWidth}
+              pageHeight={pageHeight}
+              visible={isHovered}
             />
           );
         })}

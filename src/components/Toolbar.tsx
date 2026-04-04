@@ -7,32 +7,25 @@ import NoteAddIcon from "@mui/icons-material/NoteAdd";
 
 import TextFieldsIcon from "@mui/icons-material/TextFields";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
-import ZoomInIcon from "@mui/icons-material/ZoomIn";
-import ZoomOutIcon from "@mui/icons-material/ZoomOut";
 import { useBook } from "@/context/BookContext";
 
 interface ToolbarProps {
   onAddPhotos: () => void;
-
   onAddText: () => void;
-  selectedSlotId: string | null;
-  selectedPageId: string | null;
   selectedTextId: string | null;
+  selectedPageId: string | null;
 }
 
 export default function Toolbar({
   onAddPhotos,
   onAddText,
-  selectedSlotId,
-  selectedPageId,
   selectedTextId,
+  selectedPageId,
 }: ToolbarProps) {
   const {
     addPage,
     removePage,
     removeTextBlock,
-    removeSlot,
-    updateSlot,
     currentSpreadIndex,
     book,
   } = useBook();
@@ -48,32 +41,6 @@ export default function Toolbar({
   const handleDeleteSelected = () => {
     if (selectedTextId && selectedPageId) {
       removeTextBlock(selectedPageId, selectedTextId);
-    } else if (selectedSlotId && selectedPageId) {
-      removeSlot(selectedPageId, selectedSlotId);
-    }
-  };
-
-  const handleZoomIn = () => {
-    if (selectedSlotId && selectedPageId) {
-      const page = book.pages.find((p) => p.id === selectedPageId);
-      const slot = page?.slots.find((s) => s.id === selectedSlotId);
-      if (slot) {
-        updateSlot(selectedPageId, selectedSlotId, {
-          cropZoom: Math.min(slot.cropZoom + 0.2, 3),
-        });
-      }
-    }
-  };
-
-  const handleZoomOut = () => {
-    if (selectedSlotId && selectedPageId) {
-      const page = book.pages.find((p) => p.id === selectedPageId);
-      const slot = page?.slots.find((s) => s.id === selectedSlotId);
-      if (slot) {
-        updateSlot(selectedPageId, selectedSlotId, {
-          cropZoom: Math.max(slot.cropZoom - 0.2, 1),
-        });
-      }
     }
   };
 
@@ -147,41 +114,7 @@ export default function Toolbar({
         </IconButton>
       </Tooltip>
 
-      {selectedSlotId && (
-        <>
-          <Divider sx={{ width: 32, my: 0.5, borderColor: "rgba(255,255,255,0.1)" }} />
-          <Tooltip title="Zoom in" placement="right">
-            <IconButton
-              onClick={handleZoomIn}
-              sx={{
-                width: 44,
-                height: 44,
-                color: "#888",
-                "&:hover": { color: "#08C225", bgcolor: "rgba(255,255,255,0.08)" },
-                borderRadius: 2,
-              }}
-            >
-              <ZoomInIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Zoom out" placement="right">
-            <IconButton
-              onClick={handleZoomOut}
-              sx={{
-                width: 44,
-                height: 44,
-                color: "#888",
-                "&:hover": { color: "#08C225", bgcolor: "rgba(255,255,255,0.08)" },
-                borderRadius: 2,
-              }}
-            >
-              <ZoomOutIcon />
-            </IconButton>
-          </Tooltip>
-        </>
-      )}
-
-      {(selectedSlotId || selectedTextId) && (
+      {selectedTextId && (
         <>
           <Divider sx={{ width: 32, my: 0.5, borderColor: "rgba(255,255,255,0.1)" }} />
           <Tooltip title="Delete selected" placement="right">

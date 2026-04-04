@@ -211,11 +211,9 @@ export default function EditPage() {
       {/* Left Toolbar */}
       <Toolbar
         onAddPhotos={handleAddPhotos}
-
         onAddText={handleAddText}
-        selectedSlotId={selectedSlotId}
-        selectedPageId={selectedPageId}
         selectedTextId={selectedTextId}
+        selectedPageId={selectedPageId}
       />
 
       {/* Main Canvas Area - scrollable */}
