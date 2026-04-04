@@ -30,7 +30,7 @@ import {
   getAppView,
   clearAll,
 } from "@/lib/db";
-import { generateAutoLayout, chooseBestLayout, applyVariant, getDefaultPadding } from "@/lib/layouts";
+import { generateAutoLayout, chooseBestLayout, applyVariant, getDefaultPadding, getVariantsForCount } from "@/lib/layouts";
 import { extractExifDate, createThumbnail } from "@/lib/images";
 
 interface BookContextValue {
@@ -388,14 +388,51 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
 
   const removeSlot = useCallback(
     (pageId: string, slotId: string) => {
-      setBook((prev) => ({
-        ...prev,
-        pages: prev.pages.map((p) =>
-          p.id === pageId
-            ? { ...p, slots: p.slots.filter((s) => s.id !== slotId) }
-            : p
-        ),
-      }));
+      setBook((prev) => {
+        const page = prev.pages.find((p) => p.id === pageId);
+        if (!page) return prev;
+
+        const remainingPhotos = page.slots
+          .filter((s) => s.id !== slotId && s.photoId)
+          .map((s) => s.photoId!);
+
+        if (remainingPhotos.length === 0) {
+          return {
+            ...prev,
+            pages: prev.pages.map((p) =>
+              p.id === pageId ? { ...p, slots: [], layoutVariant: undefined } : p
+            ),
+          };
+        }
+
+        // Pick the first layout variant for the new count and re-apply
+        const variants = getVariantsForCount(remainingPhotos.length);
+        const variantKey = variants[0]?.key;
+        if (!variantKey) {
+          return {
+            ...prev,
+            pages: prev.pages.map((p) =>
+              p.id === pageId
+                ? { ...p, slots: p.slots.filter((s) => s.id !== slotId) }
+                : p
+            ),
+          };
+        }
+
+        const defaults = getDefaultPadding(variantKey);
+        const paddingH = defaults.h || (page.paddingH ?? 0);
+        const paddingV = defaults.v || (page.paddingV ?? 0);
+        const newSlots = applyVariant(variantKey, remainingPhotos, paddingH, paddingV);
+
+        return {
+          ...prev,
+          pages: prev.pages.map((p) =>
+            p.id === pageId
+              ? { ...p, slots: newSlots, layoutVariant: variantKey, paddingH, paddingV }
+              : p
+          ),
+        };
+      });
     },
     []
   );
