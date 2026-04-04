@@ -11,6 +11,8 @@ import {
   MenuItem,
   ListItemIcon,
   ListItemText,
+  Snackbar,
+  Alert,
 } from "@mui/material";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
@@ -37,6 +39,7 @@ export default function ResultsPage() {
   const [downloadAnchor, setDownloadAnchor] = useState<null | HTMLElement>(
     null
   );
+  const [exportError, setExportError] = useState(false);
   const pages = book.pages;
   const totalPages = pages.length;
 
@@ -95,6 +98,7 @@ export default function ResultsPage() {
         downloadBlob(blob, filename);
       } catch (e) {
         console.error("Export failed:", e);
+        setExportError(true);
       } finally {
         setExporting(false);
       }
@@ -318,6 +322,20 @@ export default function ResultsPage() {
         </Box>
       </Box>
 
+      <Snackbar
+        open={exportError}
+        autoHideDuration={6000}
+        onClose={() => setExportError(false)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setExportError(false)}
+          severity="error"
+          variant="filled"
+        >
+          Export failed. Please try again.
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
