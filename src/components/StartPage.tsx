@@ -392,7 +392,7 @@ export default function StartPage() {
               fontSize: "0.85rem",
             }}
           >
-            <Typography sx={{ fontSize: "1rem" }}>By</Typography>
+            <Typography sx={{ fontSize: "1rem", position: "relative", top: 1 }}>By</Typography>
             <Box
               component="a"
               href="https://ente.com/?utm_source=photobook"
