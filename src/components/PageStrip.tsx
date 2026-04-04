@@ -71,26 +71,13 @@ export default function PageStrip({
         bgcolor: "#141617",
         display: "flex",
         flexDirection: "column",
-        py: 3,
+        pt: 1,
+        pb: 3,
         px: 2,
-        height: "100%",
+        flex: 1,
         overflowY: "auto",
-        borderLeft: "1px solid rgba(255,255,255,0.06)",
       }}
     >
-      <Typography
-        sx={{
-          fontSize: "0.75rem",
-          fontWeight: 700,
-          textTransform: "uppercase",
-          letterSpacing: "0.08em",
-          color: "rgba(255,255,255,0.5)",
-          mb: 2,
-        }}
-      >
-        Pages
-      </Typography>
-
       <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
         {spreads.map((spread, spreadIdx) => {
           const leftPage = spread.left !== null ? pages[spread.left] : null;

@@ -87,6 +87,10 @@ interface BookContextValue {
   ) => void;
   removeTextBlock: (pageId: string, blockId: string) => void;
 
+  // UI state
+  showPageStrip: boolean;
+  setShowPageStrip: React.Dispatch<React.SetStateAction<boolean>>;
+
   // Session
   startOver: () => void;
 }
@@ -115,6 +119,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
   );
   const [book, setBook] = useState<BookState>(emptyBook);
   const [currentSpreadIndex, setCurrentSpreadIndex] = useState(0);
+  const [showPageStrip, setShowPageStrip] = useState(true);
   const [processingPhotos, setProcessingPhotos] = useState(false);
   const [processingProgress, setProcessingProgress] = useState(0);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -637,6 +642,8 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
         addTextBlock,
         updateTextBlock,
         removeTextBlock,
+        showPageStrip,
+        setShowPageStrip,
         startOver,
       }}
     >

@@ -1,10 +1,11 @@
 "use client";
 
-import { Box, Button, Typography } from "@mui/material";
+import { Box, Button, IconButton, Typography } from "@mui/material";
+import ViewSidebarIcon from "@mui/icons-material/ViewSidebar";
 import { useBook } from "@/context/BookContext";
 
 export default function NavBar() {
-  const { appView, setAppView, book } = useBook();
+  const { appView, setAppView, book, showPageStrip, setShowPageStrip } = useBook();
 
   return (
     <Box
@@ -41,21 +42,35 @@ export default function NavBar() {
       </Box>
       <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
         {appView === "edit" && (
-          <Button
-            variant="contained"
-            onClick={() => setAppView("results")}
-            sx={{
-              background: "linear-gradient(135deg, #006E0F 0%, #08C225 100%)",
-              fontWeight: 700,
-              px: 4,
-              "&:hover": {
-                background:
-                  "linear-gradient(135deg, #005309 0%, #06A81F 100%)",
-              },
-            }}
-          >
-            Next
-          </Button>
+          <>
+            {!showPageStrip && (
+              <IconButton
+                onClick={() => setShowPageStrip(true)}
+                size="small"
+                sx={{
+                  color: "rgba(255,255,255,0.6)",
+                  "&:hover": { color: "rgba(255,255,255,0.9)" },
+                }}
+              >
+                <ViewSidebarIcon fontSize="small" />
+              </IconButton>
+            )}
+            <Button
+              variant="contained"
+              onClick={() => setAppView("results")}
+              sx={{
+                background: "linear-gradient(135deg, #006E0F 0%, #08C225 100%)",
+                fontWeight: 700,
+                px: 4,
+                "&:hover": {
+                  background:
+                    "linear-gradient(135deg, #005309 0%, #06A81F 100%)",
+                },
+              }}
+            >
+              Next
+            </Button>
+          </>
         )}
       </Box>
     </Box>

@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
-import { Box } from "@mui/material";
+import { Box, IconButton } from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
 import { useBook } from "@/context/BookContext";
 import PageStrip from "./PageStrip";
 import Toolbar from "./Toolbar";
@@ -26,6 +27,8 @@ export default function EditPage() {
     updateTextBlock,
     removeTextBlock,
     addTextBlock,
+    showPageStrip,
+    setShowPageStrip,
   } = useBook();
 
   // Selection state
@@ -331,10 +334,35 @@ export default function EditPage() {
       </Box>
 
       {/* Right Sidebar - Page Strip */}
-      <PageStrip
-        scrollContainerRef={sidebarScrollRef}
-        onSpreadClick={handleSidebarSpreadClick}
-      />
+      {showPageStrip && (
+        <Box sx={{ position: "relative", display: "flex", flexDirection: "column" }}>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "flex-end",
+              bgcolor: "#141617",
+              borderLeft: "1px solid rgba(255,255,255,0.06)",
+              px: 0.5,
+              pt: 0.5,
+            }}
+          >
+            <IconButton
+              onClick={() => setShowPageStrip(false)}
+              size="small"
+              sx={{
+                color: "rgba(255,255,255,0.45)",
+                "&:hover": { color: "rgba(255,255,255,0.8)" },
+              }}
+            >
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </Box>
+          <PageStrip
+            scrollContainerRef={sidebarScrollRef}
+            onSpreadClick={handleSidebarSpreadClick}
+          />
+        </Box>
+      )}
 
       {/* Offscreen canvas for drag ghost */}
       <canvas ref={photoDrag.dragGhostRef} style={{ position: "fixed", left: -9999 }} />
