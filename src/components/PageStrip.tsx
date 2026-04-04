@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useMemo, useRef, useState, useEffect, useCallback, type RefCallback } from "react";
+import React, { useRef, useState, useEffect, useCallback, type RefCallback } from "react";
 import { Box, Typography } from "@mui/material";
 import { Stage, Layer } from "react-konva";
 import { useBook } from "@/context/BookContext";
 import PageCanvas from "./PageCanvas";
+import { useSpreads } from "@/hooks/useSpreads";
 
 const THUMB_PAGE_W = 60;
 const THUMB_PAGE_H = Math.round(THUMB_PAGE_W / (148 / 210)); // A5 aspect
@@ -24,25 +25,7 @@ export default function PageStrip({
   const dragOverItem = useRef<number | null>(null);
   const stripContainerRef = useRef<HTMLDivElement | null>(null);
 
-  // Same spread grouping as EditPage: cover alone on right, interior paired, back cover alone on left
-  const spreads = useMemo(() => {
-    const result: { left: number | null; right: number | null }[] = [];
-    if (pages.length === 0) return result;
-    if (pages.length === 1) return [{ left: null, right: 0 }];
-
-    result.push({ left: null, right: 0 });
-
-    for (let i = 1; i <= pages.length - 2; i += 2) {
-      result.push({
-        left: i,
-        right: i + 1 <= pages.length - 2 ? i + 1 : null,
-      });
-    }
-
-    result.push({ left: pages.length - 1, right: null });
-
-    return result;
-  }, [pages.length]);
+  const spreads = useSpreads(pages.length);
 
   // Virtualization: only render visible spread thumbnails
   const [visibleSpreads, setVisibleSpreads] = useState<Set<number>>(() => new Set([0, 1, 2, 3, 4, 5, 6, 7]));

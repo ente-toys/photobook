@@ -11,6 +11,7 @@ import SpreadPage, { PICKER_WIDTH } from "./SpreadPage";
 import { useAutoScroll } from "@/hooks/useAutoScroll";
 import { usePhotoDrag } from "@/hooks/usePhotoDrag";
 import { usePageDrag } from "@/hooks/usePageDrag";
+import { useSpreads } from "@/hooks/useSpreads";
 import type { TextBlock } from "@/lib/types";
 
 // A5 aspect ratio
@@ -59,28 +60,7 @@ export default function EditPage() {
   const photoDrag = usePhotoDrag(containerRef, autoScroll);
   const pageDrag = usePageDrag();
 
-  // Group pages into spread rows: cover alone on right, interior paired, back cover alone on left
-  const spreads = useMemo(() => {
-    const result: { left: number | null; right: number | null }[] = [];
-    if (pages.length === 0) return result;
-    if (pages.length === 1) return [{ left: null, right: 0 }];
-
-    // Cover (page 0) alone on right
-    result.push({ left: null, right: 0 });
-
-    // Interior pages (1 to N-2) paired
-    for (let i = 1; i <= pages.length - 2; i += 2) {
-      result.push({
-        left: i,
-        right: i + 1 <= pages.length - 2 ? i + 1 : null,
-      });
-    }
-
-    // Back cover (last page) alone on left
-    result.push({ left: pages.length - 1, right: null });
-
-    return result;
-  }, [pages.length]);
+  const spreads = useSpreads(pages.length);
 
   // Virtualization: only render visible spreads + buffer
   const [visibleSpreads, setVisibleSpreads] = useState<Set<number>>(() => new Set([0, 1, 2]));
