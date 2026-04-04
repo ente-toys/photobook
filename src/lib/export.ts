@@ -97,12 +97,18 @@ export async function renderPageToCanvas(
   for (const block of page.textBlocks) {
     const bx = (block.x / 100) * width;
     const by = (block.y / 100) * height;
-    const fontSize =
-      block.style === "title"
-        ? Math.round(height * 0.04)
-        : Math.round(height * 0.025);
+    const fontSize = Math.round(height * ((block.fontSize ?? 2.5) / 100));
+    const color = block.color ?? "#1a1c1d";
+    const rotation = block.rotation ?? 0;
 
-    ctx.fillStyle = "#1a1c1d";
+    ctx.save();
+    if (rotation) {
+      ctx.translate(bx, by);
+      ctx.rotate((rotation * Math.PI) / 180);
+      ctx.translate(-bx, -by);
+    }
+
+    ctx.fillStyle = color;
     ctx.font =
       block.style === "title"
         ? `bold ${fontSize}px 'Manrope', sans-serif`
@@ -117,6 +123,7 @@ export async function renderPageToCanvas(
         : bx;
 
     ctx.fillText(block.text, textX, by + fontSize);
+    ctx.restore();
   }
 
   return canvas;
@@ -142,7 +149,7 @@ export async function exportPdfA5(
       A5_WIDTH_PX,
       A5_HEIGHT_PX
     );
-    const imgData = canvas.toDataURL("image/jpeg", 0.92);
+    const imgData = canvas.toDataURL("image/jpeg", 0.95);
     pdf.addImage(imgData, "JPEG", 0, 0, A5_WIDTH_MM, A5_HEIGHT_MM);
 
     onProgress?.(Math.round(((i + 1) / pages.length) * 100));
@@ -185,7 +192,7 @@ export async function exportPdfA4Spreads(
         A5_WIDTH_PX,
         A5_HEIGHT_PX
       );
-      const imgData = canvas.toDataURL("image/jpeg", 0.92);
+      const imgData = canvas.toDataURL("image/jpeg", 0.95);
       pdf.addImage(imgData, "JPEG", 0, 0, A5_WIDTH_MM, A5_HEIGHT_MM);
     }
 
@@ -197,7 +204,7 @@ export async function exportPdfA4Spreads(
         A5_WIDTH_PX,
         A5_HEIGHT_PX
       );
-      const imgData = canvas.toDataURL("image/jpeg", 0.92);
+      const imgData = canvas.toDataURL("image/jpeg", 0.95);
       pdf.addImage(
         imgData,
         "JPEG",
