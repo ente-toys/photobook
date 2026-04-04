@@ -311,6 +311,7 @@ export default function EditPage() {
                     onHoverChange={setHoveredPageId}
                     dragSourceInfo={photoDrag.dragSourceInfo}
                     dragOverInfo={photoDrag.dragOverInfo}
+                    dragOverPageId={photoDrag.dragOverPageId}
                     onPhotoDragStart={photoDrag.handleDragStart}
                     onSlotDragOver={photoDrag.handleSlotDragOver}
                     onPhotoDrop={photoDrag.handleDrop}
@@ -349,6 +350,7 @@ export default function EditPage() {
                     onHoverChange={setHoveredPageId}
                     dragSourceInfo={photoDrag.dragSourceInfo}
                     dragOverInfo={photoDrag.dragOverInfo}
+                    dragOverPageId={photoDrag.dragOverPageId}
                     onPhotoDragStart={photoDrag.handleDragStart}
                     onSlotDragOver={photoDrag.handleSlotDragOver}
                     onPhotoDrop={photoDrag.handleDrop}

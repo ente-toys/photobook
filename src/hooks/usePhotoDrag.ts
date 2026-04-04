@@ -18,6 +18,8 @@ export function usePhotoDrag(
   const dragSourceRef = useRef<DragInfo | null>(null);
   const [dragOverInfo, setDragOverInfo] = useState<DragInfo | null>(null);
   const dragOverRef = useRef<DragInfo | null>(null);
+  const [dragOverPageId, setDragOverPageId] = useState<string | null>(null);
+  const dragOverPageRef = useRef<string | null>(null);
   const dragGhostRef = useRef<HTMLCanvasElement>(null);
 
   const handleDragStart = useCallback(
@@ -62,6 +64,11 @@ export function usePhotoDrag(
         dragOverRef.current = info;
         setDragOverInfo(info);
       }
+      // Clear page-level highlight when on a slot
+      if (dragOverPageRef.current !== null) {
+        dragOverPageRef.current = null;
+        setDragOverPageId(null);
+      }
     },
     []
   );
@@ -73,6 +80,8 @@ export function usePhotoDrag(
       autoScroll.stop();
       dragOverRef.current = null;
       setDragOverInfo(null);
+      dragOverPageRef.current = null;
+      setDragOverPageId(null);
       const source = dragSourceRef.current;
       if (source) {
         const { pageId: fromPageId, slotId: fromSlotId } = source;
@@ -87,7 +96,7 @@ export function usePhotoDrag(
   );
 
   const handlePageDragOver = useCallback(
-    (e: React.DragEvent, _pageId: string) => {
+    (e: React.DragEvent, pageId: string) => {
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
       // Clear slot-level highlight when hovering page background
@@ -96,8 +105,27 @@ export function usePhotoDrag(
         dragOverRef.current = null;
         setDragOverInfo(null);
       }
+      // Set page-level highlight (only for cross-page drops on pages with room)
+      const source = dragSourceRef.current;
+      if (source && source.pageId !== pageId) {
+        const toPage = pages.find((p) => p.id === pageId);
+        const filledSlots =
+          toPage?.slots.filter((s) => s.photoId !== null).length ?? 0;
+        if (filledSlots < 4) {
+          if (dragOverPageRef.current !== pageId) {
+            dragOverPageRef.current = pageId;
+            setDragOverPageId(pageId);
+          }
+        } else if (dragOverPageRef.current !== null) {
+          dragOverPageRef.current = null;
+          setDragOverPageId(null);
+        }
+      } else if (dragOverPageRef.current !== null) {
+        dragOverPageRef.current = null;
+        setDragOverPageId(null);
+      }
     },
-    []
+    [pages]
   );
 
   const handlePageDrop = useCallback(
@@ -106,6 +134,8 @@ export function usePhotoDrag(
       autoScroll.stop();
       dragOverRef.current = null;
       setDragOverInfo(null);
+      dragOverPageRef.current = null;
+      setDragOverPageId(null);
       const source = dragSourceRef.current;
       if (source) {
         const { pageId: fromPageId, slotId: fromSlotId } = source;
@@ -129,8 +159,10 @@ export function usePhotoDrag(
     autoScroll.stop();
     dragSourceRef.current = null;
     dragOverRef.current = null;
+    dragOverPageRef.current = null;
     setDragSourceInfo(null);
     setDragOverInfo(null);
+    setDragOverPageId(null);
   }, [autoScroll]);
 
   const handleContainerDragOver = useCallback(
@@ -167,6 +199,7 @@ export function usePhotoDrag(
   return {
     dragSourceInfo,
     dragOverInfo,
+    dragOverPageId,
     handleDragStart,
     handleSlotDragOver,
     handleDrop,

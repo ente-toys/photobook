@@ -198,6 +198,7 @@ interface SpreadPageProps {
   // Photo drag
   dragSourceInfo: DragInfo | null;
   dragOverInfo: DragInfo | null;
+  dragOverPageId: string | null;
   onPhotoDragStart: (
     e: React.DragEvent,
     pageId: string,
@@ -249,6 +250,7 @@ export default function SpreadPage({
   onHoverChange,
   dragSourceInfo,
   dragOverInfo,
+  dragOverPageId,
   onPhotoDragStart,
   onSlotDragOver,
   onPhotoDrop,
@@ -402,6 +404,20 @@ export default function SpreadPage({
                 : "auto",
           }}
         />
+        {/* Green overlay when page is a valid drop target for "add to page" */}
+        {dragOverPageId === page.id && dragSourceInfo && dragSourceInfo.pageId !== page.id && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 3,
+              background: "rgba(8, 194, 37, 0.1)",
+              border: "2px dashed #08C225",
+              borderRadius: 2,
+              pointerEvents: "none",
+            }}
+          />
+        )}
         {/* Drag-and-drop overlay divs for photo slots */}
         {page.slots.map((slot) => {
           const isSelected =
@@ -495,6 +511,7 @@ export default function SpreadPage({
                 cursor: isTextSelected ? "grab" : "pointer",
                 transform: rotation ? `rotate(${rotation}deg)` : undefined,
                 transformOrigin: "top left",
+                pointerEvents: dragSourceInfo ? "none" : "auto",
               }}
             />
           );
@@ -651,6 +668,7 @@ export default function SpreadPage({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                pointerEvents: dragSourceInfo ? "none" : "auto",
               }}
             >
               {!page.topCaption && topCaptionHovered && (
@@ -716,6 +734,7 @@ export default function SpreadPage({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                pointerEvents: dragSourceInfo ? "none" : "auto",
               }}
             >
               {!page.bottomCaption && bottomCaptionHovered && (
