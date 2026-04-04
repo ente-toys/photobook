@@ -271,9 +271,9 @@ export default function ResultsPage() {
                 fontSize: "0.85rem",
                 px: 4,
                 py: 1.5,
-                boxShadow: "0 8px 20px rgba(8,194,37,0.3)",
                 "&:hover": {
-                  boxShadow: "0 12px 32px rgba(8,194,37,0.4)",
+                  background:
+                    "linear-gradient(135deg, #005C0D 0%, #07A820 100%)",
                 },
               }}
             >
