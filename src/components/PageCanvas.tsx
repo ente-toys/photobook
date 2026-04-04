@@ -280,13 +280,10 @@ function EnteBranding({
   }, [pageHeight]);
 
   const logoHeight = pageHeight * 0.12;
-  const byFontSize = pageHeight * 0.018;
   const logoWidth = logo
     ? (logo.width / logo.height) * logoHeight
     : logoHeight * 2;
-  const gap = byFontSize * 0.6;
-  const totalWidth = byFontSize * 1.2 + gap + logoWidth;
-  const startX = (pageWidth - totalWidth) / 2;
+  const logoX = (pageWidth - logoWidth) / 2;
   const stripHeight = logoHeight + pageHeight * 0.03;
   const stripY = pageHeight - stripHeight;
   const yCenter = stripY + stripHeight / 2;
@@ -302,18 +299,10 @@ function EnteBranding({
         fill="#ffffff"
         listening={false}
       />
-      <Text
-        x={startX}
-        y={yCenter - byFontSize / 2 + byFontSize * 0.1}
-        text="By"
-        fontSize={byFontSize}
-        fontFamily="'Manrope', sans-serif"
-        fill="#999"
-      />
       {logo && (
         <KonvaImage
           image={logo as unknown as HTMLImageElement}
-          x={startX + byFontSize * 1.2 + gap}
+          x={logoX}
           y={yCenter - logoHeight / 2}
           width={logoWidth}
           height={logoHeight}
