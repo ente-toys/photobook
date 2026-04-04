@@ -21,7 +21,8 @@ export async function renderPageToCanvas(
   page: BookPage,
   photoUrls: Map<string, string>,
   width: number,
-  height: number
+  height: number,
+  isBackCover = false
 ): Promise<HTMLCanvasElement> {
   const canvas = document.createElement("canvas");
   canvas.width = width;
@@ -84,7 +85,43 @@ export async function renderPageToCanvas(
     ctx.fillText(page.topCaption, width / 2, height * 0.04);
   }
 
-  if (page.bottomCaption) {
+  if (isBackCover) {
+    // Draw "By ente" branding on back cover
+    try {
+      const logo = await loadImage("/ente-icon.png");
+      const logoHeight = height * 0.12;
+      const logoWidth = (logo.naturalWidth / logo.naturalHeight) * logoHeight;
+      const byFontSize = Math.round(height * 0.018);
+      const gap = byFontSize * 0.6;
+      const totalWidth = byFontSize * 1.2 + gap + logoWidth;
+      const startX = (width - totalWidth) / 2;
+      const stripHeight = logoHeight + height * 0.03;
+      const stripY = height - stripHeight;
+      const yCenter = stripY + stripHeight / 2;
+
+      // White background strip
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, stripY, width, stripHeight);
+
+      ctx.fillStyle = "#999";
+      ctx.font = `${byFontSize}px 'Manrope', sans-serif`;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillText("By", startX, yCenter);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(
+        logo,
+        startX + byFontSize * 1.2 + gap,
+        yCenter - logoHeight / 2,
+        logoWidth,
+        logoHeight
+      );
+      ctx.textBaseline = "alphabetic";
+    } catch (e) {
+      console.warn("Failed to draw ente branding:", e);
+    }
+  } else if (page.bottomCaption) {
     ctx.fillStyle = "#1a1c1d";
     ctx.font = `${Math.round(height * 0.025)}px 'Manrope', sans-serif`;
     ctx.textAlign = "center";
@@ -139,7 +176,8 @@ export async function exportPdfA5(
       pages[i],
       photoUrls,
       A5_WIDTH_PX,
-      A5_HEIGHT_PX
+      A5_HEIGHT_PX,
+      i === pages.length - 1
     );
     const imgData = canvas.toDataURL("image/jpeg", 0.95);
     pdf.addImage(imgData, "JPEG", 0, 0, A5_WIDTH_MM, A5_HEIGHT_MM);
@@ -182,7 +220,8 @@ export async function exportPdfA4Spreads(
         pages[leftIdx],
         photoUrls,
         A5_WIDTH_PX,
-        A5_HEIGHT_PX
+        A5_HEIGHT_PX,
+        leftIdx === pages.length - 1
       );
       const imgData = canvas.toDataURL("image/jpeg", 0.95);
       pdf.addImage(imgData, "JPEG", 0, 0, A5_WIDTH_MM, A5_HEIGHT_MM);
@@ -194,7 +233,8 @@ export async function exportPdfA4Spreads(
         pages[rightIdx],
         photoUrls,
         A5_WIDTH_PX,
-        A5_HEIGHT_PX
+        A5_HEIGHT_PX,
+        rightIdx === pages.length - 1
       );
       const imgData = canvas.toDataURL("image/jpeg", 0.95);
       pdf.addImage(
@@ -225,7 +265,8 @@ export async function exportPngZip(
       pages[i],
       photoUrls,
       A5_WIDTH_PX,
-      A5_HEIGHT_PX
+      A5_HEIGHT_PX,
+      i === pages.length - 1
     );
 
     const blob = await new Promise<Blob>((resolve) =>

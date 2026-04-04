@@ -14,6 +14,7 @@ interface PageCanvasProps {
   pageWidth: number;
   pageHeight: number;
   isInteractive?: boolean;
+  isBackCover?: boolean;
   onSlotClick?: (slotId: string) => void;
   selectedSlotId?: string | null;
   selectedTextId?: string | null;
@@ -242,6 +243,79 @@ function TextBlockRenderer({
   );
 }
 
+function EnteBranding({
+  pageWidth,
+  pageHeight,
+}: {
+  pageWidth: number;
+  pageHeight: number;
+}) {
+  const [logo, setLogo] = useState<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const img = new window.Image();
+    img.src = "/ente-icon.png";
+    img.onload = () => {
+      // Pre-scale to target size in an offscreen canvas to avoid
+      // aliasing from extreme downscaling (1024px → ~60px).
+      const targetH = Math.round(pageHeight * 0.12 * (window.devicePixelRatio || 1));
+      const targetW = Math.round((img.naturalWidth / img.naturalHeight) * targetH);
+      const offscreen = document.createElement("canvas");
+      offscreen.width = targetW;
+      offscreen.height = targetH;
+      const ctx = offscreen.getContext("2d")!;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(img, 0, 0, targetW, targetH);
+      setLogo(offscreen);
+    };
+  }, [pageHeight]);
+
+  const logoHeight = pageHeight * 0.12;
+  const byFontSize = pageHeight * 0.018;
+  const logoWidth = logo
+    ? (logo.width / logo.height) * logoHeight
+    : logoHeight * 2;
+  const gap = byFontSize * 0.6;
+  const totalWidth = byFontSize * 1.2 + gap + logoWidth;
+  const startX = (pageWidth - totalWidth) / 2;
+  const stripHeight = logoHeight + pageHeight * 0.03;
+  const stripY = pageHeight - stripHeight;
+  const yCenter = stripY + stripHeight / 2;
+
+  return (
+    <>
+      {/* White background strip so branding is readable over photos */}
+      <Rect
+        x={0}
+        y={stripY}
+        width={pageWidth}
+        height={stripHeight}
+        fill="#ffffff"
+        listening={false}
+      />
+      <Text
+        x={startX}
+        y={yCenter - byFontSize / 2}
+        text="By"
+        fontSize={byFontSize}
+        fontFamily="'Manrope', sans-serif"
+        fill="#999"
+      />
+      {logo && (
+        <KonvaImage
+          image={logo as unknown as HTMLImageElement}
+          x={startX + byFontSize * 1.2 + gap}
+          y={yCenter - logoHeight / 2}
+          width={logoWidth}
+          height={logoHeight}
+          listening={false}
+        />
+      )}
+    </>
+  );
+}
+
 function CaptionText({
   text,
   y,
@@ -294,6 +368,7 @@ export default function PageCanvas({
   pageWidth,
   pageHeight,
   isInteractive = false,
+  isBackCover = false,
   selectedSlotId,
   selectedTextId,
   dragOverSlotId,
@@ -342,15 +417,19 @@ export default function PageCanvas({
         fontSize={captionFontSize}
         isEditing={editingCaption === "top"}
       />
-      <CaptionText
-        text={page.bottomCaption}
-        y={pageHeight * 0.98}
-        pageWidth={pageWidth}
-        pageHeight={pageHeight}
-        fontSize={captionFontSize}
-        isEditing={editingCaption === "bottom"}
-        anchor="bottom"
-      />
+      {isBackCover ? (
+        <EnteBranding pageWidth={pageWidth} pageHeight={pageHeight} />
+      ) : (
+        <CaptionText
+          text={page.bottomCaption}
+          y={pageHeight * 0.98}
+          pageWidth={pageWidth}
+          pageHeight={pageHeight}
+          fontSize={captionFontSize}
+          isEditing={editingCaption === "bottom"}
+          anchor="bottom"
+        />
+      )}
 
       {/* Text blocks */}
       {page.textBlocks.map((block) => (

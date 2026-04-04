@@ -305,7 +305,8 @@ export default function SpreadPage({
     }
   }, [editingCaption]);
 
-  const isInterior = pageIndex > 0 && pageIndex < totalPages - 1;
+  const isBackCover = pageIndex === totalPages - 1;
+  const isInterior = pageIndex > 0 && !isBackCover;
   const isDragTarget = pageDragTarget === pageIndex && pageDragSource !== null;
   const isDragSource = pageDragSource === pageIndex;
   const photoCount = page.slots.filter((s) => s.photoId !== null).length;
@@ -337,6 +338,7 @@ export default function SpreadPage({
               pageWidth={pageWidth}
               pageHeight={pageHeight}
               isInteractive
+              isBackCover={isBackCover}
               selectedSlotId={
                 selectedPageId === page.id ? selectedSlotId : null
               }
@@ -666,7 +668,7 @@ export default function SpreadPage({
             </div>
           )
         )}
-        {hasBottomSpace && (
+        {hasBottomSpace && !isBackCover && (
           editingCaption === "bottom" ? (
             <input
               ref={captionInputRef}
@@ -804,6 +806,7 @@ export default function SpreadPage({
           paddingV={page.paddingV ?? 0}
           onPaddingChange={(h, v) => setPagePadding(page.id, h, v)}
           side={pickerSide}
+          excludeFullScreen={isBackCover}
         />
       )}
     </Box>

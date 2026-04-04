@@ -166,12 +166,13 @@ const BookViewer = forwardRef<BookViewerHandle, BookViewerProps>(
             },
           }}
         >
-          {pages.map((page) => (
+          {pages.map((page, i) => (
             <PageElement
               key={page.id}
               page={page}
               pageWidth={pageWidth}
               pageHeight={pageHeight}
+              isBackCover={i === pages.length - 1}
             />
           ))}
         </Box>
@@ -186,10 +187,12 @@ function PageElement({
   page,
   pageWidth,
   pageHeight,
+  isBackCover,
 }: {
   page: BookPage;
   pageWidth: number;
   pageHeight: number;
+  isBackCover: boolean;
 }) {
   return (
     <div
@@ -207,6 +210,7 @@ function PageElement({
             page={page}
             pageWidth={pageWidth}
             pageHeight={pageHeight}
+            isBackCover={isBackCover}
           />
         </Layer>
       </Stage>

@@ -21,6 +21,7 @@ interface LayoutPickerProps {
   paddingV: number;
   onPaddingChange: (paddingH: number, paddingV: number) => void;
   side: "left" | "right";
+  excludeFullScreen?: boolean;
 }
 
 function VariantThumbnail({
@@ -206,10 +207,14 @@ export default function LayoutPicker({
   paddingV,
   onPaddingChange,
   side,
+  excludeFullScreen = false,
 }: LayoutPickerProps) {
   const variants = useMemo(
-    () => getVariantsForCount(photoCount),
-    [photoCount]
+    () => {
+      const all = getVariantsForCount(photoCount);
+      return excludeFullScreen ? all.filter((v) => v.key !== "1-full") : all;
+    },
+    [photoCount, excludeFullScreen]
   );
 
   if (variants.length === 0) return null;
