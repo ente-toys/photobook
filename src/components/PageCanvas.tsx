@@ -304,7 +304,7 @@ function EnteBranding({
       />
       <Text
         x={startX}
-        y={yCenter - byFontSize / 2}
+        y={yCenter - byFontSize / 2 + byFontSize * 0.1}
         text="By"
         fontSize={byFontSize}
         fontFamily="'Manrope', sans-serif"

@@ -172,7 +172,7 @@ export async function renderPageToCanvas(
       ctx.font = `${byFontSize}px 'Manrope', sans-serif`;
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
-      ctx.fillText("By", startX, yCenter);
+      ctx.fillText("By", startX, yCenter + byFontSize * 0.1);
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
       ctx.drawImage(
