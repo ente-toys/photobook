@@ -8,6 +8,26 @@ const DPI = 300;
 const A5_WIDTH_PX = Math.round((A5_WIDTH_MM / 25.4) * DPI);
 const A5_HEIGHT_PX = Math.round((A5_HEIGHT_MM / 25.4) * DPI);
 
+const BLANK_PAGE: BookPage = {
+  id: "__blank",
+  slots: [],
+  textBlocks: [],
+  topCaption: "",
+  bottomCaption: "",
+};
+
+/** Insert a blank page after the cover and before the back cover for print exports. */
+function addBlankPages(pages: BookPage[]): BookPage[] {
+  if (pages.length < 2) return pages;
+  return [
+    pages[0],          // cover
+    BLANK_PAGE,        // inside front cover
+    ...pages.slice(1, -1),
+    BLANK_PAGE,        // inside back cover
+    pages[pages.length - 1], // back cover
+  ];
+}
+
 async function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -214,9 +234,10 @@ export async function renderPageToCanvas(
 }
 
 export async function exportPdfA5(
-  pages: BookPage[],
+  inputPages: BookPage[],
   onProgress?: (pct: number) => void
 ): Promise<Blob> {
+  const pages = addBlankPages(inputPages);
   const resolver = createPhotoUrlResolver();
   try {
     const pdf = new jsPDF({
@@ -248,9 +269,10 @@ export async function exportPdfA5(
 }
 
 export async function exportPdfA4Spreads(
-  pages: BookPage[],
+  inputPages: BookPage[],
   onProgress?: (pct: number) => void
 ): Promise<Blob> {
+  const pages = addBlankPages(inputPages);
   const resolver = createPhotoUrlResolver();
   try {
     const A4W = A5_HEIGHT_MM * 2; // 420mm
@@ -317,9 +339,10 @@ export async function exportPdfA4Spreads(
 }
 
 export async function exportPngZip(
-  pages: BookPage[],
+  inputPages: BookPage[],
   onProgress?: (pct: number) => void
 ): Promise<Blob> {
+  const pages = addBlankPages(inputPages);
   const resolver = createPhotoUrlResolver();
   try {
     const zip = new JSZip();
@@ -350,9 +373,10 @@ export async function exportPngZip(
 }
 
 export async function exportPngA4Zip(
-  pages: BookPage[],
+  inputPages: BookPage[],
   onProgress?: (pct: number) => void
 ): Promise<Blob> {
+  const pages = addBlankPages(inputPages);
   const resolver = createPhotoUrlResolver();
   try {
     const zip = new JSZip();
