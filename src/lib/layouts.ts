@@ -449,6 +449,16 @@ const HIDDEN_MIRRORS = new Set([
   "4-tall-bottom",
 ]);
 
+/** Default padding for specific variants */
+const DEFAULT_PADDING = new Map<string, { h: number; v: number }>([
+  ["4-equal-cols", { h: 0, v: 1 }],
+]);
+
+/** Get the default padding for a variant */
+export function getDefaultPadding(key: string): { h: number; v: number } {
+  return DEFAULT_PADDING.get(key) ?? { h: 0, v: 0 };
+}
+
 /** Get the mirror variant key, if one exists */
 export function getMirrorVariant(key: string): string | undefined {
   return MIRROR_MAP.get(key);

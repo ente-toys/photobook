@@ -30,7 +30,7 @@ import {
   getAppView,
   clearAll,
 } from "@/lib/db";
-import { generateAutoLayout, chooseBestLayout, applyVariant } from "@/lib/layouts";
+import { generateAutoLayout, chooseBestLayout, applyVariant, getDefaultPadding } from "@/lib/layouts";
 import { extractExifDate, createThumbnail } from "@/lib/images";
 
 interface BookContextValue {
@@ -498,13 +498,16 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
         const photoIds = page.slots
           .map((s) => s.photoId)
           .filter((id): id is string => id !== null);
-        const newSlots = applyVariant(variantKey, photoIds, page.paddingH ?? 0, page.paddingV ?? 0);
+        const defaults = getDefaultPadding(variantKey);
+        const paddingH = defaults.h || (page.paddingH ?? 0);
+        const paddingV = defaults.v || (page.paddingV ?? 0);
+        const newSlots = applyVariant(variantKey, photoIds, paddingH, paddingV);
         if (newSlots.length === 0) return prev;
         return {
           ...prev,
           pages: prev.pages.map((p) =>
             p.id === pageId
-              ? { ...p, slots: newSlots, layoutVariant: variantKey }
+              ? { ...p, slots: newSlots, layoutVariant: variantKey, paddingH, paddingV }
               : p
           ),
         };
