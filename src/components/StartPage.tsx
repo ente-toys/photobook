@@ -8,7 +8,6 @@ import {
   LinearProgress,
   CircularProgress,
 } from "@mui/material";
-import AddPhotoAlternateIcon from "@mui/icons-material/AddPhotoAlternate";
 import { useBook } from "@/context/BookContext";
 import Footer from "./Footer";
 
@@ -337,7 +336,7 @@ export default function StartPage() {
           <Button
             variant="contained"
             size="large"
-            startIcon={<AddPhotoAlternateIcon />}
+
             onClick={() => fileInputRef.current?.click()}
             sx={{
               background:
