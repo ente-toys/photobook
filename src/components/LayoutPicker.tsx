@@ -58,10 +58,11 @@ function VariantThumbnail({
     >
       {slots.map((slot, i) => {
         const url = thumbnailUrls[i];
-        const left = (slot.x / 100) * THUMB_W;
-        const top = (slot.y / 100) * THUMB_H;
-        const width = (slot.width / 100) * THUMB_W;
-        const height = (slot.height / 100) * THUMB_H;
+        const GAP = 1.5; // px gap between slots for visibility
+        const left = (slot.x / 100) * THUMB_W + GAP;
+        const top = (slot.y / 100) * THUMB_H + GAP;
+        const width = (slot.width / 100) * THUMB_W - GAP * 2;
+        const height = (slot.height / 100) * THUMB_H - GAP * 2;
         return (
           <Box
             key={i}
