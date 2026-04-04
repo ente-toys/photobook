@@ -19,6 +19,7 @@ interface PageCanvasProps {
   selectedTextId?: string | null;
   onTextClick?: (textId: string) => void;
   onTextDblClick?: (textId: string) => void;
+  editingTextId?: string | null;
   editingCaption?: CaptionPosition | null;
   dragOverSlotId?: string | null;
   dragSourceSlotId?: string | null;
@@ -188,60 +189,52 @@ function TextBlockRenderer({
   pageWidth,
   pageHeight,
   isSelected,
-  onClick,
-  onDblClick,
-  isInteractive,
-  pageId,
+  isEditing,
 }: {
   block: TextBlock;
   pageWidth: number;
   pageHeight: number;
   isSelected: boolean;
-  onClick: () => void;
-  onDblClick: () => void;
-  isInteractive: boolean;
-  pageId: string;
+  isEditing: boolean;
 }) {
-  const { updateTextBlock } = useBook();
+  const textRef = useRef<any>(null);
   const bx = (block.x / 100) * pageWidth;
   const by = (block.y / 100) * pageHeight;
   const bw = (block.width / 100) * pageWidth;
 
-  const fontSize = block.style === "title" ? pageHeight * 0.04 : pageHeight * 0.025;
+  const fontSize = pageHeight * ((block.fontSize ?? 2.5) / 100);
+  const color = block.color ?? "#1a1c1d";
+  const rotation = block.rotation ?? 0;
+
+  // Hide text while inline editing
+  if (isEditing) return null;
+
+  const displayText = block.text || (isSelected ? "" : "Type here");
+  const displayColor = block.text ? color : "#bbb";
 
   return (
     <>
       <Text
+        ref={textRef}
         x={bx}
         y={by}
-        width={bw}
-        text={block.text}
+        text={displayText}
         fontSize={fontSize}
         fontFamily="'Manrope', sans-serif"
         fontStyle={block.style === "title" ? "bold" : "normal"}
-        fill="#1a1c1d"
-        align={block.alignment}
-        draggable={isInteractive}
-        onClick={onClick}
-        onTap={onClick}
-        onDblClick={onDblClick}
-        onDblTap={onDblClick}
-        onDragEnd={(e) => {
-          if (!isInteractive) return;
-          const newX = (e.target.x() / pageWidth) * 100;
-          const newY = (e.target.y() / pageHeight) * 100;
-          updateTextBlock(pageId, block.id, { x: newX, y: newY });
-        }}
+        fill={displayColor}
+        rotation={rotation}
+        listening={false}
       />
       {isSelected && (
         <Rect
-          x={bx - 2}
-          y={by - 2}
-          width={bw + 4}
-          height={fontSize + 8}
+          x={bx - 3}
+          y={by - 3}
+          width={(textRef.current?.width() ?? fontSize * 4) + 6}
+          height={(textRef.current?.height() ?? fontSize) + 6}
           stroke="#08C225"
-          strokeWidth={1}
-          dash={[4, 4]}
+          strokeWidth={1.5}
+          rotation={rotation}
           listening={false}
         />
       )}
@@ -309,6 +302,7 @@ export default function PageCanvas({
   onSlotClick,
   onTextClick,
   onTextDblClick,
+  editingTextId,
   editingCaption,
   onDropPhoto,
 }: PageCanvasProps) {
@@ -366,10 +360,7 @@ export default function PageCanvas({
           pageWidth={pageWidth}
           pageHeight={pageHeight}
           isSelected={selectedTextId === block.id}
-          onClick={() => onTextClick?.(block.id)}
-          onDblClick={() => onTextDblClick?.(block.id)}
-          isInteractive={isInteractive}
-          pageId={page.id}
+          isEditing={editingTextId === block.id}
         />
       ))}
 

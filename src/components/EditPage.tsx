@@ -7,7 +7,6 @@ import { useBook } from "@/context/BookContext";
 import PageStrip from "./PageStrip";
 import Toolbar from "./Toolbar";
 import SpreadPage, { PICKER_WIDTH } from "./SpreadPage";
-import TextEditDialog from "./TextEditDialog";
 
 import { useAutoScroll } from "@/hooks/useAutoScroll";
 import { usePhotoDrag } from "@/hooks/usePhotoDrag";
@@ -36,9 +35,8 @@ export default function EditPage() {
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
   const [selectedTextId, setSelectedTextId] = useState<string | null>(null);
 
-  // Text editing state
-  const [editingTextBlock, setEditingTextBlock] = useState<TextBlock | null>(null);
-  const [editingTextPageId, setEditingTextPageId] = useState<string | null>(null);
+  // Inline text editing state
+  const [editingTextId, setEditingTextId] = useState<string | null>(null);
 
   // Hover & UI state
   const [hoveredPageId, setHoveredPageId] = useState<string | null>(null);
@@ -163,14 +161,11 @@ export default function EditPage() {
 
   const handleTextDblClick = useCallback(
     (pageId: string, textId: string) => {
-      const page = pages.find((p) => p.id === pageId);
-      const block = page?.textBlocks.find((t) => t.id === textId);
-      if (block) {
-        setEditingTextBlock(block);
-        setEditingTextPageId(pageId);
-      }
+      setEditingTextId(textId);
+      setSelectedTextId(textId);
+      setSelectedPageId(pageId);
     },
-    [pages]
+    []
   );
 
   const handleStageClick = useCallback((e: any) => {
@@ -178,6 +173,7 @@ export default function EditPage() {
       setSelectedSlotId(null);
       setSelectedPageId(null);
       setSelectedTextId(null);
+      setEditingTextId(null);
     }
   }, []);
 
@@ -186,12 +182,31 @@ export default function EditPage() {
     const pageId = selectedPageId || leftPage?.id;
     if (!pageId) return;
     const block = addTextBlock(pageId);
-    setEditingTextBlock(block);
-    setEditingTextPageId(pageId);
     setSelectedTextId(block.id);
     setSelectedPageId(pageId);
     setSelectedSlotId(null);
-  }, [selectedPageId, leftPage?.id]);
+    setEditingTextId(block.id);
+  }, [selectedPageId, leftPage?.id, addTextBlock]);
+
+  const handleTextUpdate = useCallback(
+    (pageId: string, blockId: string, updates: Partial<TextBlock>) => {
+      updateTextBlock(pageId, blockId, updates);
+    },
+    [updateTextBlock]
+  );
+
+  const handleTextDelete = useCallback(
+    (pageId: string, blockId: string) => {
+      removeTextBlock(pageId, blockId);
+      setSelectedTextId(null);
+      setEditingTextId(null);
+    },
+    [removeTextBlock]
+  );
+
+  const handleTextEditEnd = useCallback(() => {
+    setEditingTextId(null);
+  }, []);
 
   const handleAddPhotos = useCallback(() => {
     fileInputRef.current?.click();
@@ -212,8 +227,6 @@ export default function EditPage() {
       <Toolbar
         onAddPhotos={handleAddPhotos}
         onAddText={handleAddText}
-        selectedTextId={selectedTextId}
-        selectedPageId={selectedPageId}
       />
 
       {/* Main Canvas Area - scrollable */}
@@ -268,9 +281,13 @@ export default function EditPage() {
                     selectedSlotId={selectedSlotId}
                     selectedPageId={selectedPageId}
                     selectedTextId={selectedTextId}
+                    editingTextId={editingTextId}
                     onSlotClick={handleSlotClick}
                     onTextClick={handleTextClick}
                     onTextDblClick={handleTextDblClick}
+                    onTextUpdate={handleTextUpdate}
+                    onTextDelete={handleTextDelete}
+                    onTextEditEnd={handleTextEditEnd}
                     onStageClick={handleStageClick}
                     isHovered={hoveredPageId === lp.id}
                     onHoverChange={setHoveredPageId}
@@ -302,9 +319,13 @@ export default function EditPage() {
                     selectedSlotId={selectedSlotId}
                     selectedPageId={selectedPageId}
                     selectedTextId={selectedTextId}
+                    editingTextId={editingTextId}
                     onSlotClick={handleSlotClick}
                     onTextClick={handleTextClick}
                     onTextDblClick={handleTextDblClick}
+                    onTextUpdate={handleTextUpdate}
+                    onTextDelete={handleTextDelete}
+                    onTextEditEnd={handleTextEditEnd}
                     onStageClick={handleStageClick}
                     isHovered={hoveredPageId === rp.id}
                     onHoverChange={setHoveredPageId}
@@ -375,28 +396,6 @@ export default function EditPage() {
         onChange={handleFileChange}
       />
 
-{/* Text Edit Dialog */}
-      <TextEditDialog
-        open={editingTextBlock !== null}
-        block={editingTextBlock}
-        onSave={(updates) => {
-          if (editingTextPageId && editingTextBlock) {
-            updateTextBlock(editingTextPageId, editingTextBlock.id, updates);
-          }
-        }}
-        onClose={() => {
-          setEditingTextBlock(null);
-          setEditingTextPageId(null);
-        }}
-        onDelete={() => {
-          if (editingTextPageId && editingTextBlock) {
-            removeTextBlock(editingTextPageId, editingTextBlock.id);
-          }
-          setEditingTextBlock(null);
-          setEditingTextPageId(null);
-          setSelectedTextId(null);
-        }}
-      />
     </Box>
   );
 }

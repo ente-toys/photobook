@@ -20,6 +20,9 @@ export interface TextBlock {
   height: number;
   style: TextStyle;
   alignment: TextAlignment;
+  color: string; // hex color, default "#1a1c1d"
+  rotation: number; // degrees, default 0
+  fontSize: number; // percentage of page height, default 2.5 (body) or 4 (title)
 }
 
 export interface PhotoSlot {

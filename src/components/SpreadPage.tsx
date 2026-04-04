@@ -7,7 +7,8 @@ import { Stage, Layer } from "react-konva";
 import { useBook } from "@/context/BookContext";
 import PageCanvas from "./PageCanvas";
 import LayoutPicker from "./LayoutPicker";
-import type { BookPage } from "@/lib/types";
+import TextToolbar from "./TextToolbar";
+import type { BookPage, TextBlock } from "@/lib/types";
 import type { CaptionPosition } from "./PageCanvas";
 import type { DragInfo } from "@/hooks/usePhotoDrag";
 
@@ -183,9 +184,13 @@ interface SpreadPageProps {
   selectedSlotId: string | null;
   selectedPageId: string | null;
   selectedTextId: string | null;
+  editingTextId: string | null;
   onSlotClick: (pageId: string, slotId: string) => void;
   onTextClick: (pageId: string, textId: string) => void;
   onTextDblClick: (pageId: string, textId: string) => void;
+  onTextUpdate: (pageId: string, blockId: string, updates: Partial<TextBlock>) => void;
+  onTextDelete: (pageId: string, blockId: string) => void;
+  onTextEditEnd: () => void;
   onStageClick: (e: any) => void;
   // Hover
   isHovered: boolean;
@@ -232,9 +237,13 @@ export default function SpreadPage({
   selectedSlotId,
   selectedPageId,
   selectedTextId,
+  editingTextId,
   onSlotClick,
   onTextClick,
   onTextDblClick,
+  onTextUpdate,
+  onTextDelete,
+  onTextEditEnd,
   onStageClick,
   isHovered,
   onHoverChange,
@@ -334,6 +343,9 @@ export default function SpreadPage({
               selectedTextId={
                 selectedPageId === page.id ? selectedTextId : null
               }
+              editingTextId={
+                selectedPageId === page.id ? editingTextId : null
+              }
               editingCaption={editingCaption}
               dragOverSlotId={
                 dragOverInfo?.pageId === page.id ? dragOverInfo.slotId : null
@@ -428,6 +440,63 @@ export default function SpreadPage({
             />
           );
         })}
+        {/* Text block interaction overlays — higher z-index than slots so text gets click priority */}
+        {page.textBlocks.map((block) => {
+          const isTextEditing = selectedPageId === page.id && editingTextId === block.id;
+          if (isTextEditing) return null;
+          const isTextSelected = selectedPageId === page.id && selectedTextId === block.id;
+          const bx = (block.x / 100) * pageWidth;
+          const by = (block.y / 100) * pageHeight;
+          const bw = (block.width / 100) * pageWidth;
+          const fontSize = pageHeight * ((block.fontSize ?? 2.5) / 100);
+          const rotation = block.rotation ?? 0;
+          return (
+            <div
+              key={`text-overlay-${block.id}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onTextClick(page.id, block.id);
+              }}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                onTextDblClick(page.id, block.id);
+              }}
+              onMouseDown={isTextSelected ? (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                const startX = e.clientX;
+                const startY = e.clientY;
+                const origX = block.x;
+                const origY = block.y;
+                const onMove = (ev: MouseEvent) => {
+                  const dx = ((ev.clientX - startX) / pageWidth) * 100;
+                  const dy = ((ev.clientY - startY) / pageHeight) * 100;
+                  onTextUpdate(page.id, block.id, {
+                    x: Math.max(-block.width + 5, Math.min(95, origX + dx)),
+                    y: Math.max(-5, Math.min(95, origY + dy)),
+                  });
+                };
+                const onUp = () => {
+                  document.removeEventListener("mousemove", onMove);
+                  document.removeEventListener("mouseup", onUp);
+                };
+                document.addEventListener("mousemove", onMove);
+                document.addEventListener("mouseup", onUp);
+              } : undefined}
+              style={{
+                position: "absolute",
+                left: bx - 4,
+                top: by - 4,
+                width: bw + 8,
+                height: fontSize * 1.6 + 8,
+                zIndex: 6,
+                cursor: isTextSelected ? "grab" : "pointer",
+                transform: rotation ? `rotate(${rotation}deg)` : undefined,
+                transformOrigin: "top left",
+              }}
+            />
+          );
+        })}
         {/* Photo slot controls (zoom/delete) on selected slots */}
         {page.slots.map((slot) => {
           const isSelected =
@@ -445,6 +514,92 @@ export default function SpreadPage({
             />
           );
         })}
+        {/* Inline text editing overlay */}
+        {selectedPageId === page.id && editingTextId && (() => {
+          const block = page.textBlocks.find((t) => t.id === editingTextId);
+          if (!block) return null;
+          const bx = (block.x / 100) * pageWidth;
+          const by = (block.y / 100) * pageHeight;
+          const bw = (block.width / 100) * pageWidth;
+          const fontSize = pageHeight * ((block.fontSize ?? 2.5) / 100);
+          const color = block.color ?? "#1a1c1d";
+          const rotation = block.rotation ?? 0;
+          return (
+            <input
+              key={`edit-${block.id}`}
+              type="text"
+              autoFocus
+              defaultValue={block.text}
+              placeholder="Type here"
+              onBlur={(e) => {
+                onTextUpdate(page.id, block.id, { text: e.currentTarget.value });
+                onTextEditEnd();
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  onTextUpdate(page.id, block.id, { text: e.currentTarget.value });
+                  onTextEditEnd();
+                }
+                if (e.key === "Enter") {
+                  onTextUpdate(page.id, block.id, { text: e.currentTarget.value });
+                  onTextEditEnd();
+                }
+              }}
+              style={{
+                position: "absolute",
+                left: bx + bw / 2,
+                top: by,
+                transform: `translateX(-50%)${rotation ? ` rotate(${rotation}deg)` : ""}`,
+                transformOrigin: "center top",
+                width: "auto",
+                minWidth: fontSize * 6,
+                zIndex: 15,
+                border: "none",
+                borderBottom: "1.5px solid rgba(8, 194, 37, 0.5)",
+                outline: "none",
+                borderRadius: 4,
+                background: "rgba(255,255,255,0.85)",
+                fontFamily: "'Manrope', sans-serif",
+                fontSize: fontSize,
+                fontWeight: block.style === "title" ? 700 : 400,
+                color: color,
+                textAlign: "center" as const,
+                padding: "2px 6px",
+                lineHeight: 1.3,
+                caretColor: "#08C225",
+              }}
+              onInput={(e) => {
+                const el = e.currentTarget;
+                el.style.width = "0";
+                el.style.width = Math.max(fontSize * 6, el.scrollWidth + 4) + "px";
+              }}
+              ref={(el) => {
+                if (el) {
+                  // Auto-size to content on mount
+                  requestAnimationFrame(() => {
+                    el.style.width = "0";
+                    el.style.width = Math.max(fontSize * 6, el.scrollWidth + 4) + "px";
+                  });
+                }
+              }}
+            />
+          );
+        })()}
+        {/* Floating text toolbar */}
+        {selectedPageId === page.id && selectedTextId && !editingTextId && (() => {
+          const block = page.textBlocks.find((t) => t.id === selectedTextId);
+          if (!block) return null;
+          return (
+            <TextToolbar
+              block={block}
+              pageWidth={pageWidth}
+              pageHeight={pageHeight}
+              onUpdate={(updates) => onTextUpdate(page.id, block.id, updates)}
+              onDelete={() => onTextDelete(page.id, block.id)}
+              onEdit={() => onTextDblClick(page.id, block.id)}
+            />
+          );
+        })()}
         {/* Caption zones */}
         {hasTopSpace && (
           editingCaption === "top" ? (

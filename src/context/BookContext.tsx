@@ -585,12 +585,15 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
     const block: TextBlock = {
       id: uuid(),
       text: "",
-      x: 10,
+      x: 50,
       y: 40,
-      width: 80,
+      width: 45,
       height: 15,
       style: "body",
-      alignment: "center",
+      alignment: "right",
+      color: "#1a1c1d",
+      rotation: 0,
+      fontSize: 2.5,
     };
     setBook((prev) => ({
       ...prev,

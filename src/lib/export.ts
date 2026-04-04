@@ -113,16 +113,8 @@ export async function renderPageToCanvas(
       block.style === "title"
         ? `bold ${fontSize}px 'Manrope', sans-serif`
         : `${fontSize}px 'Manrope', sans-serif`;
-    ctx.textAlign = block.alignment;
-
-    const textX =
-      block.alignment === "center"
-        ? bx + ((block.width / 100) * width) / 2
-        : block.alignment === "right"
-        ? bx + (block.width / 100) * width
-        : bx;
-
-    ctx.fillText(block.text, textX, by + fontSize);
+    ctx.textAlign = "left";
+    ctx.fillText(block.text, bx, by + fontSize);
     ctx.restore();
   }
 

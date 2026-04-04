@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Box, IconButton, Tooltip, Divider } from "@mui/material";
+import { Box, IconButton, Tooltip } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import NoteAddIcon from "@mui/icons-material/NoteAdd";
 
@@ -12,20 +12,15 @@ import { useBook } from "@/context/BookContext";
 interface ToolbarProps {
   onAddPhotos: () => void;
   onAddText: () => void;
-  selectedTextId: string | null;
-  selectedPageId: string | null;
 }
 
 export default function Toolbar({
   onAddPhotos,
   onAddText,
-  selectedTextId,
-  selectedPageId,
 }: ToolbarProps) {
   const {
     addPage,
     removePage,
-    removeTextBlock,
     currentSpreadIndex,
     book,
   } = useBook();
@@ -36,12 +31,6 @@ export default function Toolbar({
 
   const handleAddText = () => {
     onAddText();
-  };
-
-  const handleDeleteSelected = () => {
-    if (selectedTextId && selectedPageId) {
-      removeTextBlock(selectedPageId, selectedTextId);
-    }
   };
 
   const handleRemovePage = () => {
@@ -113,26 +102,6 @@ export default function Toolbar({
           <TextFieldsIcon />
         </IconButton>
       </Tooltip>
-
-      {selectedTextId && (
-        <>
-          <Divider sx={{ width: 32, my: 0.5, borderColor: "rgba(255,255,255,0.1)" }} />
-          <Tooltip title="Delete selected" placement="right">
-            <IconButton
-              onClick={handleDeleteSelected}
-              sx={{
-                width: 44,
-                height: 44,
-                color: "#888",
-                "&:hover": { color: "#ba1a1a", bgcolor: "rgba(255,255,255,0.08)" },
-                borderRadius: 2,
-              }}
-            >
-              <DeleteOutlineIcon />
-            </IconButton>
-          </Tooltip>
-        </>
-      )}
 
       <Box sx={{ flex: 1 }} />
 
