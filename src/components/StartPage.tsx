@@ -9,10 +9,6 @@ import {
   CircularProgress,
 } from "@mui/material";
 import AddPhotoAlternateIcon from "@mui/icons-material/AddPhotoAlternate";
-import AutoStoriesIcon from "@mui/icons-material/AutoStories";
-import HistoryEduIcon from "@mui/icons-material/HistoryEdu";
-import ShieldIcon from "@mui/icons-material/Shield";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import { useBook } from "@/context/BookContext";
 import Footer from "./Footer";
 
@@ -249,8 +245,9 @@ export default function StartPage() {
               mb: 6,
             }}
           >
-            Drop in your photos, get a print-ready photobook — beautifully
-            arranged, completely private, all in your browser.
+            Drop in your photos, get a print-ready photobook.
+            <br />
+            Beautifully arranged, completely free and private.
           </Typography>
 
           {/* Preview card */}
@@ -350,7 +347,7 @@ export default function StartPage() {
               px: 6,
               py: 2,
               mb: 3,
-              boxShadow: "0px 12px 32px rgba(8, 194, 37, 0.25)",
+              boxShadow: "none",
               "&:hover": {
                 transform: "scale(1.02)",
                 background:
@@ -362,7 +359,7 @@ export default function StartPage() {
               transition: "all 0.3s ease",
             }}
           >
-            Choose Your Photos
+            Choose your photos
           </Button>
 
           <input
@@ -376,88 +373,49 @@ export default function StartPage() {
             }}
           />
 
-          {/* Feature badges */}
+          <Typography
+            sx={{
+              fontSize: "0.85rem",
+              color: "#999",
+              letterSpacing: "0.04em",
+            }}
+          >
+            Print-ready. Auto-arranged. 100% in your browser.
+          </Typography>
+
           <Box
             sx={{
               display: "flex",
-              gap: 4,
-              color: "#888",
+              alignItems: "center",
+              gap: 0.75,
+              mt: 6,
+              color: "#999",
               fontSize: "0.85rem",
             }}
           >
-            {["Print-Ready Quality", "Automatic Layouts", "Fully Private"].map(
-              (label) => (
-                <Box
-                  key={label}
-                  sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
-                >
-                  <CheckCircleIcon sx={{ fontSize: 16 }} />
-                  <Typography sx={{ fontSize: "0.8rem" }}>{label}</Typography>
-                </Box>
-              )
-            )}
-          </Box>
-        </Box>
-      </Box>
-
-      {/* Features section */}
-      <Box
-        sx={{
-          maxWidth: 1100,
-          mx: "auto",
-          px: 4,
-          py: 10,
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", md: "1fr 1fr 1fr" },
-          gap: 6,
-        }}
-      >
-        {[
-          {
-            icon: <AutoStoriesIcon sx={{ fontSize: 28, color: "#08C225" }} />,
-            title: "Automatic Layouts",
-            desc: "Drop in your photos and get beautifully arranged pages instantly — landscape, portrait, or mixed, it just works.",
-          },
-          {
-            icon: <HistoryEduIcon sx={{ fontSize: 28, color: "#08C225" }} />,
-            title: "Add Your Story",
-            desc: "Add captions, quotes, and titles to tell the story behind your photos in elegant typography.",
-          },
-          {
-            icon: <ShieldIcon sx={{ fontSize: 28, color: "#08C225" }} />,
-            title: "Completely Private",
-            desc: "Everything happens in your browser. No uploads, no accounts — just your memories turned into a PDF you can print anywhere.",
-          },
-        ].map((feat) => (
-          <Box key={feat.title} sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+            <Typography sx={{ fontSize: "1rem" }}>By</Typography>
             <Box
+              component="a"
+              href="https://ente.com/?utm_source=photobook"
+              target="_blank"
+              rel="noopener noreferrer"
               sx={{
-                width: 48,
-                height: 48,
-                bgcolor: "rgba(8, 194, 37, 0.08)",
-                borderRadius: 2,
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "center",
+                textDecoration: "none",
+                "&:hover": { opacity: 0.7 },
+                transition: "opacity 0.2s ease",
               }}
             >
-              {feat.icon}
+              <Box
+                component="img"
+                src="/ente-icon.png"
+                alt="ente"
+                sx={{ height: 80 }}
+              />
             </Box>
-            <Typography sx={{ fontWeight: 700, fontSize: "1.15rem", color: "#1a1c1d" }}>
-              {feat.title}
-            </Typography>
-            <Typography
-              sx={{
-                fontFamily: "'Manrope', sans-serif",
-                color: "#666",
-                lineHeight: 1.7,
-                fontSize: "0.95rem",
-              }}
-            >
-              {feat.desc}
-            </Typography>
           </Box>
-        ))}
+        </Box>
       </Box>
 
       <Footer showPrivacyPolicy light />
