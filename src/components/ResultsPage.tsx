@@ -9,8 +9,6 @@ import {
   CircularProgress,
   Menu,
   MenuItem,
-  ListItemIcon,
-  ListItemText,
   Snackbar,
   Alert,
 } from "@mui/material";
@@ -294,43 +292,114 @@ export default function ResultsPage() {
               onClose={() => setDownloadAnchor(null)}
               anchorOrigin={{ vertical: "top", horizontal: "center" }}
               transformOrigin={{ vertical: "bottom", horizontal: "center" }}
+              slotProps={{
+                paper: {
+                  sx: {
+                    bgcolor: "rgba(30, 32, 34, 0.85)",
+                    backdropFilter: "blur(24px)",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    borderRadius: 3,
+                    boxShadow: "0 16px 48px rgba(0,0,0,0.4)",
+                    p: 1,
+                    minWidth: 260,
+                    mb: 1,
+                  },
+                },
+              }}
             >
-              <MenuItem onClick={() => handleExport("pdf-a5")}>
-                <ListItemIcon>
-                  <PictureAsPdfIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText
-                  primary="PDF — A5 pages"
-                  secondary="One page per PDF page"
-                />
-              </MenuItem>
-              <MenuItem onClick={() => handleExport("pdf-a4")}>
-                <ListItemIcon>
-                  <PictureAsPdfIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText
-                  primary="PDF — A4 spreads"
-                  secondary="Two pages per PDF page"
-                />
-              </MenuItem>
-              <MenuItem onClick={() => handleExport("png-zip")}>
-                <ListItemIcon>
-                  <FolderZipIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText
-                  primary="ZIP — A5 PNGs"
-                  secondary="High-res PNG per page"
-                />
-              </MenuItem>
-              <MenuItem onClick={() => handleExport("png-a4-zip")}>
-                <ListItemIcon>
-                  <FolderZipIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText
-                  primary="ZIP — A4 spread PNGs"
-                  secondary="Two pages per image"
-                />
-              </MenuItem>
+              {[
+                {
+                  type: "pdf-a5" as const,
+                  label: "PDF",
+                  detail: "A5 pages",
+                  desc: "One page per PDF page",
+                  icon: <PictureAsPdfIcon sx={{ fontSize: 20 }} />,
+                },
+                {
+                  type: "pdf-a4" as const,
+                  label: "PDF",
+                  detail: "A4 spreads",
+                  desc: "Two pages per PDF page",
+                  icon: <PictureAsPdfIcon sx={{ fontSize: 20 }} />,
+                },
+                {
+                  type: "png-zip" as const,
+                  label: "ZIP",
+                  detail: "A5 PNGs",
+                  desc: "High-res PNG per page",
+                  icon: <FolderZipIcon sx={{ fontSize: 20 }} />,
+                },
+                {
+                  type: "png-a4-zip" as const,
+                  label: "ZIP",
+                  detail: "A4 spread PNGs",
+                  desc: "Two pages per image",
+                  icon: <FolderZipIcon sx={{ fontSize: 20 }} />,
+                },
+              ].map((opt) => (
+                <MenuItem
+                  key={opt.type}
+                  onClick={() => handleExport(opt.type)}
+                  sx={{
+                    borderRadius: 2,
+                    px: 2,
+                    py: 1.25,
+                    mb: 0.5,
+                    gap: 1.5,
+                    "&:last-child": { mb: 0 },
+                    "&:hover": {
+                      bgcolor: "rgba(255,255,255,0.06)",
+                    },
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 1.5,
+                      bgcolor: "rgba(255,255,255,0.06)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "rgba(255,255,255,0.5)",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {opt.icon}
+                  </Box>
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography
+                      sx={{
+                        color: "rgba(255,255,255,0.92)",
+                        fontSize: "0.85rem",
+                        fontWeight: 600,
+                        lineHeight: 1.3,
+                      }}
+                    >
+                      {opt.label}
+                      <Typography
+                        component="span"
+                        sx={{
+                          color: "rgba(255,255,255,0.45)",
+                          fontWeight: 400,
+                          ml: 0.75,
+                        }}
+                      >
+                        — {opt.detail}
+                      </Typography>
+                    </Typography>
+                    <Typography
+                      sx={{
+                        color: "rgba(255,255,255,0.35)",
+                        fontSize: "0.75rem",
+                        lineHeight: 1.3,
+                      }}
+                    >
+                      {opt.desc}
+                    </Typography>
+                  </Box>
+                </MenuItem>
+              ))}
             </Menu>
           </Box>
         </Box>
