@@ -349,6 +349,70 @@ export async function exportPngZip(
   }
 }
 
+export async function exportPngA4Zip(
+  pages: BookPage[],
+  onProgress?: (pct: number) => void
+): Promise<Blob> {
+  const resolver = createPhotoUrlResolver();
+  try {
+    const zip = new JSZip();
+    const spreadW = A5_WIDTH_PX * 2;
+    const spreadH = A5_HEIGHT_PX;
+    const totalSpreads = Math.ceil(pages.length / 2);
+
+    for (let s = 0; s < totalSpreads; s++) {
+      const canvas = document.createElement("canvas");
+      canvas.width = spreadW;
+      canvas.height = spreadH;
+      const ctx = canvas.getContext("2d")!;
+
+      // White background
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, spreadW, spreadH);
+
+      const leftIdx = s * 2;
+      const rightIdx = s * 2 + 1;
+
+      // Left page
+      if (leftIdx < pages.length) {
+        const pageCanvas = await renderPageToCanvas(
+          pages[leftIdx],
+          resolver.resolve,
+          A5_WIDTH_PX,
+          A5_HEIGHT_PX,
+          leftIdx === pages.length - 1
+        );
+        ctx.drawImage(pageCanvas, 0, 0);
+      }
+
+      // Right page
+      if (rightIdx < pages.length) {
+        const pageCanvas = await renderPageToCanvas(
+          pages[rightIdx],
+          resolver.resolve,
+          A5_WIDTH_PX,
+          A5_HEIGHT_PX,
+          rightIdx === pages.length - 1
+        );
+        ctx.drawImage(pageCanvas, A5_WIDTH_PX, 0);
+      }
+
+      const blob = await new Promise<Blob>((resolve) =>
+        canvas.toBlob((b) => resolve(b!), "image/png")
+      );
+
+      const spreadNum = String(s + 1).padStart(3, "0");
+      zip.file(`spread_${spreadNum}.png`, blob);
+
+      onProgress?.(Math.round(((s + 1) / totalSpreads) * 100));
+    }
+
+    return zip.generateAsync({ type: "blob" });
+  } finally {
+    resolver.revokeAll();
+  }
+}
+
 export function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

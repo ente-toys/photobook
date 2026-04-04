@@ -26,6 +26,7 @@ import {
   exportPdfA5,
   exportPdfA4Spreads,
   exportPngZip,
+  exportPngA4Zip,
   downloadBlob,
 } from "@/lib/export";
 
@@ -68,7 +69,7 @@ export default function ResultsPage() {
   }, []);
 
   const handleExport = useCallback(
-    async (type: "pdf-a5" | "pdf-a4" | "png-zip") => {
+    async (type: "pdf-a5" | "pdf-a4" | "png-zip" | "png-a4-zip") => {
       setDownloadAnchor(null);
       setExporting(true);
       setExportProgress(0);
@@ -92,6 +93,10 @@ export default function ResultsPage() {
           case "png-zip":
             blob = await exportPngZip(pages, setExportProgress);
             filename = "photobook-pages.zip";
+            break;
+          case "png-a4-zip":
+            blob = await exportPngA4Zip(pages, setExportProgress);
+            filename = "photobook-A4-spreads.zip";
             break;
         }
 
@@ -315,6 +320,15 @@ export default function ResultsPage() {
                 <ListItemText
                   primary="ZIP — A5 PNGs"
                   secondary="High-res PNG per page"
+                />
+              </MenuItem>
+              <MenuItem onClick={() => handleExport("png-a4-zip")}>
+                <ListItemIcon>
+                  <FolderZipIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText
+                  primary="ZIP — A4 spread PNGs"
+                  secondary="Two pages per image"
                 />
               </MenuItem>
             </Menu>
