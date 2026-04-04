@@ -167,7 +167,7 @@ function PhotoSlotRenderer({
         />
       )}
       {/* Empty slot indicator */}
-      {!image && (
+      {!image && !slot.photoId && (
         <Text
           x={sx}
           y={sy + sh / 2 - 8}
