@@ -29,7 +29,7 @@ import {
   getAppView,
   clearAll,
 } from "@/lib/db";
-import { generateAutoLayout, chooseBestLayout, applyVariant, getDefaultPadding, getVariantsForCount } from "@/lib/layouts";
+import { generateAutoLayout, chooseBestLayout, chooseBestVariantKey, defaultVariantKeyForCount, applyVariant, getDefaultPadding, getVariantsForCount } from "@/lib/layouts";
 import { extractExifDate, createThumbnail } from "@/lib/images";
 import { clearImageCache } from "@/lib/imageCache";
 
@@ -401,6 +401,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
             const newPage: BookPage = {
               id: uuid(),
               slots: chooseBestLayout([photo]),
+              layoutVariant: chooseBestVariantKey([photo]),
               textBlocks: [],
               topCaption: "",
               bottomCaption: "",
@@ -640,14 +641,23 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
 
         const newPages = prev.pages.map((p) => {
           if (p.id === fromPageId) {
-            const newSlots = sourcePhotoIds.length > 0
-              ? chooseBestLayout(sourcePhotoIds.map(makePhotoStub))
-              : [];
-            return { ...p, slots: newSlots };
+            if (sourcePhotoIds.length === 0) {
+              return { ...p, slots: [], layoutVariant: undefined };
+            }
+            const srcPhotos = sourcePhotoIds.map(makePhotoStub);
+            return {
+              ...p,
+              slots: chooseBestLayout(srcPhotos),
+              layoutVariant: chooseBestVariantKey(srcPhotos),
+            };
           }
           if (p.id === toPageId) {
-            const newSlots = chooseBestLayout(targetPhotoIds.map(makePhotoStub));
-            return { ...p, slots: newSlots };
+            const tgtPhotos = targetPhotoIds.map(makePhotoStub);
+            return {
+              ...p,
+              slots: chooseBestLayout(tgtPhotos),
+              layoutVariant: chooseBestVariantKey(tgtPhotos),
+            };
           }
           return p;
         });
@@ -688,17 +698,24 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
     (pageId: string, paddingH: number, paddingV: number) => {
       setBook((prev) => {
         const page = prev.pages.find((p) => p.id === pageId);
-        if (!page || !page.layoutVariant) return prev;
+        if (!page) return prev;
         const photoIds = page.slots
           .map((s) => s.photoId)
           .filter((id): id is string => id !== null);
-        const newSlots = applyVariant(page.layoutVariant, photoIds, paddingH, paddingV);
+        if (photoIds.length === 0) return prev;
+        // Fall back to a default variant key if the page doesn't have one
+        // yet (e.g. auto-laid-out pages from older sessions). Without this,
+        // the padding buttons silently do nothing until the user clicks a
+        // layout thumbnail first.
+        const variantKey =
+          page.layoutVariant ?? defaultVariantKeyForCount(photoIds.length);
+        const newSlots = applyVariant(variantKey, photoIds, paddingH, paddingV);
         if (newSlots.length === 0) return prev;
         return {
           ...prev,
           pages: prev.pages.map((p) =>
             p.id === pageId
-              ? { ...p, slots: newSlots, paddingH, paddingV }
+              ? { ...p, slots: newSlots, layoutVariant: variantKey, paddingH, paddingV }
               : p
           ),
         };

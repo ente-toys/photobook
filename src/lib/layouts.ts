@@ -558,6 +558,37 @@ function layout4TopOneBotThree(photos: Photo[]): PhotoSlot[] {
   return gen4Top1Bot3(photos.map((p) => p.id));
 }
 
+/** Pick the best layout variant key for a set of photos (orientation-based). */
+export function chooseBestVariantKey(photos: Photo[]): string {
+  const count = photos.length;
+  if (count <= 1) return "1-moderate";
+
+  if (count === 2) {
+    const o0 = getOrientation(photos[0]);
+    const o1 = getOrientation(photos[1]);
+    if (o0 === "landscape" && o1 === "landscape") return "2-stacked";
+    return "2-side";
+  }
+
+  if (count === 3) {
+    const o0 = getOrientation(photos[0]);
+    if (o0 === "landscape") return "3-top1-bot2";
+    return "3-left1-right2";
+  }
+
+  const landscapes = photos.filter((p) => getOrientation(p) === "landscape");
+  if (landscapes.length >= 1) return "4-top1-bot3";
+  return "4-grid";
+}
+
+/** Default variant key for a given photo count (used as a fallback). */
+export function defaultVariantKeyForCount(count: number): string {
+  if (count <= 1) return "1-moderate";
+  if (count === 2) return "2-side";
+  if (count === 3) return "3-left1-right2";
+  return "4-grid";
+}
+
 export function chooseBestLayout(photos: Photo[]): PhotoSlot[] {
   const count = photos.length;
   if (count === 0) return [];
@@ -602,6 +633,7 @@ export function generateAutoLayout(photos: Photo[]): BookPage[] {
     pages.push({
       id: uuid(),
       slots: layout1([sorted[0]]),
+      layoutVariant: "1-moderate",
       textBlocks: [],
       topCaption: "",
       bottomCaption: "",
@@ -623,11 +655,13 @@ export function generateAutoLayout(photos: Photo[]): BookPage[] {
     }
 
     const pagePhotos = sorted.slice(idx, idx + count);
+    const variantKey = chooseBestVariantKey(pagePhotos);
     const slots = chooseBestLayout(pagePhotos);
 
     pages.push({
       id: uuid(),
       slots,
+      layoutVariant: variantKey,
       textBlocks: [],
       topCaption: "",
       bottomCaption: "",
