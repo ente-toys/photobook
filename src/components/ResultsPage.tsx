@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useCallback, useRef, useMemo } from "react";
+import React, {
+  useState,
+  useCallback,
+  useRef,
+  useMemo,
+  useEffect,
+} from "react";
 import {
   Box,
   Button,
@@ -65,6 +71,33 @@ export default function ResultsPage() {
   const handlePageChange = useCallback((idx: number) => {
     setPageIndex(idx);
   }, []);
+
+  // Keyboard navigation: left/right arrows flip pages
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if the user is typing into an input/textarea or a menu is open
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      if (downloadAnchor) return;
+
+      if (e.key === "ArrowLeft" && !isAtStart) {
+        e.preventDefault();
+        viewerRef.current?.flipPrev();
+      } else if (e.key === "ArrowRight" && !isAtEnd) {
+        e.preventDefault();
+        viewerRef.current?.flipNext();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isAtStart, isAtEnd, downloadAnchor]);
 
   const handleExport = useCallback(
     async (type: "pdf-a5" | "pdf-a4" | "png-zip" | "png-a4-zip") => {
