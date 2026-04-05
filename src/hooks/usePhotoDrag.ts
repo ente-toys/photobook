@@ -48,14 +48,42 @@ export function usePhotoDrag(
         }
         e.dataTransfer.setDragImage(canvas, size / 2, size / 2);
       }
+
+      // Fallback cleanup: the source SpreadPage can unmount mid-drag due to
+      // virtualization (NEIGHBORHOOD_RADIUS + IntersectionObserver trimming).
+      // When that happens, React's onDragEnd never fires on the detached slot
+      // div, so autoScroll.stop() is never called and dragOverPageId stays set —
+      // leaving the rAF loop pulling the viewport back to the last edge position
+      // and the green overlay stuck. Window-level listeners run regardless of
+      // which element (or no element) the drop/dragend targeted, and are
+      // idempotent when the normal React handlers already cleaned up.
+      const onGlobalEnd = () => {
+        autoScroll.stop();
+        dragSourceRef.current = null;
+        dragOverRef.current = null;
+        dragOverPageRef.current = null;
+        setDragSourceInfo(null);
+        setDragOverInfo(null);
+        setDragOverPageId(null);
+        window.removeEventListener("dragend", onGlobalEnd);
+        window.removeEventListener("drop", onGlobalEnd);
+      };
+      window.addEventListener("dragend", onGlobalEnd);
+      window.addEventListener("drop", onGlobalEnd);
     },
-    [thumbnailUrls]
+    [thumbnailUrls, autoScroll]
   );
 
   const handleSlotDragOver = useCallback(
     (e: React.DragEvent, pageId: string, slotId: string) => {
       e.preventDefault();
-      e.stopPropagation();
+      // Deliberately DO NOT stopPropagation here: the outer scroll container's
+      // onDragOver (handleContainerDragOver) is the only place auto-scroll
+      // speed gets computed, and slot overlay divs cover almost the whole page.
+      // Stopping propagation here meant dragging anywhere over slots near the
+      // top/bottom edge never triggered auto-scroll. The page-level drop zone
+      // is a sibling of the slot (not an ancestor), so letting the event bubble
+      // does not cause duplicate page-drop handling.
       e.dataTransfer.dropEffect = "move";
       // Only update state when the target actually changes
       const cur = dragOverRef.current;
