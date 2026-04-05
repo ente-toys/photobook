@@ -51,9 +51,9 @@ const BookViewer = forwardRef<BookViewerHandle, BookViewerProps>(
 
     // Size pages to fill available space — constrained by both height and width
     // Two pages sit side-by-side, so spread width = 2 * pageWidth
-    const maxByHeight = dimensions.height * 0.95;
-    const maxByWidth = (dimensions.width - 120) / 2 / PAGE_ASPECT; // 120px for arrow buttons
-    const pageHeight = Math.max(300, Math.min(maxByHeight, maxByWidth, 1000));
+    const maxByHeight = dimensions.height * 0.6;
+    const maxByWidth = ((dimensions.width - 160) / 2 / PAGE_ASPECT) * 0.6; // 160px for arrow buttons
+    const pageHeight = Math.max(300, Math.min(maxByHeight, maxByWidth, 1200));
     const pageWidth = Math.round(pageHeight * PAGE_ASPECT);
 
     // Expose navigation methods to parent

@@ -128,11 +128,12 @@ export default function ResultsPage() {
           sx={{
             flex: 1,
             display: "flex",
-            alignItems: "center",
+            alignItems: "stretch",
             justifyContent: "center",
             px: 4,
             py: 1,
             position: "relative",
+            minHeight: 0,
           }}
         >
           {/* Left arrow */}
@@ -142,6 +143,8 @@ export default function ResultsPage() {
             sx={{
               position: "absolute",
               left: 24,
+              top: "50%",
+              transform: "translateY(-50%)",
               zIndex: 10,
               width: 48,
               height: 48,
@@ -169,6 +172,8 @@ export default function ResultsPage() {
             sx={{
               position: "absolute",
               right: 24,
+              top: "50%",
+              transform: "translateY(-50%)",
               zIndex: 10,
               width: 48,
               height: 48,
