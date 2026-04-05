@@ -355,14 +355,61 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
       setPhotos(allPhotos);
       setThumbnailUrls(newThumbUrls);
 
-      // Generate auto layout (bypass undo tracking — this is not a user action)
-      const pages = generateAutoLayout(allPhotos);
-      setBookRaw({ pages, currentSpreadIndex: 0 });
-      undoStackRef.current = [];
-      redoStackRef.current = [];
-      setCanUndo(false);
-      setCanRedo(false);
-      setCurrentSpreadIndex(0);
+      if (replace) {
+        // Fresh session: generate auto layout from scratch (bypass undo tracking)
+        const pages = generateAutoLayout(allPhotos);
+        setBookRaw({ pages, currentSpreadIndex: 0 });
+        undoStackRef.current = [];
+        redoStackRef.current = [];
+        setCanUndo(false);
+        setCanRedo(false);
+        setCurrentSpreadIndex(0);
+      } else if (newPhotos.length > 0) {
+        // Add-to-existing: insert each new photo as its own new page at the
+        // chronologically correct position, leaving existing pages untouched
+        // so the user's layout edits are preserved.
+        const photoMap = new Map(allPhotos.map((p) => [p.id, p]));
+        const sortedNew = [...newPhotos].sort(
+          (a, b) => a.dateTaken - b.dateTaken
+        );
+
+        setBook((prev) => {
+          const pages = [...prev.pages];
+          const pageDates: (number | null)[] = pages.map((page) => {
+            let max: number | null = null;
+            for (const slot of page.slots) {
+              if (!slot.photoId) continue;
+              const ph = photoMap.get(slot.photoId);
+              if (ph && (max === null || ph.dateTaken > max)) max = ph.dateTaken;
+            }
+            return max;
+          });
+
+          for (const photo of sortedNew) {
+            // Find last non-blank page whose latest photo date <= new photo's date
+            let insertAfter = -1;
+            for (let i = 0; i < pages.length; i++) {
+              const d = pageDates[i];
+              if (d !== null && d <= photo.dateTaken) insertAfter = i;
+            }
+            // If the new photo predates everything, still insert after the
+            // cover (page 0) so the cover stays put.
+            const idx =
+              insertAfter >= 0 ? insertAfter + 1 : Math.min(1, pages.length);
+            const newPage: BookPage = {
+              id: uuid(),
+              slots: chooseBestLayout([photo]),
+              textBlocks: [],
+              topCaption: "",
+              bottomCaption: "",
+            };
+            pages.splice(idx, 0, newPage);
+            pageDates.splice(idx, 0, photo.dateTaken);
+          }
+
+          return { ...prev, pages };
+        });
+      }
 
       setProcessingPhotos(false);
       setAppViewState("edit");
