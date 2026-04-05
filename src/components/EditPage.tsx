@@ -17,6 +17,11 @@ import type { TextBlock } from "@/lib/types";
 // A5 aspect ratio
 const PAGE_ASPECT = 148 / 210;
 const PAGE_GAP = 2;
+// Spreads within this many rows of the current row are always mounted, on
+// top of whatever the IntersectionObserver reports. This keeps the "about
+// to be scrolled into" region warm so fast scrolls never reveal an
+// unmounted dark row or a post-mount image decode flash.
+const NEIGHBORHOOD_RADIUS = 4;
 
 export default function EditPage() {
   const {
@@ -62,6 +67,15 @@ export default function EditPage() {
 
   const spreads = useSpreads(pages.length);
 
+  // Map the current page-based spread index (stored in context) to the row
+  // index within `spreads`, so we can build a neighborhood window around it.
+  const currentSpreadRow = useMemo(() => {
+    const idx = spreads.findIndex(
+      (s) => s.left === currentSpreadIndex || s.right === currentSpreadIndex
+    );
+    return idx >= 0 ? idx : 0;
+  }, [spreads, currentSpreadIndex]);
+
   // Virtualization: only render visible spreads + buffer
   const [visibleSpreads, setVisibleSpreads] = useState<Set<number>>(() => new Set([0, 1, 2]));
   const spreadElsRef = useRef<Map<number, Element>>(new Map());
@@ -87,7 +101,10 @@ export default function EditPage() {
           return next;
         });
       },
-      { root, rootMargin: "600px 0px" }
+      // Generous margin so fast flings stay ahead of the viewport. Paired
+      // with the NEIGHBORHOOD_RADIUS window below, this means a spread is
+      // mounted well before it could possibly scroll into view.
+      { root, rootMargin: "2000px 0px" }
     );
     observerRef.current = observer;
 
@@ -158,29 +175,49 @@ export default function EditPage() {
     return { pageWidth: Math.round(pw), pageHeight: ph };
   }, [containerSize.width]);
 
-  // Sync sidebar scroll with main area scroll
+  // Sync sidebar scroll with main area scroll.
+  // Coalesced into a single rAF per frame so that raw scroll events (which
+  // browsers fire at a higher cadence than repaints) don't do layout work
+  // repeatedly, and the boundary-cross `setCurrentSpreadIndex` update —
+  // which triggers a context-wide re-render cascade through every mounted
+  // SpreadPage — fires at most once per animation frame.
+  const scrollRafRef = useRef<number | null>(null);
   const handleMainScroll = useCallback(() => {
-    const main = containerRef.current;
-    const sidebar = sidebarScrollRef.current;
-    if (!main || !sidebar) return;
+    if (scrollRafRef.current !== null) return;
+    scrollRafRef.current = requestAnimationFrame(() => {
+      scrollRafRef.current = null;
+      const main = containerRef.current;
+      const sidebar = sidebarScrollRef.current;
+      if (!main || !sidebar) return;
 
-    const maxMainScroll = main.scrollHeight - main.clientHeight;
-    if (maxMainScroll <= 0) return;
+      const maxMainScroll = main.scrollHeight - main.clientHeight;
+      if (maxMainScroll <= 0) return;
 
-    const fraction = main.scrollTop / maxMainScroll;
-    const maxSidebarScroll = sidebar.scrollHeight - sidebar.clientHeight;
-    sidebar.scrollTop = fraction * maxSidebarScroll;
+      const fraction = main.scrollTop / maxMainScroll;
+      const maxSidebarScroll = sidebar.scrollHeight - sidebar.clientHeight;
+      sidebar.scrollTop = fraction * maxSidebarScroll;
 
-    // Update currentSpreadIndex based on visible spread
-    const visibleIdx = Math.round(fraction * Math.max(0, spreads.length - 1));
-    const spread = spreads[visibleIdx];
-    if (spread) {
-      const newIndex = spread.left ?? spread.right ?? 0;
-      if (newIndex !== currentSpreadIndex) {
-        setCurrentSpreadIndex(newIndex);
+      // Update currentSpreadIndex based on visible spread
+      const visibleIdx = Math.round(fraction * Math.max(0, spreads.length - 1));
+      const spread = spreads[visibleIdx];
+      if (spread) {
+        const newIndex = spread.left ?? spread.right ?? 0;
+        if (newIndex !== currentSpreadIndex) {
+          setCurrentSpreadIndex(newIndex);
+        }
       }
-    }
+    });
   }, [spreads, currentSpreadIndex, setCurrentSpreadIndex]);
+
+  // Cancel any pending scroll-handler frame on unmount.
+  useEffect(() => {
+    return () => {
+      if (scrollRafRef.current !== null) {
+        cancelAnimationFrame(scrollRafRef.current);
+        scrollRafRef.current = null;
+      }
+    };
+  }, []);
 
   // Scroll main area to a specific spread row (called from sidebar click)
   const handleSidebarSpreadClick = useCallback((spreadIdx: number) => {
@@ -307,7 +344,13 @@ export default function EditPage() {
         >
           {/* Spreads (virtualized: only visible spreads render full content) */}
           {spreads.map((spread, spreadIdx) => {
-            const isVisible = visibleSpreads.has(spreadIdx);
+            // Union of the IntersectionObserver-reported visible set with a
+            // fixed ±NEIGHBORHOOD_RADIUS window around the current spread
+            // row, so rows immediately above and below the viewport stay
+            // mounted during fast scrolls.
+            const isVisible =
+              visibleSpreads.has(spreadIdx) ||
+              Math.abs(spreadIdx - currentSpreadRow) <= NEIGHBORHOOD_RADIUS;
             const lp = spread.left !== null ? pages[spread.left] : null;
             const rp = spread.right !== null ? pages[spread.right] : null;
 

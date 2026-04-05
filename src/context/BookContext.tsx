@@ -31,6 +31,7 @@ import {
 } from "@/lib/db";
 import { generateAutoLayout, chooseBestLayout, applyVariant, getDefaultPadding, getVariantsForCount } from "@/lib/layouts";
 import { extractExifDate, createThumbnail } from "@/lib/images";
+import { clearImageCache } from "@/lib/imageCache";
 
 interface BookContextValue {
   // App state
@@ -249,6 +250,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
       if (replace) {
         // Clear previous session when starting fresh from start page
         thumbnailUrls.forEach((url) => URL.revokeObjectURL(url));
+        clearImageCache();
         await clearAll();
       }
 
@@ -763,6 +765,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
   const startOver = useCallback(async () => {
     // Revoke all URLs
     thumbnailUrls.forEach((url) => URL.revokeObjectURL(url));
+    clearImageCache();
 
     await clearAll();
     setPhotos([]);

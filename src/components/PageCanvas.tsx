@@ -6,6 +6,7 @@ import Konva from "konva";
 import type { BookPage, PhotoSlot, TextBlock } from "@/lib/types";
 import { A5_ASPECT } from "@/lib/types";
 import { useBook } from "@/context/BookContext";
+import { getCachedImage, loadImageCached } from "@/lib/imageCache";
 
 export type CaptionPosition = "top" | "bottom";
 
@@ -50,7 +51,12 @@ function PhotoSlotRenderer({
   isInteractive: boolean;
   pageId: string;
 }) {
-  const [image, setImage] = useState<HTMLImageElement | null>(null);
+  // Initialize from the shared cache so re-mounts (virtualization churn in
+  // EditPage) draw the photo on the first paint instead of flashing white.
+  const photoId = slot.photoId;
+  const [image, setImage] = useState<HTMLImageElement | null>(() =>
+    photoId ? getCachedImage(photoId) : null
+  );
 
   const sx = (slot.x / 100) * pageWidth;
   const sy = (slot.y / 100) * pageHeight;
@@ -58,23 +64,33 @@ function PhotoSlotRenderer({
   const sh = (slot.height / 100) * pageHeight;
 
   useEffect(() => {
-    if (!photoUrl) {
+    if (!photoId || !photoUrl) {
       setImage(null);
       return;
     }
+    const cached = getCachedImage(photoId);
+    if (cached) {
+      // setImage is a no-op if the reference is unchanged; otherwise this
+      // covers the case where the slot now references a different photo
+      // that happens to already be decoded in the cache.
+      setImage(cached);
+      return;
+    }
+    // Not cached yet — keep showing whatever we have (may be null or a stale
+    // image from the previous photo, matching the prior behavior of not
+    // flashing to blank while the new photo decodes) and load asynchronously.
     let cancelled = false;
-    const img = new window.Image();
-    img.onload = () => {
-      if (!cancelled) setImage(img);
-    };
-    img.onerror = () => {
-      if (!cancelled) setImage(null);
-    };
-    img.src = photoUrl;
+    loadImageCached(photoId, photoUrl)
+      .then((img) => {
+        if (!cancelled) setImage(img);
+      })
+      .catch(() => {
+        if (!cancelled) setImage(null);
+      });
     return () => {
       cancelled = true;
     };
-  }, [photoUrl]);
+  }, [photoId, photoUrl]);
 
   const clipFunc = (ctx: Konva.Context) => {
     ctx.rect(sx, sy, sw, sh);
