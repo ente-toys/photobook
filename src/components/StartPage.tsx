@@ -123,7 +123,6 @@ export default function StartPage() {
         bgcolor: "#fff",
         display: "flex",
         flexDirection: "column",
-        pt: 8,
         position: "relative",
         overflow: "hidden",
       }}
@@ -136,10 +135,9 @@ export default function StartPage() {
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          justifyContent: "center",
           position: "relative",
           px: 3,
-          pt: 5,
+          pt: { xs: "128px", sm: "170px" },
           pb: 8,
         }}
         onDrop={handleDrop}
