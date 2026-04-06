@@ -237,7 +237,11 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const [showPageStrip, setShowPageStrip] = useState(true);
+  const [showPageStrip, setShowPageStrip] = useState(
+    () =>
+      typeof window === "undefined" ||
+      !window.matchMedia("(max-width: 640px)").matches,
+  );
   const [processingPhotos, setProcessingPhotos] = useState(false);
   const [processingProgress, setProcessingProgress] = useState(0);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
