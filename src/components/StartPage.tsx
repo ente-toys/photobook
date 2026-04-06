@@ -359,9 +359,9 @@ export default function StartPage() {
             >
               <Box
                 component="img"
-                src="/ente-icon.png"
+                src="/ente-branding.svg"
                 alt="ente"
-                sx={{ height: 80 }}
+                sx={{ height: 21 }}
               />
             </Box>
           </Box>

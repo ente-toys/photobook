@@ -266,11 +266,11 @@ function EnteBranding({
 
   useEffect(() => {
     const img = new window.Image();
-    img.src = "/ente-icon.png";
+    img.src = "/ente-branding.svg";
     img.onload = () => {
       // Pre-scale to target size in an offscreen canvas to avoid
       // aliasing from extreme downscaling (1024px → ~60px).
-      const targetH = Math.round(pageHeight * 0.12 * (window.devicePixelRatio || 1));
+      const targetH = Math.round(pageHeight * 0.031 * (window.devicePixelRatio || 1));
       const targetW = Math.round((img.naturalWidth / img.naturalHeight) * targetH);
       const offscreen = document.createElement("canvas");
       offscreen.width = targetW;
@@ -283,7 +283,7 @@ function EnteBranding({
     };
   }, [pageHeight]);
 
-  const logoHeight = pageHeight * 0.12;
+  const logoHeight = pageHeight * 0.031;
   const logoWidth = logo
     ? (logo.width / logo.height) * logoHeight
     : logoHeight * 2;

@@ -153,8 +153,8 @@ export async function renderPageToCanvas(
   if (isBackCover) {
     // Draw "By ente" branding on back cover
     try {
-      const logo = await loadImage("/ente-icon.png");
-      const logoHeight = height * 0.12;
+      const logo = await loadImage("/ente-branding.svg");
+      const logoHeight = height * 0.031;
       const logoWidth = (logo.naturalWidth / logo.naturalHeight) * logoHeight;
       const byFontSize = Math.round(height * 0.018);
       const gap = byFontSize * 0.6;
