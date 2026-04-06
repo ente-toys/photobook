@@ -1,6 +1,6 @@
 # Ente Photobook
 
-A fully private photobook maker that runs entirely in your browser. No uploads, no accounts, no tracking — just drag in your photos, design your book, and download the result. What you do with it is up to you: print it at home, take it to a local print shop, or order online.
+A fully private photobook maker that runs entirely in your browser. No uploads, no accounts, no tracking. Just drag in your photos, design your book, and download the result. What you do with it is up to you: print it at home, take it to a local print shop, or order online.
 
 ## Why?
 
@@ -19,9 +19,15 @@ Every photobook service out there requires you to upload your personal photos to
 
 ## Getting started
 
+Go to [photobook.ente.com](https://photobook.ente.com) and start making your photobook.
+
+## Development
+
+Want to make code changes? Run it locally:
+
 ```bash
 npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to start making your photobook.
+Then open [http://localhost:3000](http://localhost:3000).
