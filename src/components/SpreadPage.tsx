@@ -658,7 +658,7 @@ export default function SpreadPage({
                 outline: "none",
                 borderRadius: 4,
                 background: "rgba(255,255,255,0.85)",
-                fontFamily: "var(--font-manrope), sans-serif",
+                fontFamily: "var(--font-nunito), sans-serif",
                 fontSize: fontSize,
                 fontWeight: block.style === "title" ? 700 : 400,
                 color: color,
@@ -721,7 +721,7 @@ export default function SpreadPage({
                 border: "none",
                 outline: "none",
                 background: "white",
-                fontFamily: "var(--font-manrope), sans-serif",
+                fontFamily: "var(--font-nunito), sans-serif",
                 fontSize: captionFontSize,
                 color: "#1a1c1d",
                 textAlign: "center" as const,
@@ -754,7 +754,7 @@ export default function SpreadPage({
               {!page.topCaption && topCaptionHovered && (
                 <span
                   style={{
-                    fontFamily: "var(--font-manrope), sans-serif",
+                    fontFamily: "var(--font-nunito), sans-serif",
                     fontSize: captionFontSize,
                     color: "#aaa",
                     pointerEvents: "none",
@@ -787,7 +787,7 @@ export default function SpreadPage({
                 border: "none",
                 outline: "none",
                 background: "white",
-                fontFamily: "var(--font-manrope), sans-serif",
+                fontFamily: "var(--font-nunito), sans-serif",
                 fontSize: captionFontSize,
                 color: "#1a1c1d",
                 textAlign: "center" as const,
@@ -820,7 +820,7 @@ export default function SpreadPage({
               {!page.bottomCaption && bottomCaptionHovered && (
                 <span
                   style={{
-                    fontFamily: "var(--font-manrope), sans-serif",
+                    fontFamily: "var(--font-nunito), sans-serif",
                     fontSize: captionFontSize,
                     color: "#aaa",
                     pointerEvents: "none",

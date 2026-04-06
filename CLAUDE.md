@@ -39,7 +39,7 @@ No test framework is configured.
 
 **UI stack:** MUI v7 + Emotion, Konva (`react-konva`) for the page canvas editor. HEIC/HEIF conversion via `heic2any`. Page flip animation via `page-flip`.
 
-**Design system:** Ente-aligned — accent green `#08C225`, light mode only, grey app background with white book pages. Font: Noto Serif for book content.
+**Design system:** Ente-aligned — accent green `#08C225`, light mode only, grey app background with white book pages. Font: Nunito for book content.
 
 ## Key Conventions
 

@@ -4,6 +4,11 @@ import type { BookPage, Photo } from "./types";
 import { A5_WIDTH_MM, A5_HEIGHT_MM } from "./types";
 import { getPhotoBlob } from "./db";
 
+function getNunitoFont(): string {
+  if (typeof window === "undefined") return "sans-serif";
+  return getComputedStyle(document.documentElement).getPropertyValue("--font-nunito").trim() || "sans-serif";
+}
+
 function getManropeFont(): string {
   if (typeof window === "undefined") return "sans-serif";
   return getComputedStyle(document.documentElement).getPropertyValue("--font-manrope").trim() || "sans-serif";
@@ -150,7 +155,7 @@ export async function renderPageToCanvas(
   // Draw captions
   if (page.topCaption) {
     ctx.fillStyle = "#1a1c1d";
-    ctx.font = `${Math.round(height * 0.025)}px ${getManropeFont()}, sans-serif`;
+    ctx.font = `${Math.round(height * 0.025)}px ${getNunitoFont()}, sans-serif`;
     ctx.textAlign = "center";
     ctx.fillText(page.topCaption, width / 2, height * 0.04);
   }
@@ -193,7 +198,7 @@ export async function renderPageToCanvas(
     }
   } else if (page.bottomCaption) {
     ctx.fillStyle = "#1a1c1d";
-    ctx.font = `${Math.round(height * 0.025)}px ${getManropeFont()}, sans-serif`;
+    ctx.font = `${Math.round(height * 0.025)}px ${getNunitoFont()}, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "bottom";
     ctx.fillText(page.bottomCaption, width / 2, height * 0.98);
@@ -219,8 +224,8 @@ export async function renderPageToCanvas(
     ctx.fillStyle = color;
     ctx.font =
       block.style === "title"
-        ? `bold ${fontSize}px ${getManropeFont()}, sans-serif`
-        : `${fontSize}px ${getManropeFont()}, sans-serif`;
+        ? `bold ${fontSize}px ${getNunitoFont()}, sans-serif`
+        : `${fontSize}px ${getNunitoFont()}, sans-serif`;
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
 

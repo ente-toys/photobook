@@ -8,12 +8,12 @@ import { A5_ASPECT } from "@/lib/types";
 import { useBook } from "@/context/BookContext";
 import { getCachedImage, getCachedUrl, loadImageCached } from "@/lib/imageCache";
 
-let _canvasManrope: string | null = null;
-function getManropeFont(): string {
-  if (_canvasManrope) return _canvasManrope;
+let _canvasNunito: string | null = null;
+function getNunitoFont(): string {
+  if (_canvasNunito) return _canvasNunito;
   if (typeof window === "undefined") return "sans-serif";
-  _canvasManrope = getComputedStyle(document.documentElement).getPropertyValue("--font-manrope").trim() || "sans-serif";
-  return _canvasManrope;
+  _canvasNunito = getComputedStyle(document.documentElement).getPropertyValue("--font-nunito").trim() || "sans-serif";
+  return _canvasNunito;
 }
 
 export type CaptionPosition = "top" | "bottom";
@@ -244,7 +244,7 @@ function TextBlockRenderer({
         y={by}
         text={displayText}
         fontSize={fontSize}
-        fontFamily={getManropeFont()}
+        fontFamily={getNunitoFont()}
         fontStyle={block.style === "title" ? "bold" : "normal"}
         fill={displayColor}
         rotation={rotation}
@@ -368,7 +368,7 @@ function CaptionText({
       width={pageWidth}
       text={text}
       fontSize={fontSize}
-      fontFamily={getManropeFont()}
+      fontFamily={getNunitoFont()}
       fill="#1a1c1d"
       align="center"
     />
@@ -462,7 +462,7 @@ export default function PageCanvas({
         text=""
         fontSize={8}
         fill="#ccc"
-        fontFamily={getManropeFont()}
+        fontFamily={getNunitoFont()}
       />
     </>
   );

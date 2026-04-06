@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Manrope, Noto_Serif, Sora } from "next/font/google";
+import { Manrope, Nunito, Sora } from "next/font/google";
 import { AppRouterCacheProvider } from "@mui/material-nextjs/v15-appRouter";
 import { ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
@@ -13,12 +13,11 @@ const manrope = Manrope({
   variable: "--font-manrope",
 });
 
-const notoSerif = Noto_Serif({
+const nunito = Nunito({
   subsets: ["latin"],
   weight: ["400", "700"],
-  style: ["normal", "italic"],
   display: "swap",
-  variable: "--font-noto-serif",
+  variable: "--font-nunito",
 });
 
 const sora = Sora({
@@ -44,7 +43,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${manrope.variable} ${notoSerif.variable} ${sora.variable}`}>
+      <body className={`${manrope.variable} ${nunito.variable} ${sora.variable}`}>
         <AppRouterCacheProvider>
           <ThemeProvider theme={theme}>
             <CssBaseline />
