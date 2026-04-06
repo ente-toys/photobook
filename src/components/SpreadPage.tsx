@@ -297,7 +297,7 @@ export default function SpreadPage({
   };
 
   const handleCaptionCancel = () => {
-    setEditingCaption(null);
+    handleCaptionSave();
   };
 
   useEffect(() => {
