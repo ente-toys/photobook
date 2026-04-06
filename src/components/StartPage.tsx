@@ -9,7 +9,6 @@ import {
   CircularProgress,
 } from "@mui/material";
 import { useBook } from "@/context/BookContext";
-import Footer from "./Footer";
 
 const ACCEPTED_TYPES = [
   "image/jpeg",
@@ -125,8 +124,46 @@ export default function StartPage() {
         display: "flex",
         flexDirection: "column",
         pt: 8,
+        position: "relative",
+        overflow: "hidden",
       }}
     >
+      {/* Background blurs — at page level so they extend behind the nav */}
+      <Box
+        sx={{
+          position: "absolute",
+          inset: 0,
+          zIndex: 0,
+          pointerEvents: "none",
+          opacity: 0.12,
+        }}
+      >
+        <Box
+          sx={{
+            position: "absolute",
+            top: -96,
+            left: -96,
+            width: 384,
+            height: 384,
+            bgcolor: "#08C225",
+            borderRadius: "50%",
+            filter: "blur(120px)",
+          }}
+        />
+        <Box
+          sx={{
+            position: "absolute",
+            top: "50%",
+            right: -96,
+            width: 500,
+            height: 500,
+            bgcolor: "#A4F795",
+            borderRadius: "50%",
+            filter: "blur(160px)",
+          }}
+        />
+      </Box>
+
       {/* Hero */}
       <Box
         component="main"
@@ -137,7 +174,6 @@ export default function StartPage() {
           alignItems: "center",
           justifyContent: "center",
           position: "relative",
-          overflow: "hidden",
           px: 3,
           py: 8,
         }}
@@ -145,42 +181,6 @@ export default function StartPage() {
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
       >
-        {/* Background blurs */}
-        <Box
-          sx={{
-            position: "absolute",
-            inset: 0,
-            zIndex: 0,
-            pointerEvents: "none",
-            opacity: 0.12,
-            overflow: "hidden",
-          }}
-        >
-          <Box
-            sx={{
-              position: "absolute",
-              top: -96,
-              left: -96,
-              width: 384,
-              height: 384,
-              bgcolor: "#08C225",
-              borderRadius: "50%",
-              filter: "blur(120px)",
-            }}
-          />
-          <Box
-            sx={{
-              position: "absolute",
-              top: "50%",
-              right: -96,
-              width: 500,
-              height: 500,
-              bgcolor: "#A4F795",
-              borderRadius: "50%",
-              filter: "blur(160px)",
-            }}
-          />
-        </Box>
 
         {/* Drag overlay */}
         {dragOver && (
@@ -333,42 +333,9 @@ export default function StartPage() {
             Print-ready. Auto-arranged. 100% in your browser.
           </Typography>
 
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 0.75,
-              mt: 6,
-              color: "#999",
-              fontSize: "0.85rem",
-            }}
-          >
-            <Typography sx={{ fontSize: "1rem", position: "relative", top: 1 }}>By</Typography>
-            <Box
-              component="a"
-              href="https://ente.com/?utm_source=photobook"
-              target="_blank"
-              rel="noopener noreferrer"
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                textDecoration: "none",
-                "&:hover": { opacity: 0.7 },
-                transition: "opacity 0.2s ease",
-              }}
-            >
-              <Box
-                component="img"
-                src="/ente-branding.svg"
-                alt="ente"
-                sx={{ height: 21 }}
-              />
-            </Box>
-          </Box>
         </Box>
       </Box>
 
-      <Footer showPrivacyPolicy light />
     </Box>
   );
 }
