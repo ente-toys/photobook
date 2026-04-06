@@ -84,7 +84,7 @@ export default function StartPage() {
         <CircularProgress sx={{ color: "#08C225" }} size={48} />
         <Typography
           sx={{
-            fontFamily: "'Manrope', sans-serif",
+            fontFamily: "'Sora', 'Avenir Next', 'Segoe UI', sans-serif",
             fontWeight: 700,
             fontSize: "1.25rem",
             color: "#1a1c1d",
@@ -175,7 +175,8 @@ export default function StartPage() {
           justifyContent: "center",
           position: "relative",
           px: 3,
-          py: 8,
+          pt: 5,
+          pb: 8,
         }}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
@@ -224,6 +225,7 @@ export default function StartPage() {
           <Typography
             variant="h1"
             sx={{
+              fontFamily: "'Sora', 'Avenir Next', 'Segoe UI', sans-serif",
               fontSize: { xs: "2.5rem", md: "4rem" },
               fontWeight: 800,
               letterSpacing: "-0.02em",
@@ -236,7 +238,7 @@ export default function StartPage() {
           </Typography>
           <Typography
             sx={{
-              fontFamily: "'Manrope', sans-serif",
+              fontFamily: "'Sora', 'Avenir Next', 'Segoe UI', sans-serif",
               fontSize: "1.15rem",
               color: "#666",
               maxWidth: 560,
@@ -292,6 +294,7 @@ export default function StartPage() {
             sx={{
               background:
                 "linear-gradient(135deg, #006E0F 0%, #08C225 100%)",
+              fontFamily: "'Sora', 'Avenir Next', 'Segoe UI', sans-serif",
               fontSize: "1.15rem",
               fontWeight: 700,
               px: 6,
@@ -325,6 +328,7 @@ export default function StartPage() {
 
           <Typography
             sx={{
+              fontFamily: "'Sora', 'Avenir Next', 'Segoe UI', sans-serif",
               fontSize: "0.85rem",
               color: "#999",
               letterSpacing: "0.04em",

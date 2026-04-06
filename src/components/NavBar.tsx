@@ -75,7 +75,7 @@ function StartNavBar({ onLogoClick }: { onLogoClick: () => void }) {
           background: "rgba(255, 255, 255, 0.76)",
           backdropFilter: "blur(28px)",
           boxShadow: "0 20px 48px rgba(18, 18, 18, 0.07)",
-          maxWidth: 900,
+          maxWidth: 1100,
           mx: "auto",
           animation: "navSlideIn 0.45s cubic-bezier(0.22, 1, 0.36, 1)",
           "@keyframes navSlideIn": {
