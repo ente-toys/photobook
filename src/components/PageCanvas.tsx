@@ -6,7 +6,7 @@ import Konva from "konva";
 import type { BookPage, PhotoSlot, TextBlock } from "@/lib/types";
 import { A5_ASPECT } from "@/lib/types";
 import { useBook } from "@/context/BookContext";
-import { getCachedImage, loadImageCached } from "@/lib/imageCache";
+import { getCachedImage, getCachedUrl, loadImageCached } from "@/lib/imageCache";
 
 let _canvasManrope: string | null = null;
 function getManropeFont(): string {
@@ -24,6 +24,10 @@ interface PageCanvasProps {
   pageHeight: number;
   isInteractive?: boolean;
   isBackCover?: boolean;
+  /** Override the URL map used for photo slots. When omitted, falls back to
+   *  thumbnailUrls (256px) from BookContext — appropriate for PageStrip.
+   *  SpreadPage / BookViewer pass photoUrls (which prefers 1080px previews). */
+  photoUrls?: Map<string, string>;
   onSlotClick?: (slotId: string) => void;
   selectedSlotId?: string | null;
   selectedTextId?: string | null;
@@ -76,24 +80,23 @@ function PhotoSlotRenderer({
       setImage(null);
       return;
     }
+    // Show whatever is in the cache immediately (may be a lower-res thumb
+    // while the preview loads — prevents blank flash on remount).
     const cached = getCachedImage(photoId);
-    if (cached) {
-      // setImage is a no-op if the reference is unchanged; otherwise this
-      // covers the case where the slot now references a different photo
-      // that happens to already be decoded in the cache.
-      setImage(cached);
-      return;
-    }
-    // Not cached yet — keep showing whatever we have (may be null or a stale
-    // image from the previous photo, matching the prior behavior of not
-    // flashing to blank while the new photo decodes) and load asynchronously.
+    if (cached) setImage(cached);
+
+    // If the cached image was loaded from this exact URL, we're done.
+    // Otherwise load the new URL (handles thumb → preview upgrade).
+    if (cached && getCachedUrl(photoId) === photoUrl) return;
+
     let cancelled = false;
     loadImageCached(photoId, photoUrl)
       .then((img) => {
         if (!cancelled) setImage(img);
       })
       .catch(() => {
-        if (!cancelled) setImage(null);
+        // Only blank the slot if we had nothing to show
+        if (!cancelled && !cached) setImage(null);
       });
     return () => {
       cancelled = true;
@@ -387,10 +390,11 @@ export default function PageCanvas({
   onTextDblClick,
   editingTextId,
   editingCaption,
+  photoUrls: photoUrlsProp,
   onDropPhoto,
 }: PageCanvasProps) {
   const { thumbnailUrls } = useBook();
-  const urls = thumbnailUrls;
+  const urls = photoUrlsProp ?? thumbnailUrls;
 
   const captionFontSize = pageHeight * 0.025;
 

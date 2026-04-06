@@ -6,6 +6,7 @@ import React, {
   useState,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
 } from "react";
 import { v4 as uuid } from "uuid";
@@ -25,6 +26,8 @@ import {
   savePhotoBlob,
   saveThumbnail,
   getThumbnail,
+  savePreview,
+  getPreview,
   saveAppView,
   getAppView,
   clearAll,
@@ -43,7 +46,9 @@ interface BookContextValue {
 
   // Photos
   photos: Photo[];
-  thumbnailUrls: Map<string, string>; // id -> objectURL (thumb)
+  thumbnailUrls: Map<string, string>; // id -> objectURL (256px thumb)
+  photoUrls: Map<string, string>; // id -> objectURL (preview if loaded, else thumb)
+  loadPreviews: (photoIds: string[]) => void;
   addPhotos: (files: File[], replace?: boolean) => Promise<void>;
   processingPhotos: boolean;
   processingProgress: number;
@@ -123,6 +128,11 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
   );
   const thumbnailUrlsRef = useRef<Map<string, string>>(thumbnailUrls);
   thumbnailUrlsRef.current = thumbnailUrls;
+  const [previewUrls, setPreviewUrls] = useState<Map<string, string>>(
+    new Map()
+  );
+  const previewUrlsRef = useRef<Map<string, string>>(previewUrls);
+  previewUrlsRef.current = previewUrls;
   const [book, setBookRaw] = useState<BookState>(emptyBook);
   const [currentSpreadIndex, setCurrentSpreadIndex] = useState(0);
 
@@ -130,6 +140,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     return () => {
       thumbnailUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     };
   }, []);
 
@@ -177,6 +188,55 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
   }, []);
+  // Merged URL map: preview (1080px) if loaded, else thumbnail (256px).
+  // Consumers that need high-res (SpreadPage, BookViewer) use this + loadPreviews.
+  // Consumers that only need tiny images (PageStrip) use thumbnailUrls directly.
+  const photoUrls = useMemo(() => {
+    if (previewUrls.size === 0) return thumbnailUrls;
+    const merged = new Map(thumbnailUrls);
+    for (const [id, url] of previewUrls) {
+      merged.set(id, url);
+    }
+    return merged;
+  }, [thumbnailUrls, previewUrls]);
+
+  // Tracks which photo IDs are currently being loaded from IndexedDB to
+  // prevent redundant concurrent reads when multiple components request
+  // the same previews.
+  const loadingPreviewsRef = useRef<Set<string>>(new Set());
+
+  const loadPreviews = useCallback(async (photoIds: string[]) => {
+    const missing = photoIds.filter(
+      (id) =>
+        !previewUrlsRef.current.has(id) && !loadingPreviewsRef.current.has(id)
+    );
+    if (missing.length === 0) return;
+
+    missing.forEach((id) => loadingPreviewsRef.current.add(id));
+
+    const loaded = new Map<string, string>();
+    await Promise.all(
+      missing.map(async (id) => {
+        try {
+          const blob = await getPreview(id);
+          if (blob) {
+            loaded.set(id, URL.createObjectURL(blob));
+          }
+        } finally {
+          loadingPreviewsRef.current.delete(id);
+        }
+      })
+    );
+
+    if (loaded.size > 0) {
+      setPreviewUrls((prev) => {
+        const next = new Map(prev);
+        for (const [id, url] of loaded) next.set(id, url);
+        return next;
+      });
+    }
+  }, []);
+
   const [showPageStrip, setShowPageStrip] = useState(true);
   const [processingPhotos, setProcessingPhotos] = useState(false);
   const [processingProgress, setProcessingProgress] = useState(0);
@@ -250,12 +310,14 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
       if (replace) {
         // Clear previous session when starting fresh from start page
         thumbnailUrls.forEach((url) => URL.revokeObjectURL(url));
+        previewUrls.forEach((url) => URL.revokeObjectURL(url));
         clearImageCache();
         await clearAll();
       }
 
       const newPhotos: Photo[] = [];
       const newThumbUrls = replace ? new Map<string, string>() : new Map(thumbnailUrls);
+      const newPreviewUrls = replace ? new Map<string, string>() : new Map(previewUrls);
 
       // Flush progress to state only on animation frames
       const scheduleProgressUpdate = (value: number) => {
@@ -269,7 +331,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
       };
 
       // Process each photo: HEIC conversion, dimensions, thumbnail, IndexedDB save
-      type PhotoResult = { photo: Photo; thumbUrl: string };
+      type PhotoResult = { photo: Photo; thumbUrl: string; previewUrl: string };
       const results: (PhotoResult | null)[] = new Array(files.length).fill(null);
       let completed = 0;
 
@@ -304,7 +366,8 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
         const img = await loadImage(tempUrl);
         URL.revokeObjectURL(tempUrl);
         const dateTaken = await extractExifDate(file);
-        const thumb = await createThumbnail(img, 1080);
+        const thumb = await createThumbnail(img, 256);
+        const preview = await createThumbnail(img, 1080);
 
         const photo: Photo = {
           id: uuid(),
@@ -317,9 +380,11 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
         // Save to IndexedDB
         await savePhotoBlob(photo.id, blob);
         await saveThumbnail(photo.id, thumb);
+        await savePreview(photo.id, preview);
 
         const thumbUrl = URL.createObjectURL(thumb);
-        results[index] = { photo, thumbUrl };
+        const previewUrl = URL.createObjectURL(preview);
+        results[index] = { photo, thumbUrl, previewUrl };
         completed++;
         scheduleProgressUpdate(Math.round((completed / files.length) * 100));
       };
@@ -342,6 +407,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
       for (const result of results) {
         if (result) {
           newThumbUrls.set(result.photo.id, result.thumbUrl);
+          newPreviewUrls.set(result.photo.id, result.previewUrl);
           newPhotos.push(result.photo);
         }
       }
@@ -356,6 +422,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
       const allPhotos = replace ? newPhotos : [...photos, ...newPhotos];
       setPhotos(allPhotos);
       setThumbnailUrls(newThumbUrls);
+      setPreviewUrls(newPreviewUrls);
 
       if (replace) {
         // Fresh session: generate auto layout from scratch (bypass undo tracking)
@@ -417,7 +484,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
       setProcessingPhotos(false);
       setAppViewState("edit");
     },
-    [photos, thumbnailUrls]
+    [photos, thumbnailUrls, previewUrls]
   );
 
   const addPage = useCallback(
@@ -782,11 +849,13 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
   const startOver = useCallback(async () => {
     // Revoke all URLs
     thumbnailUrls.forEach((url) => URL.revokeObjectURL(url));
+    previewUrls.forEach((url) => URL.revokeObjectURL(url));
     clearImageCache();
 
     await clearAll();
     setPhotos([]);
     setThumbnailUrls(new Map());
+    setPreviewUrls(new Map());
     setBookRaw(emptyBook);
     undoStackRef.current = [];
     redoStackRef.current = [];
@@ -795,7 +864,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
     setCurrentSpreadIndex(0);
     setAppViewState("start");
     setRestored(false);
-  }, [thumbnailUrls]);
+  }, [thumbnailUrls, previewUrls]);
 
   return (
     <BookContext.Provider
@@ -807,6 +876,8 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
         setRestored,
         photos,
         thumbnailUrls,
+        photoUrls,
+        loadPreviews,
         addPhotos,
         processingPhotos,
         processingProgress,

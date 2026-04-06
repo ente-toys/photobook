@@ -5,6 +5,7 @@ import React, {
   useEffect,
   useState,
   useCallback,
+  useMemo,
   forwardRef,
   useImperativeHandle,
 } from "react";
@@ -29,6 +30,7 @@ const PAGE_ASPECT = 148 / 210;
 
 const BookViewer = forwardRef<BookViewerHandle, BookViewerProps>(
   function BookViewer({ pages, onPageChange }, ref) {
+    const { photoUrls, loadPreviews } = useBook();
     const containerRef = useRef<HTMLDivElement>(null);
     const bookRef = useRef<HTMLDivElement>(null);
     const pageFlipRef = useRef<PageFlip | null>(null);
@@ -39,6 +41,15 @@ const BookViewer = forwardRef<BookViewerHandle, BookViewerProps>(
     // Remembered page index so re-initializing PageFlip (e.g. after a resize)
     // does not jump the reader back to the cover.
     const startPageRef = useRef(0);
+
+    // Load 1080px previews for all pages in the book
+    const allPhotoIds = useMemo(
+      () => pages.flatMap((p) => p.slots.filter((s) => s.photoId).map((s) => s.photoId!)),
+      [pages]
+    );
+    useEffect(() => {
+      if (allPhotoIds.length > 0) loadPreviews(allPhotoIds);
+    }, [allPhotoIds, loadPreviews]);
 
     useEffect(() => {
       let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -225,6 +236,7 @@ const BookViewer = forwardRef<BookViewerHandle, BookViewerProps>(
               page={page}
               pageWidth={pageWidth}
               pageHeight={pageHeight}
+              photoUrls={photoUrls}
               isBackCover={i === pages.length - 1}
             />
           ))}
@@ -240,11 +252,13 @@ function PageElement({
   page,
   pageWidth,
   pageHeight,
+  photoUrls,
   isBackCover,
 }: {
   page: BookPage;
   pageWidth: number;
   pageHeight: number;
+  photoUrls?: Map<string, string>;
   isBackCover: boolean;
 }) {
   return (
@@ -261,6 +275,7 @@ function PageElement({
         <Layer>
           <PageCanvas
             page={page}
+            photoUrls={photoUrls}
             pageWidth={pageWidth}
             pageHeight={pageHeight}
             isBackCover={isBackCover}

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { Box, IconButton, Typography } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { Stage, Layer } from "react-konva";
@@ -265,7 +265,16 @@ export default function SpreadPage({
   onPageDropOnPage,
   onPageDragEndCleanup,
 }: SpreadPageProps) {
-  const { thumbnailUrls, removePage, setPageLayout, setPagePadding, updatePage, updateSlot, photos } = useBook();
+  const { thumbnailUrls, photoUrls, loadPreviews, removePage, setPageLayout, setPagePadding, updatePage, updateSlot, photos } = useBook();
+
+  // Trigger lazy-loading of 1080px previews for this page's photos
+  const pagePhotoIds = useMemo(
+    () => page.slots.filter((s) => s.photoId).map((s) => s.photoId!),
+    [page.slots]
+  );
+  useEffect(() => {
+    if (pagePhotoIds.length > 0) loadPreviews(pagePhotoIds);
+  }, [pagePhotoIds, loadPreviews]);
 
   // Caption editing
   const [editingCaption, setEditingCaption] = useState<CaptionPosition | null>(null);
@@ -339,6 +348,7 @@ export default function SpreadPage({
               page={page}
               pageWidth={pageWidth}
               pageHeight={pageHeight}
+              photoUrls={photoUrls}
               isInteractive
               isBackCover={isBackCover}
               selectedSlotId={

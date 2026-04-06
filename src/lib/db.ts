@@ -11,6 +11,11 @@ const thumbnailStore = localforage.createInstance({
   storeName: "thumbnails",
 });
 
+const previewStore = localforage.createInstance({
+  name: "ente-photobook",
+  storeName: "previews",
+});
+
 const metaStore = localforage.createInstance({
   name: "ente-photobook",
   storeName: "metadata",
@@ -30,6 +35,14 @@ export async function saveThumbnail(id: string, blob: Blob): Promise<void> {
 
 export async function getThumbnail(id: string): Promise<Blob | null> {
   return thumbnailStore.getItem<Blob>(id);
+}
+
+export async function savePreview(id: string, blob: Blob): Promise<void> {
+  await previewStore.setItem(id, blob);
+}
+
+export async function getPreview(id: string): Promise<Blob | null> {
+  return previewStore.getItem<Blob>(id);
 }
 
 export async function saveBookState(state: BookState): Promise<void> {
@@ -60,6 +73,7 @@ export async function clearAll(): Promise<void> {
   await Promise.all([
     photoBlobStore.clear(),
     thumbnailStore.clear(),
+    previewStore.clear(),
     metaStore.clear(),
   ]);
 }
