@@ -89,6 +89,7 @@ function StartNavBar({ onLogoClick }: { onLogoClick: () => void }) {
             display: "flex",
             alignItems: "center",
             justifyContent: isMobileNav ? "space-between" : "flex-start",
+            width: isMobileNav ? "100%" : "auto",
             gap: "12px",
           }}
         >
