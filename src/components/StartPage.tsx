@@ -229,7 +229,7 @@ export default function StartPage() {
             <Box
               className="card"
               component="img"
-              src="/hero-photo.jpg"
+              src="/hero-photo.png"
               alt="A photobook page with photos from Delhi"
               draggable={false}
               onDragStart={(e: React.DragEvent) => e.preventDefault()}
