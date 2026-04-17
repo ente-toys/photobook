@@ -33,7 +33,11 @@ import {
   clearAll,
 } from "@/lib/db";
 import { generateAutoLayout, chooseBestLayout, chooseBestVariantKey, defaultVariantKeyForCount, applyVariant, getDefaultPadding, getVariantsForCount } from "@/lib/layouts";
-import { extractExifDate, createThumbnail } from "@/lib/images";
+import {
+  extractExifDate,
+  createThumbnail,
+  normalizeImportedImageBlob,
+} from "@/lib/images";
 import { clearImageCache } from "@/lib/imageCache";
 import type { EnteCredentials, EnteFileDescriptor } from "@/lib/ente/types";
 import {
@@ -379,29 +383,14 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
       let completed = 0;
 
       const processPhoto = async (file: File, index: number) => {
-        let blob: Blob = file;
-
-        // Convert HEIC/HEIF
-        if (
-          file.type === "image/heic" ||
-          file.type === "image/heif" ||
-          file.name.toLowerCase().endsWith(".heic") ||
-          file.name.toLowerCase().endsWith(".heif")
-        ) {
-          try {
-            const heic2any = (await import("heic2any")).default;
-            const converted = await heic2any({
-              blob: file,
-              toType: "image/jpeg",
-              quality: 0.92,
-            });
-            blob = Array.isArray(converted) ? converted[0] : converted;
-          } catch (e) {
-            console.warn("HEIC conversion failed for", file.name, e);
-            completed++;
-            scheduleProgressUpdate(Math.round((completed / files.length) * 100));
-            return;
-          }
+        let blob: Blob;
+        try {
+          blob = await normalizeImportedImageBlob(file, file.name);
+        } catch (e) {
+          console.warn("HEIC conversion failed for", file.name, e);
+          completed++;
+          scheduleProgressUpdate(Math.round((completed / files.length) * 100));
+          return;
         }
 
         // Get dimensions (temporary URL, revoked after use to save memory)
@@ -564,7 +553,11 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
                 credentials,
                 descriptor,
               );
-              await savePhotoBlob(photoId, blob);
+              const normalizedBlob = await normalizeImportedImageBlob(
+                blob,
+                descriptor.fileName,
+              );
+              await savePhotoBlob(photoId, normalizedBlob);
             } catch (e) {
               console.warn(
                 `Ente: failed to download original for "${descriptor.fileName}"`,
