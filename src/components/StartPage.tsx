@@ -312,7 +312,7 @@ export default function StartPage() {
               mb: 6,
             }}
           >
-            Drop in your photos, get a print-ready photobook.
+            Drop in your photos and get a print-ready photobook.
             <br />
             Beautifully arranged, completely private, and free.
           </Typography>
