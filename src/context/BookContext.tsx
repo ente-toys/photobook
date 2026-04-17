@@ -712,7 +712,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
       setProcessingPhotos(true);
       progressRef.current = 0;
       setProcessingProgress(0);
-      setProcessingMessage("Connecting to Ente…");
+      setProcessingMessage("Importing your photos...");
 
       // Ente import always replaces the current session (same convention as
       // the file picker from StartPage).
@@ -729,10 +729,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
           albumUrl,
           requestPassword,
           (phase) => {
-            if (phase === "connecting") setProcessingMessage("Connecting to Ente…");
-            else if (phase === "listing") setProcessingMessage("Listing album…");
-            else if (phase === "preparing")
-              setProcessingMessage("Decrypting metadata…");
+            // Single consistent message for the whole Ente import flow.
           },
         );
       } catch (e) {
@@ -752,7 +749,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
         throw new Error("This album has no photos we can import.");
       }
 
-      setProcessingMessage("Decrypting thumbnails…");
+      // Keep the same message throughout.
 
       type ThumbResult = {
         photo: Photo;

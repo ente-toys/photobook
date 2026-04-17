@@ -508,16 +508,42 @@ export default function ResultsPage() {
 
       <Dialog
         open={waitingForOriginals}
-        PaperProps={{ sx: { borderRadius: 2, minWidth: 360 } }}
+        slotProps={{
+          backdrop: { sx: { bgcolor: "rgba(0,0,0,0.25)" } },
+        }}
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            bgcolor: "#fff",
+            minWidth: 360,
+            boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
+          },
+        }}
       >
-        <DialogContent sx={{ textAlign: "center", py: 4 }}>
+        <Box sx={{ textAlign: "center", px: 3.5, py: 3.5 }}>
           <CircularProgress sx={{ color: "#08C225", mb: 2 }} size={36} />
-          <Typography sx={{ fontWeight: 700, fontSize: "1.05rem", mb: 0.5 }}>
+          <Typography
+            sx={{
+              fontFamily: "var(--font-nunito), 'Nunito', sans-serif",
+              fontWeight: 700,
+              fontSize: "1.05rem",
+              color: "#222",
+              mb: 0.5,
+            }}
+          >
             Finishing your album download
           </Typography>
-          <Typography sx={{ color: "#666", fontSize: "0.9rem", mb: 2 }}>
-            We need the full-resolution photos before we can build a
-            print-ready file.
+          <Typography
+            sx={{
+              fontFamily: "var(--font-nunito), 'Nunito', sans-serif",
+              color: "#777",
+              fontSize: "0.8rem",
+              lineHeight: 1.6,
+              mb: 2.5,
+            }}
+          >
+            We need the full-resolution photos before we can
+            build a print-ready file.
           </Typography>
           <LinearProgress
             variant="determinate"
@@ -538,10 +564,16 @@ export default function ResultsPage() {
               },
             }}
           />
-          <Typography sx={{ color: "#888", fontSize: "0.85rem" }}>
+          <Typography
+            sx={{
+              fontFamily: "var(--font-nunito), 'Nunito', sans-serif",
+              color: "#999",
+              fontSize: "0.8rem",
+            }}
+          >
             {originalsProgress.done} / {originalsProgress.total} photos
           </Typography>
-        </DialogContent>
+        </Box>
       </Dialog>
 
       <Snackbar

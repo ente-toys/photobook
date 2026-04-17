@@ -365,7 +365,7 @@ export default function StartPage() {
               fontWeight: 700,
               px: 6,
               py: 2,
-              mb: 2,
+              mb: 0,
               boxShadow: "none",
               "&:hover": {
                 transform: "scale(1.02)",
@@ -382,34 +382,27 @@ export default function StartPage() {
           </Button>
 
           <Button
-            variant="outlined"
-            size="large"
-            startIcon={<LinkIcon />}
+            variant="text"
+            disableRipple
+            startIcon={<LinkIcon sx={{ fontSize: "1rem !important" }} />}
             onClick={openEnteDialog}
             sx={{
               color: "#08C225",
-              borderColor: "#08C225",
               fontFamily:
                 "var(--font-sora), 'Avenir Next', 'Segoe UI', sans-serif",
-              fontSize: "1rem",
-              fontWeight: 600,
-              px: 5,
-              py: 1.5,
+              fontSize: "0.9rem",
+              fontWeight: 500,
               mb: 3,
-              borderWidth: 2,
               textTransform: "none",
+              bgcolor: "transparent",
               "&:hover": {
-                borderColor: "#006E0F",
-                borderWidth: 2,
-                bgcolor: "rgba(8, 194, 37, 0.06)",
+                color: "#006E0F",
+                bgcolor: "transparent",
               },
-              "&:active": {
-                transform: "scale(0.97)",
-              },
-              transition: "all 0.2s ease",
+              transition: "color 0.2s ease",
             }}
           >
-            Import from an Ente album
+            Import from Ente Photos
           </Button>
 
           <input
@@ -479,19 +472,46 @@ function EnteUrlDialog({
   onCancel,
 }: EnteUrlDialogProps) {
   return (
-    <Dialog open={open} onClose={onCancel} maxWidth="sm" fullWidth>
-      <DialogTitle
-        sx={{
-          fontFamily: "var(--font-sora), sans-serif",
-          fontWeight: 700,
-        }}
-      >
-        Import from an Ente album
-      </DialogTitle>
-      <DialogContent>
-        <Typography sx={{ color: "#666", mb: 2, fontSize: "0.95rem" }}>
-          Paste a public album link. Photos are downloaded straight to your
-          browser and decrypted locally — nothing is uploaded anywhere.
+    <Dialog
+      open={open}
+      onClose={onCancel}
+      maxWidth="xs"
+      fullWidth
+      slotProps={{
+        backdrop: { sx: { bgcolor: "transparent" } },
+      }}
+      PaperProps={{
+        sx: {
+          borderRadius: 3,
+          bgcolor: "#fff",
+          overflow: "hidden",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
+        },
+      }}
+    >
+      <Box sx={{ px: 3.5, pt: 3.5, pb: 3.5, textAlign: "center" }}>
+        <Typography
+          sx={{
+            fontFamily: "var(--font-nunito), 'Nunito', sans-serif",
+            fontWeight: 700,
+            fontSize: "1.15rem",
+            color: "#222",
+            mb: 0.75,
+          }}
+        >
+          Import from Ente Photos
+        </Typography>
+        <Typography
+          sx={{
+            fontFamily: "var(--font-nunito), 'Nunito', sans-serif",
+            color: "#777",
+            mb: 2.5,
+            fontSize: "0.8rem",
+            lineHeight: 1.6,
+          }}
+        >
+          Paste a public album link. Photos are downloaded and
+          decrypted locally in your browser.
         </Typography>
         <TextField
           autoFocus
@@ -508,34 +528,73 @@ function EnteUrlDialog({
           }}
           slotProps={{
             input: {
-              sx: { fontFamily: "ui-monospace, monospace", fontSize: "0.9rem" },
+              sx: {
+                fontFamily: "ui-monospace, monospace",
+                fontSize: "0.85rem",
+                borderRadius: 2,
+                color: "#333",
+              },
+            },
+          }}
+          sx={{
+            "& .MuiOutlinedInput-root": {
+              "& fieldset": { borderColor: "#ddd" },
+              "&:hover fieldset": { borderColor: "#bbb" },
+              "&.Mui-focused fieldset": { borderColor: "#08C225" },
             },
           }}
         />
         {error && (
-          <Alert severity="error" sx={{ mt: 2 }}>
+          <Alert severity="error" sx={{ mt: 2, borderRadius: 2 }}>
             {error}
           </Alert>
         )}
-      </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Button onClick={onCancel} sx={{ color: "#666" }}>
-          Cancel
-        </Button>
-        <Button
-          onClick={onSubmit}
-          variant="contained"
+        <Box
           sx={{
-            background: "linear-gradient(135deg, #006E0F 0%, #08C225 100%)",
-            fontWeight: 700,
-            "&:hover": {
-              background: "linear-gradient(135deg, #005309 0%, #06A81F 100%)",
-            },
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            gap: 1.5,
+            mt: 3,
           }}
         >
-          Import
-        </Button>
-      </DialogActions>
+          <Button
+            onClick={onCancel}
+            sx={{
+              fontFamily: "var(--font-nunito), 'Nunito', sans-serif",
+              color: "#999",
+              fontWeight: 600,
+              textTransform: "none",
+              px: 3,
+              "&:hover": { color: "#555", bgcolor: "transparent" },
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={onSubmit}
+            variant="contained"
+            disableElevation
+            sx={{
+              fontFamily: "var(--font-nunito), 'Nunito', sans-serif",
+              background:
+                "linear-gradient(135deg, #006E0F 0%, #08C225 100%)",
+              fontWeight: 700,
+              textTransform: "none",
+              borderRadius: 2,
+              px: 3,
+              boxShadow: "none",
+              "&:hover": {
+                background:
+                  "linear-gradient(135deg, #005309 0%, #06A81F 100%)",
+                boxShadow: "none",
+              },
+            }}
+          >
+            Import
+          </Button>
+        </Box>
+      </Box>
     </Dialog>
   );
 }
