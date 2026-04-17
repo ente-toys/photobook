@@ -69,6 +69,8 @@ interface BookContextValue {
   processingPhotos: boolean;
   processingProgress: number;
   processingMessage: string;
+  importNotice: string | null;
+  clearImportNotice: () => void;
   /**
    * Photo IDs whose full-resolution blob is still being downloaded from Ente.
    * Empty unless an Ente import is in flight or was interrupted.
@@ -314,6 +316,8 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
   const [processingMessage, setProcessingMessage] = useState(
     "Processing your photos...",
   );
+  const [importNotice, setImportNotice] = useState<string | null>(null);
+  const clearImportNotice = useCallback(() => setImportNotice(null), []);
   const pendingEnteOriginals = useMemo(() => {
     const next = new Set<string>();
     for (const photo of photos) {
@@ -748,9 +752,13 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
       }
 
       const { credentials, files } = preparation;
-      // Keep parity with the file picker's 400-photo cap.
-      const MAX_PHOTOS = 400;
+      const MAX_PHOTOS = 800;
       const limited = files.slice(0, MAX_PHOTOS);
+      if (files.length > MAX_PHOTOS) {
+        setImportNotice(
+          `This album has ${files.length} photos. We imported the first ${MAX_PHOTOS}.`,
+        );
+      }
 
       if (limited.length === 0) {
         setProcessingPhotos(false);
@@ -1351,6 +1359,8 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
         processingPhotos,
         processingProgress,
         processingMessage,
+        importNotice,
+        clearImportNotice,
         pendingEnteOriginals,
         waitForEnteOriginals,
         book,

@@ -25,7 +25,7 @@ const ACCEPTED_TYPES = [
   "image/heif",
 ];
 
-const MAX_PHOTOS = 400;
+const MAX_PHOTOS = 800;
 
 type EnteDialogStage = "closed" | "url" | "password";
 
