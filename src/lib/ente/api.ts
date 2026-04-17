@@ -135,16 +135,15 @@ export async function verifyAlbumPassword(
 }
 
 /**
- * GET /public-collection/diff — paginated file list. Iterates until hasMore is
- * false, returning every file (including isDeleted markers, which the caller
- * should filter out).
+ * GET /public-collection/diff — paginated change stream. Iterates until
+ * hasMore is false, materializing the album's current file set by file ID.
  */
 export async function fetchAllFiles(
   creds: EnteCredentials,
   onPage?: (running: EnteRemoteFile[]) => void,
   signal?: AbortSignal,
 ): Promise<EnteRemoteFile[]> {
-  const all: EnteRemoteFile[] = [];
+  const filesById = new Map<number, EnteRemoteFile>();
   let sinceTime = 0;
   while (true) {
     const url = new URL(`${creds.apiOrigin}/public-collection/diff`);
@@ -160,13 +159,17 @@ export async function fetchAllFiles(
     };
     if (!json.diff?.length) break;
     for (const f of json.diff) {
-      all.push(f);
+      if (f.isDeleted) {
+        filesById.delete(f.id);
+      } else {
+        filesById.set(f.id, f);
+      }
       if (f.updationTime > sinceTime) sinceTime = f.updationTime;
     }
-    onPage?.(all);
+    onPage?.([...filesById.values()]);
     if (!json.hasMore) break;
   }
-  return all;
+  return [...filesById.values()];
 }
 
 /**
