@@ -2,10 +2,12 @@ import type {
   EnteCredentials,
   EnteFileDescriptor,
   EnteFileMetadata,
+  EnteMediaKind,
   EntePublicCollectionInfo,
   EnteRemoteFile,
   EntePublicMagicMetadata,
 } from "./types";
+import JSZip from "jszip";
 import {
   decryptBlobBytes,
   decryptFileBytes,
@@ -24,8 +26,8 @@ import { parseEnteAlbumUrl } from "./url";
 
 /** Ente's fileType values. */
 const FILE_TYPE_IMAGE = 0;
+const FILE_TYPE_LIVE_PHOTO = 2;
 // const FILE_TYPE_VIDEO = 1;
-// const FILE_TYPE_LIVE_PHOTO = 2;
 
 export type EnteImportPhase =
   | "connecting"
@@ -44,7 +46,8 @@ export interface EnteImportPreparation {
  * list, and decrypt per-file metadata + keys.
  *
  * Returns the list of photo descriptors ready for thumbnail decryption +
- * background original downloads. Video / live-photo files are filtered out.
+ * background original downloads. Video files are filtered out; Live Photos are
+ * kept and later reduced to their still-image component.
  *
  * {@link requestPassword} is invoked only if the album is password-protected.
  * Throwing from it (or returning `null`) aborts the import.
@@ -162,6 +165,37 @@ export async function fetchAndDecryptOriginal(
   });
 }
 
+/**
+ * Convert a decrypted Ente original into a single renderable image. Regular
+ * images pass through unchanged; Live Photos are zip archives whose image entry
+ * becomes the renderable still photo.
+ */
+export async function extractRenderableImage(
+  file: EnteFileDescriptor,
+  originalBlob: Blob,
+): Promise<{ blob: Blob; fileName: string }> {
+  if (file.mediaKind === "image") {
+    return { blob: originalBlob, fileName: file.fileName };
+  }
+
+  const zip = await JSZip.loadAsync(originalBlob, { createFolders: true });
+  for (const zipFileName of Object.keys(zip.files)) {
+    if (!zipFileName.startsWith("image")) continue;
+    const imageBytes = await zip.files[zipFileName]?.async("uint8array");
+    if (!imageBytes) continue;
+
+    const imageFileName = withExtensionFrom(file.fileName, zipFileName);
+    return {
+      blob: new Blob([imageBytes as BlobPart], {
+        type: guessMimeFromName(imageFileName),
+      }),
+      fileName: imageFileName,
+    };
+  }
+
+  throw new Error(`Live Photo "${file.fileName}" does not contain an image.`);
+}
+
 // --- internals --------------------------------------------------------------
 
 async function decryptFileDescriptors(
@@ -185,7 +219,7 @@ async function decryptFileDescriptors(
       const f = live[i]!;
       try {
         const d = await decryptOne(collectionKey, f);
-        if (d && d.isImage) out.push(d);
+        if (d) out.push(d);
       } catch (e) {
         console.warn(`Ente: failed to decrypt metadata for file ${f.id}`, e);
       }
@@ -232,10 +266,13 @@ async function decryptOne(
   // Ente stores creationTime in microseconds since epoch.
   const creationMicros = pubMagic?.editedTime ?? metadata.creationTime;
   const dateTaken = Math.round(creationMicros / 1000);
+  const mediaKind = mediaKindFromFileType(metadata.fileType);
+  if (!mediaKind) return null;
 
   return {
     enteFileId: f.id,
     fileKey,
+    mediaKind,
     thumbnailDecryptionHeader: f.thumbnail.decryptionHeader,
     fileDecryptionHeader: f.file.decryptionHeader,
     fileName,
@@ -243,8 +280,26 @@ async function decryptOne(
     width: pubMagic?.w ?? 0,
     height: pubMagic?.h ?? 0,
     fileSize: f.info?.fileSize,
-    isImage: metadata.fileType === FILE_TYPE_IMAGE,
   };
+}
+
+function mediaKindFromFileType(fileType: number): EnteMediaKind | null {
+  if (fileType === FILE_TYPE_IMAGE) return "image";
+  if (fileType === FILE_TYPE_LIVE_PHOTO) return "live-photo";
+  return null;
+}
+
+function withExtensionFrom(baseFileName: string, extensionSource: string): string {
+  const dotIndex = extensionSource.lastIndexOf(".");
+  if (dotIndex === -1) return baseFileName;
+
+  const ext = extensionSource.slice(dotIndex + 1);
+  if (!ext) return baseFileName;
+
+  const baseDotIndex = baseFileName.lastIndexOf(".");
+  const stem =
+    baseDotIndex === -1 ? baseFileName : baseFileName.slice(0, baseDotIndex);
+  return `${stem}.${ext}`;
 }
 
 function guessMimeFromName(name: string): string {

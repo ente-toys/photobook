@@ -45,6 +45,7 @@ import {
   prepareEnteAlbum,
   fetchAndDecryptThumbnail,
   fetchAndDecryptOriginal,
+  extractRenderableImage,
 } from "@/lib/ente/import";
 
 interface BookContextValue {
@@ -171,13 +172,13 @@ function buildEnteOriginalDownloadJob(photo: Photo):
     descriptor: {
       enteFileId: data.enteFileId,
       fileKey: data.fileKey,
+      mediaKind: data.mediaKind,
       thumbnailDecryptionHeader: "",
       fileDecryptionHeader: data.fileDecryptionHeader,
       fileName: photo.fileName,
       dateTaken: photo.dateTaken,
       width: photo.width,
       height: photo.height,
-      isImage: true,
     },
   };
 }
@@ -640,9 +641,13 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
                 credentials,
                 descriptor,
               );
-              const normalizedBlob = await normalizeImportedImageBlob(
+              const renderable = await extractRenderableImage(
+                descriptor,
                 blob,
-                fileName,
+              );
+              const normalizedBlob = await normalizeImportedImageBlob(
+                renderable.blob,
+                renderable.fileName,
               );
               const normalizedUrl = URL.createObjectURL(normalizedBlob);
               let previewBlob: Blob;
@@ -808,6 +813,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
               accessToken: credentials.accessToken,
               accessTokenJWT: credentials.accessTokenJWT,
               enteFileId: descriptor.enteFileId,
+              mediaKind: descriptor.mediaKind,
               fileKey: descriptor.fileKey,
               fileDecryptionHeader: descriptor.fileDecryptionHeader,
             },

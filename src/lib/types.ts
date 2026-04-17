@@ -1,5 +1,6 @@
 export type PhotoSource = "local" | "ente";
 export type PhotoOriginalStatus = "pending" | "ready" | "failed";
+export type EnteOriginalMediaKind = "image" | "live-photo";
 
 export interface EntePhotoOriginalData {
   apiOrigin: string;
@@ -7,6 +8,7 @@ export interface EntePhotoOriginalData {
   accessToken: string;
   accessTokenJWT?: string;
   enteFileId: number;
+  mediaKind: EnteOriginalMediaKind;
   fileKey: string;
   fileDecryptionHeader: string;
 }

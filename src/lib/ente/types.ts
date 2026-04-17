@@ -2,6 +2,8 @@
 // ente-media (web/packages/media/) but kept permissive — we accept unknown
 // fields and only validate what we use.
 
+export type EnteMediaKind = "image" | "live-photo";
+
 /**
  * Credentials for a public album: how to identify and authenticate requests,
  * plus the key to decrypt the collection and its files.
@@ -87,6 +89,7 @@ export interface EnteFileDescriptor {
   enteFileId: number;
   /** Base64 file key used to decrypt thumbnail + file content + magic metadata. */
   fileKey: string;
+  mediaKind: EnteMediaKind;
   thumbnailDecryptionHeader: string;
   fileDecryptionHeader: string;
   fileName: string;
@@ -97,5 +100,4 @@ export interface EnteFileDescriptor {
   height: number;
   /** Declared size of the original file in bytes (if known). */
   fileSize?: number;
-  isImage: boolean;
 }
