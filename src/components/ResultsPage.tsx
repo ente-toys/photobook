@@ -13,6 +13,9 @@ import {
   Typography,
   IconButton,
   CircularProgress,
+  LinearProgress,
+  Dialog,
+  DialogContent,
   Menu,
   MenuItem,
   Snackbar,
@@ -35,7 +38,8 @@ import {
 } from "@/lib/export";
 
 export default function ResultsPage() {
-  const { book, setAppView } = useBook();
+  const { book, setAppView, pendingEnteOriginals, waitForEnteOriginals } =
+    useBook();
   const viewerRef = useRef<BookViewerHandle>(null);
   // pageIndex is the 0-based page-flip index of the current left-most visible page
   const [pageIndex, setPageIndex] = useState(0);
@@ -45,6 +49,11 @@ export default function ResultsPage() {
     null
   );
   const [exportError, setExportError] = useState(false);
+  const [waitingForOriginals, setWaitingForOriginals] = useState(false);
+  const [originalsProgress, setOriginalsProgress] = useState({
+    done: 0,
+    total: 0,
+  });
   const pages = book.pages;
   const totalPages = pages.length;
 
@@ -102,6 +111,23 @@ export default function ResultsPage() {
   const handleExport = useCallback(
     async (type: "pdf-a5" | "pdf-a4" | "png-zip" | "png-a4-zip") => {
       setDownloadAnchor(null);
+
+      // Block on any in-flight Ente original downloads — we want the PDF/PNG
+      // to use the full-resolution photos, not the thumbnail fallbacks we
+      // stashed during import. If the user exports before originals finish,
+      // we show progress here instead of silently shipping a low-res export.
+      if (pendingEnteOriginals.size > 0) {
+        setWaitingForOriginals(true);
+        setOriginalsProgress({ done: 0, total: pendingEnteOriginals.size });
+        try {
+          await waitForEnteOriginals((done, total) => {
+            setOriginalsProgress({ done, total });
+          });
+        } finally {
+          setWaitingForOriginals(false);
+        }
+      }
+
       setExporting(true);
       setExportProgress(0);
 
@@ -139,7 +165,7 @@ export default function ResultsPage() {
         setExporting(false);
       }
     },
-    [pages]
+    [pages, pendingEnteOriginals.size, waitForEnteOriginals]
   );
 
   return (
@@ -442,6 +468,44 @@ export default function ResultsPage() {
           </Box>
         </Box>
       </Box>
+
+      <Dialog
+        open={waitingForOriginals}
+        PaperProps={{ sx: { borderRadius: 2, minWidth: 360 } }}
+      >
+        <DialogContent sx={{ textAlign: "center", py: 4 }}>
+          <CircularProgress sx={{ color: "#08C225", mb: 2 }} size={36} />
+          <Typography sx={{ fontWeight: 700, fontSize: "1.05rem", mb: 0.5 }}>
+            Finishing your album download
+          </Typography>
+          <Typography sx={{ color: "#666", fontSize: "0.9rem", mb: 2 }}>
+            We need the full-resolution photos before we can build a
+            print-ready file.
+          </Typography>
+          <LinearProgress
+            variant="determinate"
+            value={
+              originalsProgress.total
+                ? (originalsProgress.done / originalsProgress.total) * 100
+                : 0
+            }
+            sx={{
+              height: 6,
+              borderRadius: 3,
+              mb: 1,
+              bgcolor: "#e8e8e8",
+              "& .MuiLinearProgress-bar": {
+                background:
+                  "linear-gradient(135deg, #006E0F 0%, #08C225 100%)",
+                borderRadius: 3,
+              },
+            }}
+          />
+          <Typography sx={{ color: "#888", fontSize: "0.85rem" }}>
+            {originalsProgress.done} / {originalsProgress.total} photos
+          </Typography>
+        </DialogContent>
+      </Dialog>
 
       <Snackbar
         open={exportError}

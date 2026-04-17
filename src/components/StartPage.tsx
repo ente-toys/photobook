@@ -7,7 +7,14 @@ import {
   Typography,
   LinearProgress,
   CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Alert,
 } from "@mui/material";
+import LinkIcon from "@mui/icons-material/Link";
 import { useBook } from "@/context/BookContext";
 
 const ACCEPTED_TYPES = [
@@ -20,10 +27,97 @@ const ACCEPTED_TYPES = [
 
 const MAX_PHOTOS = 400;
 
+type EnteDialogStage = "closed" | "url" | "password";
+
 export default function StartPage() {
-  const { addPhotos, processingPhotos, processingProgress } = useBook();
+  const {
+    addPhotos,
+    addEntePhotos,
+    processingPhotos,
+    processingProgress,
+    processingMessage,
+  } = useBook();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
+
+  // --- Ente dialog state --------------------------------------------------
+  const [enteStage, setEnteStage] = useState<EnteDialogStage>("closed");
+  const [enteUrl, setEnteUrl] = useState("");
+  const [entePassword, setEntePassword] = useState("");
+  const [enteError, setEnteError] = useState<string | null>(null);
+  // Resolver for the password Promise handed back to addEntePhotos.
+  const passwordResolverRef = useRef<((pw: string | null) => void) | null>(
+    null,
+  );
+
+  const openEnteDialog = useCallback(() => {
+    setEnteStage("url");
+    setEnteError(null);
+    setEntePassword("");
+  }, []);
+
+  const closeEnteDialog = useCallback(() => {
+    // If we're closing while waiting for a password, resolve with null so
+    // the import aborts cleanly.
+    const resolve = passwordResolverRef.current;
+    passwordResolverRef.current = null;
+    if (resolve) resolve(null);
+    setEnteStage("closed");
+    setEnteError(null);
+  }, []);
+
+  const requestPassword = useCallback((): Promise<string | null> => {
+    return new Promise((resolve) => {
+      passwordResolverRef.current = resolve;
+      setEntePassword("");
+      setEnteError(null);
+      setEnteStage("password");
+    });
+  }, []);
+
+  const handleImportEnte = useCallback(async () => {
+    setEnteError(null);
+    const url = enteUrl.trim();
+    if (!url) {
+      setEnteError("Paste the album link first.");
+      return;
+    }
+    // Close the URL dialog so the fullscreen processing UI takes over; we'll
+    // re-open it if we need a password.
+    setEnteStage("closed");
+
+    try {
+      await addEntePhotos(url, requestPassword);
+      // Success: addEntePhotos navigates to the edit view, dialog stays closed.
+      setEnteUrl("");
+    } catch (e) {
+      const cancelled = (e as { cancelled?: boolean })?.cancelled === true;
+      if (cancelled) {
+        // User cancelled the password prompt — drop silently.
+        return;
+      }
+      const msg = e instanceof Error ? e.message : "Something went wrong.";
+      // Re-open the URL dialog with the error surfaced.
+      setEnteStage("url");
+      setEnteError(msg);
+    }
+  }, [enteUrl, addEntePhotos, requestPassword]);
+
+  const handleSubmitPassword = useCallback(() => {
+    const resolve = passwordResolverRef.current;
+    passwordResolverRef.current = null;
+    setEnteStage("closed");
+    if (resolve) resolve(entePassword);
+  }, [entePassword]);
+
+  const handleCancelPassword = useCallback(() => {
+    const resolve = passwordResolverRef.current;
+    passwordResolverRef.current = null;
+    setEnteStage("closed");
+    if (resolve) resolve(null);
+  }, []);
+
+  // --- File picker / drag-drop --------------------------------------------
 
   const handleFiles = useCallback(
     (files: FileList | File[]) => {
@@ -90,7 +184,7 @@ export default function StartPage() {
             color: "#1a1c1d",
           }}
         >
-          Processing your photos...
+          {processingMessage}
         </Typography>
         <Box sx={{ width: 300 }}>
           <LinearProgress
@@ -112,6 +206,16 @@ export default function StartPage() {
         <Typography sx={{ color: "#888", fontSize: "0.9rem" }}>
           {processingProgress}% complete
         </Typography>
+
+        {/* The password dialog has to live inside the processing screen too,
+            because the import is paused waiting on the user here. */}
+        <EntePasswordDialog
+          open={enteStage === "password"}
+          password={entePassword}
+          onPasswordChange={setEntePassword}
+          onSubmit={handleSubmitPassword}
+          onCancel={handleCancelPassword}
+        />
       </Box>
     );
   }
@@ -261,7 +365,7 @@ export default function StartPage() {
               fontWeight: 700,
               px: 6,
               py: 2,
-              mb: 3,
+              mb: 2,
               boxShadow: "none",
               "&:hover": {
                 transform: "scale(1.02)",
@@ -275,6 +379,37 @@ export default function StartPage() {
             }}
           >
             Choose your photos
+          </Button>
+
+          <Button
+            variant="outlined"
+            size="large"
+            startIcon={<LinkIcon />}
+            onClick={openEnteDialog}
+            sx={{
+              color: "#08C225",
+              borderColor: "#08C225",
+              fontFamily:
+                "var(--font-sora), 'Avenir Next', 'Segoe UI', sans-serif",
+              fontSize: "1rem",
+              fontWeight: 600,
+              px: 5,
+              py: 1.5,
+              mb: 3,
+              borderWidth: 2,
+              textTransform: "none",
+              "&:hover": {
+                borderColor: "#006E0F",
+                borderWidth: 2,
+                bgcolor: "rgba(8, 194, 37, 0.06)",
+              },
+              "&:active": {
+                transform: "scale(0.97)",
+              },
+              transition: "all 0.2s ease",
+            }}
+          >
+            Import from an Ente album
           </Button>
 
           <input
@@ -302,6 +437,172 @@ export default function StartPage() {
         </Box>
       </Box>
 
+      {/* Ente URL entry dialog */}
+      <EnteUrlDialog
+        open={enteStage === "url"}
+        url={enteUrl}
+        error={enteError}
+        onUrlChange={setEnteUrl}
+        onSubmit={handleImportEnte}
+        onCancel={closeEnteDialog}
+      />
+
+      {/* Password dialog shown on top of the processing screen too — but also
+          reachable directly if the user hits a password-protected album
+          immediately (rare but possible depending on network timing). */}
+      <EntePasswordDialog
+        open={enteStage === "password"}
+        password={entePassword}
+        onPasswordChange={setEntePassword}
+        onSubmit={handleSubmitPassword}
+        onCancel={handleCancelPassword}
+      />
     </Box>
+  );
+}
+
+interface EnteUrlDialogProps {
+  open: boolean;
+  url: string;
+  error: string | null;
+  onUrlChange: (v: string) => void;
+  onSubmit: () => void;
+  onCancel: () => void;
+}
+
+function EnteUrlDialog({
+  open,
+  url,
+  error,
+  onUrlChange,
+  onSubmit,
+  onCancel,
+}: EnteUrlDialogProps) {
+  return (
+    <Dialog open={open} onClose={onCancel} maxWidth="sm" fullWidth>
+      <DialogTitle
+        sx={{
+          fontFamily: "var(--font-sora), sans-serif",
+          fontWeight: 700,
+        }}
+      >
+        Import from an Ente album
+      </DialogTitle>
+      <DialogContent>
+        <Typography sx={{ color: "#666", mb: 2, fontSize: "0.95rem" }}>
+          Paste a public album link. Photos are downloaded straight to your
+          browser and decrypted locally — nothing is uploaded anywhere.
+        </Typography>
+        <TextField
+          autoFocus
+          fullWidth
+          variant="outlined"
+          placeholder="https://albums.ente.io/?t=…#…"
+          value={url}
+          onChange={(e) => onUrlChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              onSubmit();
+            }
+          }}
+          slotProps={{
+            input: {
+              sx: { fontFamily: "ui-monospace, monospace", fontSize: "0.9rem" },
+            },
+          }}
+        />
+        {error && (
+          <Alert severity="error" sx={{ mt: 2 }}>
+            {error}
+          </Alert>
+        )}
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onCancel} sx={{ color: "#666" }}>
+          Cancel
+        </Button>
+        <Button
+          onClick={onSubmit}
+          variant="contained"
+          sx={{
+            background: "linear-gradient(135deg, #006E0F 0%, #08C225 100%)",
+            fontWeight: 700,
+            "&:hover": {
+              background: "linear-gradient(135deg, #005309 0%, #06A81F 100%)",
+            },
+          }}
+        >
+          Import
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+interface EntePasswordDialogProps {
+  open: boolean;
+  password: string;
+  onPasswordChange: (v: string) => void;
+  onSubmit: () => void;
+  onCancel: () => void;
+}
+
+function EntePasswordDialog({
+  open,
+  password,
+  onPasswordChange,
+  onSubmit,
+  onCancel,
+}: EntePasswordDialogProps) {
+  return (
+    <Dialog open={open} onClose={onCancel} maxWidth="xs" fullWidth>
+      <DialogTitle
+        sx={{
+          fontFamily: "var(--font-sora), sans-serif",
+          fontWeight: 700,
+        }}
+      >
+        Album password
+      </DialogTitle>
+      <DialogContent>
+        <Typography sx={{ color: "#666", mb: 2, fontSize: "0.95rem" }}>
+          This album is password-protected. Enter the password shared with you.
+        </Typography>
+        <TextField
+          autoFocus
+          fullWidth
+          variant="outlined"
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => onPasswordChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              onSubmit();
+            }
+          }}
+        />
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onCancel} sx={{ color: "#666" }}>
+          Cancel
+        </Button>
+        <Button
+          onClick={onSubmit}
+          variant="contained"
+          sx={{
+            background: "linear-gradient(135deg, #006E0F 0%, #08C225 100%)",
+            fontWeight: 700,
+            "&:hover": {
+              background: "linear-gradient(135deg, #005309 0%, #06A81F 100%)",
+            },
+          }}
+        >
+          Unlock
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }
