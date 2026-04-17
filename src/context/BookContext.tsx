@@ -369,7 +369,16 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
             })
           );
 
-          setPhotos(savedPhotos);
+          // Ente photos left in "pending" state across sessions have stale
+          // credentials (tokens likely expired). Mark them as failed and strip
+          // the stored credentials so they don't linger in IndexedDB.
+          const restoredPhotos = savedPhotos.map((photo) =>
+            photo.source === "ente" && photo.originalStatus === "pending"
+              ? { ...photo, originalStatus: "failed" as const, enteOriginal: undefined, originalError: "Session expired — re-import the album to retry." }
+              : photo,
+          );
+
+          setPhotos(restoredPhotos);
           setThumbnailUrls(thumbUrls);
           setBookRaw(savedBook);
           setCurrentSpreadIndex(savedBook.currentSpreadIndex);
@@ -584,7 +593,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
           originalStatus: status,
           originalError,
         };
-        if (status === "ready") {
+        if (status === "ready" || status === "failed") {
           next.enteOriginal = undefined;
         }
         return next;
