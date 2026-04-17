@@ -882,6 +882,12 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
       );
       successful.sort((a, b) => a.photo.dateTaken - b.photo.dateTaken);
 
+      if (successful.length === 0) {
+        setProcessingPhotos(false);
+        setProcessingMessage("Processing your photos...");
+        throw new Error("We couldn't prepare any photos from this album.");
+      }
+
       const newPhotos: Photo[] = successful.map((r) => r.photo);
       const newThumbUrls = new Map<string, string>();
       const newPreviewUrls = new Map<string, string>();
