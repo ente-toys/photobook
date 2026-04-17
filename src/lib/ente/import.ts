@@ -41,6 +41,9 @@ export interface EnteImportPreparation {
   files: EnteFileDescriptor[];
 }
 
+const DOWNLOADS_DISABLED_MESSAGE =
+  "This Ente Photos album can't be imported because downloads are disabled for this public link. Ask the owner to enable downloads or share a different link.";
+
 /**
  * Phase A: resolve the album URL, verify password (if needed), fetch the file
  * list, and decrypt per-file metadata + keys.
@@ -73,6 +76,10 @@ export async function prepareEnteAlbum(
     undefined,
     signal,
   );
+
+  if (!info.publicURL.enableDownload) {
+    throw new Error(DOWNLOADS_DISABLED_MESSAGE);
+  }
 
   if (info.publicURL.passwordEnabled) {
     if (!info.publicURL.password) {
