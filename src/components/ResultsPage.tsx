@@ -38,7 +38,7 @@ import {
 } from "@/lib/export";
 
 export default function ResultsPage() {
-  const { book, setAppView, pendingEnteOriginals, waitForEnteOriginals } =
+  const { book, photos, setAppView, waitForEnteOriginals } =
     useBook();
   const viewerRef = useRef<BookViewerHandle>(null);
   // pageIndex is the 0-based page-flip index of the current left-most visible page
@@ -48,7 +48,7 @@ export default function ResultsPage() {
   const [downloadAnchor, setDownloadAnchor] = useState<null | HTMLElement>(
     null
   );
-  const [exportError, setExportError] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [waitingForOriginals, setWaitingForOriginals] = useState(false);
   const [originalsProgress, setOriginalsProgress] = useState({
     done: 0,
@@ -56,6 +56,8 @@ export default function ResultsPage() {
   });
   const pages = book.pages;
   const totalPages = pages.length;
+  const photosRef = useRef(photos);
+  photosRef.current = photos;
 
   // With showCover: true, page-flip treats page 0 as front cover (single),
   // last page as back cover (single), and everything in between as spreads.
@@ -77,9 +79,30 @@ export default function ResultsPage() {
   const isAtStart = pageIndex === 0;
   const isAtEnd = pageIndex >= totalPages - 1;
 
+  const usedPhotoIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const page of pages) {
+      for (const slot of page.slots) {
+        if (slot.photoId) {
+          ids.add(slot.photoId);
+        }
+      }
+    }
+    return ids;
+  }, [pages]);
+
   const handlePageChange = useCallback((idx: number) => {
     setPageIndex(idx);
   }, []);
+
+  const getBlockedEntePhotos = useCallback(() => {
+    return photosRef.current.filter(
+      (photo) =>
+        usedPhotoIds.has(photo.id) &&
+        photo.source === "ente" &&
+        photo.originalStatus !== "ready",
+    );
+  }, [usedPhotoIds]);
 
   // Keyboard navigation: left/right arrows flip pages
   useEffect(() => {
@@ -112,20 +135,34 @@ export default function ResultsPage() {
     async (type: "pdf-a5" | "pdf-a4" | "png-zip" | "png-a4-zip") => {
       setDownloadAnchor(null);
 
-      // Block on any in-flight Ente original downloads — we want the PDF/PNG
-      // to use the full-resolution photos, not the thumbnail fallbacks we
-      // stashed during import. If the user exports before originals finish,
-      // we show progress here instead of silently shipping a low-res export.
-      if (pendingEnteOriginals.size > 0) {
+      const initiallyBlocked = getBlockedEntePhotos();
+      const pendingIds = initiallyBlocked
+        .filter((photo) => photo.originalStatus === "pending")
+        .map((photo) => photo.id);
+
+      if (pendingIds.length > 0) {
         setWaitingForOriginals(true);
-        setOriginalsProgress({ done: 0, total: pendingEnteOriginals.size });
+        setOriginalsProgress({ done: 0, total: pendingIds.length });
         try {
-          await waitForEnteOriginals((done, total) => {
+          await waitForEnteOriginals(pendingIds, (done, total) => {
             setOriginalsProgress({ done, total });
           });
         } finally {
           setWaitingForOriginals(false);
         }
+      }
+
+      const remainingBlocked = getBlockedEntePhotos();
+      if (remainingBlocked.length > 0) {
+        const failedCount = remainingBlocked.filter(
+          (photo) => photo.originalStatus === "failed",
+        ).length;
+        setExportError(
+          failedCount > 0
+            ? "Some Ente photos failed to prepare. Re-import the album before exporting."
+            : "Ente originals are still being prepared. Please wait a moment and try again.",
+        );
+        return;
       }
 
       setExporting(true);
@@ -160,12 +197,12 @@ export default function ResultsPage() {
         downloadBlob(blob, filename);
       } catch (e) {
         console.error("Export failed:", e);
-        setExportError(true);
+        setExportError("Export failed. Please try again.");
       } finally {
         setExporting(false);
       }
     },
-    [pages, pendingEnteOriginals.size, waitForEnteOriginals]
+    [getBlockedEntePhotos, pages, waitForEnteOriginals]
   );
 
   return (
@@ -508,17 +545,17 @@ export default function ResultsPage() {
       </Dialog>
 
       <Snackbar
-        open={exportError}
+        open={Boolean(exportError)}
         autoHideDuration={6000}
-        onClose={() => setExportError(false)}
+        onClose={() => setExportError(null)}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
         <Alert
-          onClose={() => setExportError(false)}
+          onClose={() => setExportError(null)}
           severity="error"
           variant="filled"
         >
-          Export failed. Please try again.
+          {exportError}
         </Alert>
       </Snackbar>
     </Box>

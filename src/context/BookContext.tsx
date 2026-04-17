@@ -15,6 +15,7 @@ import type {
   BookPage,
   BookState,
   Photo,
+  PhotoOriginalStatus,
   PhotoSlot,
   TextBlock,
 } from "@/lib/types";
@@ -74,9 +75,10 @@ interface BookContextValue {
   pendingEnteOriginals: Set<string>;
   /**
    * Await all pending Ente originals; calls back with (done, total) after each
-   * one resolves. Resolves immediately if nothing is pending.
+   * one resolves. If photoIds are provided, waits only for that subset.
    */
   waitForEnteOriginals: (
+    photoIds?: string[],
     onProgress?: (done: number, total: number) => void,
   ) => Promise<void>;
 
@@ -145,11 +147,48 @@ const emptyBook: BookState = {
   currentSpreadIndex: 0,
 };
 
+function isPendingEnteOriginal(photo: Photo): boolean {
+  return photo.source === "ente" && photo.originalStatus === "pending";
+}
+
+function buildEnteOriginalDownloadJob(photo: Photo):
+  | {
+      credentials: EnteCredentials;
+      descriptor: EnteFileDescriptor;
+    }
+  | null {
+  const data = photo.enteOriginal;
+  if (!data) return null;
+
+  return {
+    credentials: {
+      apiOrigin: data.apiOrigin,
+      albumsOrigin: data.albumsOrigin,
+      accessToken: data.accessToken,
+      accessTokenJWT: data.accessTokenJWT,
+      collectionKey: "",
+    },
+    descriptor: {
+      enteFileId: data.enteFileId,
+      fileKey: data.fileKey,
+      thumbnailDecryptionHeader: "",
+      fileDecryptionHeader: data.fileDecryptionHeader,
+      fileName: photo.fileName,
+      dateTaken: photo.dateTaken,
+      width: photo.width,
+      height: photo.height,
+      isImage: true,
+    },
+  };
+}
+
 export function BookProvider({ children }: { children: React.ReactNode }) {
   const [appView, setAppViewState] = useState<AppView>("start");
   const [loading, setLoading] = useState(true);
   const [restored, setRestored] = useState(false);
   const [photos, setPhotos] = useState<Photo[]>([]);
+  const photosRef = useRef<Photo[]>(photos);
+  photosRef.current = photos;
   const [thumbnailUrls, setThumbnailUrls] = useState<Map<string, string>>(
     new Map()
   );
@@ -274,11 +313,18 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
   const [processingMessage, setProcessingMessage] = useState(
     "Processing your photos...",
   );
-  const [pendingEnteOriginals, setPendingEnteOriginals] = useState<Set<string>>(
-    new Set(),
-  );
+  const pendingEnteOriginals = useMemo(() => {
+    const next = new Set<string>();
+    for (const photo of photos) {
+      if (isPendingEnteOriginal(photo)) {
+        next.add(photo.id);
+      }
+    }
+    return next;
+  }, [photos]);
   const pendingEnteOriginalsRef = useRef<Set<string>>(pendingEnteOriginals);
   pendingEnteOriginalsRef.current = pendingEnteOriginals;
+  const activeEnteOriginalDownloadsRef = useRef<Set<string>>(new Set());
   /**
    * Per-pending-photo resolvers, used by waitForEnteOriginals() so consumers
    * can block on all outstanding downloads without re-polling.
@@ -290,7 +336,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
 
   // Persist on changes (debounced)
   useEffect(() => {
-    if (loading) return;
+    if (loading || processingPhotos) return;
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(() => {
       saveBookState({ ...book, currentSpreadIndex });
@@ -407,6 +453,8 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
           width: img.naturalWidth,
           height: img.naturalHeight,
           dateTaken: dateTaken || file.lastModified || Date.now(),
+          source: "local",
+          originalStatus: "ready",
         };
 
         // Save to IndexedDB
@@ -519,13 +567,28 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
     [photos, thumbnailUrls, previewUrls]
   );
 
-  const markEnteOriginalDone = useCallback((photoId: string) => {
-    setPendingEnteOriginals((prev) => {
-      if (!prev.has(photoId)) return prev;
-      const next = new Set(prev);
-      next.delete(photoId);
-      return next;
-    });
+  const markEnteOriginalDone = useCallback((
+    photoId: string,
+    status: PhotoOriginalStatus,
+    originalError?: string,
+  ) => {
+    setPhotos((prev) =>
+      prev.map((photo) => {
+        if (photo.id !== photoId || photo.source !== "ente") {
+          return photo;
+        }
+
+        const next: Photo = {
+          ...photo,
+          originalStatus: status,
+          originalError,
+        };
+        if (status === "ready") {
+          next.enteOriginal = undefined;
+        }
+        return next;
+      }),
+    );
     const waiters = enteOriginalWaitersRef.current.get(photoId);
     if (waiters) {
       enteOriginalWaitersRef.current.delete(photoId);
@@ -534,11 +597,35 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const startEnteOriginalDownloads = useCallback(
-    async (
-      credentials: EnteCredentials,
-      descriptorsByPhotoId: Map<string, EnteFileDescriptor>,
-    ) => {
-      const entries = Array.from(descriptorsByPhotoId.entries());
+    async (photoIds: string[]) => {
+      const entries = photoIds
+        .map((photoId) => {
+          const photo = photosRef.current.find((candidate) => candidate.id === photoId);
+          if (!photo || !isPendingEnteOriginal(photo)) {
+            return null;
+          }
+          const job = buildEnteOriginalDownloadJob(photo);
+          if (!job) {
+            markEnteOriginalDone(
+              photoId,
+              "failed",
+              "Missing Ente download metadata.",
+            );
+            return null;
+          }
+          return { photoId, fileName: photo.fileName, ...job };
+        })
+        .filter(
+          (
+            entry,
+          ): entry is {
+            photoId: string;
+            fileName: string;
+            credentials: EnteCredentials;
+            descriptor: EnteFileDescriptor;
+          } => entry !== null,
+        );
+
       // Ente's CDN tolerates a few parallel requests; match Ente web's default.
       const CONCURRENCY = 3;
       let cursor = 0;
@@ -547,7 +634,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
         async () => {
           while (cursor < entries.length) {
             const i = cursor++;
-            const [photoId, descriptor] = entries[i]!;
+            const { photoId, fileName, credentials, descriptor } = entries[i]!;
             try {
               const blob = await fetchAndDecryptOriginal(
                 credentials,
@@ -555,18 +642,33 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
               );
               const normalizedBlob = await normalizeImportedImageBlob(
                 blob,
-                descriptor.fileName,
+                fileName,
               );
+              const currentPhoto = photosRef.current.find(
+                (candidate) => candidate.id === photoId,
+              );
+              if (!currentPhoto || !isPendingEnteOriginal(currentPhoto)) {
+                continue;
+              }
               await savePhotoBlob(photoId, normalizedBlob);
+              markEnteOriginalDone(photoId, "ready");
             } catch (e) {
-              console.warn(
-                `Ente: failed to download original for "${descriptor.fileName}"`,
-                e,
+              const currentPhoto = photosRef.current.find(
+                (candidate) => candidate.id === photoId,
               );
-              // Leave the thumbnail-sized fallback already stored in
-              // photo_blobs; export will use it at lower quality.
+              if (currentPhoto && isPendingEnteOriginal(currentPhoto)) {
+                const message =
+                  e instanceof Error
+                    ? e.message
+                    : "Failed to prepare the original photo.";
+                console.warn(
+                  `Ente: failed to download original for "${fileName}"`,
+                  e,
+                );
+                markEnteOriginalDone(photoId, "failed", message);
+              }
             } finally {
-              markEnteOriginalDone(photoId);
+              activeEnteOriginalDownloadsRef.current.delete(photoId);
             }
           }
         },
@@ -592,7 +694,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
       previewUrls.forEach((url) => URL.revokeObjectURL(url));
       clearImageCache();
       await clearAll();
-      setPendingEnteOriginals(new Set());
+      activeEnteOriginalDownloadsRef.current.clear();
       enteOriginalWaitersRef.current = new Map();
 
       let preparation;
@@ -630,7 +732,6 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
         photo: Photo;
         thumbUrl: string;
         previewUrl: string;
-        descriptor: EnteFileDescriptor;
       };
       const thumbResults: (ThumbResult | null)[] = new Array(
         limited.length,
@@ -678,24 +779,30 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
             width,
             height,
             dateTaken: descriptor.dateTaken,
+            source: "ente",
+            originalStatus: "pending",
+            enteOriginal: {
+              apiOrigin: credentials.apiOrigin,
+              albumsOrigin: credentials.albumsOrigin,
+              accessToken: credentials.accessToken,
+              accessTokenJWT: credentials.accessTokenJWT,
+              enteFileId: descriptor.enteFileId,
+              fileKey: descriptor.fileKey,
+              fileDecryptionHeader: descriptor.fileDecryptionHeader,
+            },
           };
 
-          // Save thumbnail into thumbnails, previews, AND photo_blobs stores.
-          // Using the decrypted thumbnail as a full-blob fallback means that
-          // if the original download fails or the user exports before it
-          // finishes, the export still produces a (lower-resolution) image
-          // rather than a blank slot.
+          // Save the decrypted thumbnail for immediate rendering. The original
+          // blob is written later once the background download succeeds.
           await Promise.all([
             saveThumbnail(photoId, thumbBlob),
             savePreview(photoId, thumbBlob),
-            savePhotoBlob(photoId, thumbBlob),
           ]);
 
           thumbResults[index] = {
             photo,
             thumbUrl: URL.createObjectURL(thumbBlob),
             previewUrl: URL.createObjectURL(thumbBlob),
-            descriptor,
           };
         } catch (e) {
           console.warn(
@@ -737,11 +844,9 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
       const newPhotos: Photo[] = successful.map((r) => r.photo);
       const newThumbUrls = new Map<string, string>();
       const newPreviewUrls = new Map<string, string>();
-      const descriptorsByPhotoId = new Map<string, EnteFileDescriptor>();
       for (const r of successful) {
         newThumbUrls.set(r.photo.id, r.thumbUrl);
         newPreviewUrls.set(r.photo.id, r.previewUrl);
-        descriptorsByPhotoId.set(r.photo.id, r.descriptor);
       }
 
       const pages = generateAutoLayout(newPhotos);
@@ -755,24 +860,20 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
       setCanRedo(false);
       setCurrentSpreadIndex(0);
 
-      const pendingIds = new Set(newPhotos.map((p) => p.id));
-      setPendingEnteOriginals(pendingIds);
-
       setProcessingPhotos(false);
       setProcessingMessage("Processing your photos...");
       setAppViewState("edit");
-
-      // Fire-and-forget: keep the browser busy with original downloads after
-      // the user is already in the editor. Failures are swallowed here — each
-      // individual download logs its own warning.
-      void startEnteOriginalDownloads(credentials, descriptorsByPhotoId);
     },
-    [thumbnailUrls, previewUrls, startEnteOriginalDownloads],
+    [thumbnailUrls, previewUrls],
   );
 
   const waitForEnteOriginals = useCallback(
-    async (onProgress?: (done: number, total: number) => void) => {
-      const pending = Array.from(pendingEnteOriginalsRef.current);
+    async (
+      photoIds?: string[],
+      onProgress?: (done: number, total: number) => void,
+    ) => {
+      const requested = photoIds ?? Array.from(pendingEnteOriginalsRef.current);
+      const pending = requested.filter((id) => pendingEnteOriginalsRef.current.has(id));
       if (pending.length === 0) return;
       const total = pending.length;
       let done = 0;
@@ -801,6 +902,23 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
     },
     [],
   );
+
+  useEffect(() => {
+    if (loading || processingPhotos) return;
+
+    const queue = photos
+      .filter(
+        (photo) =>
+          isPendingEnteOriginal(photo) &&
+          !activeEnteOriginalDownloadsRef.current.has(photo.id),
+      )
+      .map((photo) => photo.id);
+
+    if (queue.length === 0) return;
+
+    queue.forEach((photoId) => activeEnteOriginalDownloadsRef.current.add(photoId));
+    void startEnteOriginalDownloads(queue);
+  }, [loading, photos, processingPhotos, startEnteOriginalDownloads]);
 
   const addPage = useCallback(
     (afterIndex?: number) => {
@@ -1179,7 +1297,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
     setCurrentSpreadIndex(0);
     setAppViewState("start");
     setRestored(false);
-    setPendingEnteOriginals(new Set());
+    activeEnteOriginalDownloadsRef.current.clear();
     enteOriginalWaitersRef.current = new Map();
   }, [thumbnailUrls, previewUrls]);
 
