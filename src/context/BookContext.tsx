@@ -644,13 +644,34 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
                 blob,
                 fileName,
               );
+              const normalizedUrl = URL.createObjectURL(normalizedBlob);
+              let previewBlob: Blob;
+              try {
+                const img = await loadImage(normalizedUrl);
+                previewBlob = await createThumbnail(img, 1080);
+              } finally {
+                URL.revokeObjectURL(normalizedUrl);
+              }
               const currentPhoto = photosRef.current.find(
                 (candidate) => candidate.id === photoId,
               );
               if (!currentPhoto || !isPendingEnteOriginal(currentPhoto)) {
                 continue;
               }
-              await savePhotoBlob(photoId, normalizedBlob);
+              await Promise.all([
+                savePhotoBlob(photoId, normalizedBlob),
+                savePreview(photoId, previewBlob),
+              ]);
+              const previewUrl = URL.createObjectURL(previewBlob);
+              setPreviewUrls((prev) => {
+                const next = new Map(prev);
+                const existing = next.get(photoId);
+                if (existing) {
+                  URL.revokeObjectURL(existing);
+                }
+                next.set(photoId, previewUrl);
+                return next;
+              });
               markEnteOriginalDone(photoId, "ready");
             } catch (e) {
               const currentPhoto = photosRef.current.find(
