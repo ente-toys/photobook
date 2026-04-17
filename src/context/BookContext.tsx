@@ -729,8 +729,8 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
 
       // Ente import always replaces the current session (same convention as
       // the file picker from StartPage).
-      thumbnailUrls.forEach((url) => URL.revokeObjectURL(url));
-      previewUrls.forEach((url) => URL.revokeObjectURL(url));
+      thumbnailUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
       clearImageCache();
       await clearAll();
       activeEnteOriginalDownloadsRef.current.clear();
@@ -905,7 +905,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
       setProcessingMessage("Processing your photos...");
       setAppViewState("edit");
     },
-    [thumbnailUrls, previewUrls],
+    [],
   );
 
   const waitForEnteOriginals = useCallback(
@@ -1322,8 +1322,8 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
 
   const startOver = useCallback(async () => {
     // Revoke all URLs
-    thumbnailUrls.forEach((url) => URL.revokeObjectURL(url));
-    previewUrls.forEach((url) => URL.revokeObjectURL(url));
+    thumbnailUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     clearImageCache();
 
     await clearAll();
@@ -1340,7 +1340,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
     setRestored(false);
     activeEnteOriginalDownloadsRef.current.clear();
     enteOriginalWaitersRef.current = new Map();
-  }, [thumbnailUrls, previewUrls]);
+  }, []);
 
   return (
     <BookContext.Provider
