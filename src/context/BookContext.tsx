@@ -337,18 +337,17 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
   const enteOriginalWaitersRef = useRef<
     Map<string, Array<() => void>>
   >(new Map());
-  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-
   // Persist on changes (debounced)
   useEffect(() => {
     if (loading || processingPhotos) return;
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(() => {
-      saveBookState({ ...book, currentSpreadIndex });
-      savePhotos(photos);
-      saveAppView(appView);
+    const saveTimeout = setTimeout(() => {
+      void saveBookState({ ...book, currentSpreadIndex });
+      void savePhotos(photos);
+      void saveAppView(appView);
     }, 500);
-  }, [book, photos, appView, currentSpreadIndex, loading]);
+
+    return () => clearTimeout(saveTimeout);
+  }, [book, photos, appView, currentSpreadIndex, loading, processingPhotos]);
 
   // Restore session on mount
   useEffect(() => {
