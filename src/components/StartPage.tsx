@@ -477,6 +477,7 @@ function EnteUrlDialog({
       onClose={onCancel}
       maxWidth="xs"
       fullWidth
+      disableRestoreFocus
       slotProps={{
         backdrop: { sx: { bgcolor: "transparent" } },
       }}
