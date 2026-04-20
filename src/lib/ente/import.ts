@@ -29,12 +29,6 @@ const FILE_TYPE_IMAGE = 0;
 const FILE_TYPE_LIVE_PHOTO = 2;
 // const FILE_TYPE_VIDEO = 1;
 
-export type EnteImportPhase =
-  | "connecting"
-  | "password-required"
-  | "listing"
-  | "preparing";
-
 export interface EnteImportPreparation {
   credentials: EnteCredentials;
   info: EntePublicCollectionInfo;
@@ -58,10 +52,8 @@ const DOWNLOADS_DISABLED_MESSAGE =
 export async function prepareEnteAlbum(
   albumUrl: string,
   requestPassword: () => Promise<string | null>,
-  onPhase: (phase: EnteImportPhase) => void,
   signal?: AbortSignal,
 ): Promise<EnteImportPreparation> {
-  onPhase("connecting");
   const parsed = parseEnteAlbumUrl(albumUrl);
   let credentials: EnteCredentials = {
     apiOrigin: parsed.apiOrigin,
@@ -85,7 +77,6 @@ export async function prepareEnteAlbum(
     if (!info.publicURL.password) {
       throw new Error("Album is password-protected but server omitted the password parameters.");
     }
-    onPhase("password-required");
     const password = await requestPassword();
     if (!password) {
       const e = new Error("Album import cancelled.");
@@ -112,10 +103,8 @@ export async function prepareEnteAlbum(
     // is the password params which we already have, so skip the refetch.
   }
 
-  onPhase("listing");
   const rawFiles = await fetchAllFiles(credentials, undefined, signal);
 
-  onPhase("preparing");
   const descriptors = await decryptFileDescriptors(
     credentials.collectionKey,
     rawFiles,

@@ -738,13 +738,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
 
       let preparation;
       try {
-        preparation = await prepareEnteAlbum(
-          albumUrl,
-          requestPassword,
-          (phase) => {
-            // Single consistent message for the whole Ente import flow.
-          },
-        );
+        preparation = await prepareEnteAlbum(albumUrl, requestPassword);
       } catch (e) {
         setProcessingPhotos(false);
         setProcessingMessage("Processing your photos...");

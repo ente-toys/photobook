@@ -207,8 +207,6 @@ export default function StartPage() {
           {processingProgress}% complete
         </Typography>
 
-        {/* The password dialog has to live inside the processing screen too,
-            because the import is paused waiting on the user here. */}
         <EntePasswordDialog
           open={enteStage === "password"}
           password={entePassword}
@@ -438,17 +436,6 @@ export default function StartPage() {
         onUrlChange={setEnteUrl}
         onSubmit={handleImportEnte}
         onCancel={closeEnteDialog}
-      />
-
-      {/* Password dialog shown on top of the processing screen too — but also
-          reachable directly if the user hits a password-protected album
-          immediately (rare but possible depending on network timing). */}
-      <EntePasswordDialog
-        open={enteStage === "password"}
-        password={entePassword}
-        onPasswordChange={setEntePassword}
-        onSubmit={handleSubmitPassword}
-        onCancel={handleCancelPassword}
       />
     </Box>
   );
