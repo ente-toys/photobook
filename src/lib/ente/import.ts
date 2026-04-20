@@ -55,19 +55,7 @@ export async function prepareEnteAlbum(
   signal?: AbortSignal,
 ): Promise<EnteImportPreparation> {
   const parsed = parseEnteAlbumUrl(albumUrl);
-  let credentials: EnteCredentials = {
-    apiOrigin: parsed.apiOrigin,
-    albumsOrigin: parsed.albumsOrigin,
-    accessToken: parsed.accessToken,
-    collectionKey: parsed.collectionKey,
-  };
-
-  let info = await fetchCollectionInfo(
-    credentials.apiOrigin,
-    credentials.accessToken,
-    undefined,
-    signal,
-  );
+  let { credentials, info } = await resolveCollectionCredentials(parsed, signal);
 
   if (!info.publicURL.enableDownload) {
     throw new Error(DOWNLOADS_DISABLED_MESSAGE);
@@ -112,6 +100,41 @@ export async function prepareEnteAlbum(
   );
 
   return { credentials, info, files: descriptors };
+}
+
+async function resolveCollectionCredentials(
+  parsed: ReturnType<typeof parseEnteAlbumUrl>,
+  signal?: AbortSignal,
+): Promise<{
+  credentials: EnteCredentials;
+  info: EntePublicCollectionInfo;
+}> {
+  let lastError: unknown;
+
+  for (const apiOrigin of parsed.apiOrigins) {
+    const credentials: EnteCredentials = {
+      apiOrigin,
+      albumsOrigin: parsed.albumsOrigin,
+      accessToken: parsed.accessToken,
+      collectionKey: parsed.collectionKey,
+    };
+
+    try {
+      const info = await fetchCollectionInfo(
+        credentials.apiOrigin,
+        credentials.accessToken,
+        undefined,
+        signal,
+      );
+      return { credentials, info };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Unable to resolve the Ente deployment for this album link.");
 }
 
 /**

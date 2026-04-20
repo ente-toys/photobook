@@ -8,7 +8,12 @@ export interface ParsedEnteAlbumUrl {
   accessToken: string;
   /** 32-byte collection key, base64-encoded (matching the wasm API format). */
   collectionKey: string;
-  apiOrigin: string;
+  /**
+   * Candidate API origins to try, in priority order. The pasted album link is
+   * the source of truth; env-configured endpoints are only used when they match
+   * that deployment or as an explicit fallback.
+   */
+  apiOrigins: string[];
   albumsOrigin: string;
 }
 
@@ -54,20 +59,64 @@ export function parseEnteAlbumUrl(input: string): ParsedEnteAlbumUrl {
     );
   }
 
-  // Self-hosted origins can be surfaced via env vars at build time.
-  const apiOrigin =
-    process.env.NEXT_PUBLIC_ENTE_API_ENDPOINT?.replace(/\/+$/, "") ||
-    DEFAULT_API_ORIGIN;
-  const albumsOrigin =
-    process.env.NEXT_PUBLIC_ENTE_ALBUMS_ENDPOINT?.replace(/\/+$/, "") ||
-    DEFAULT_ALBUMS_ORIGIN;
+  const { apiOrigins, albumsOrigin } = resolveOrigins(url);
 
   return {
     accessToken,
     collectionKey: bytesToBase64(keyBytes),
-    apiOrigin,
+    apiOrigins,
     albumsOrigin,
   };
+}
+
+function resolveOrigins(url: URL): {
+  apiOrigins: string[];
+  albumsOrigin: string;
+} {
+  const configuredApiOrigin = sanitizeOrigin(process.env.NEXT_PUBLIC_ENTE_API_ENDPOINT);
+  const configuredAlbumsOrigin = sanitizeOrigin(
+    process.env.NEXT_PUBLIC_ENTE_ALBUMS_ENDPOINT,
+  );
+  const inputOrigin = sanitizeOrigin(url.origin)!;
+  const host = url.hostname;
+  const siblingApiOrigin = inferSiblingApiOrigin(url);
+
+  const apiOrigins = uniqueOrigins([
+    configuredAlbumsOrigin && configuredAlbumsOrigin === inputOrigin
+      ? configuredApiOrigin
+      : undefined,
+    isDefaultHostedAlbumsHost(host) ? DEFAULT_API_ORIGIN : undefined,
+    siblingApiOrigin,
+    !isDefaultHostedAlbumsHost(host) ? inputOrigin : undefined,
+    configuredApiOrigin,
+    DEFAULT_API_ORIGIN,
+  ]);
+
+  return {
+    apiOrigins,
+    albumsOrigin: isDefaultHostedAlbumsHost(host) ? DEFAULT_ALBUMS_ORIGIN : inputOrigin,
+  };
+}
+
+function inferSiblingApiOrigin(url: URL): string | undefined {
+  const labels = url.hostname.split(".");
+  if (labels.length < 2) return undefined;
+
+  labels[0] = "api";
+
+  return `${url.protocol}//${labels.join(".")}${url.port ? `:${url.port}` : ""}`;
+}
+
+function sanitizeOrigin(origin: string | undefined): string | undefined {
+  return origin?.replace(/\/+$/, "");
+}
+
+function uniqueOrigins(origins: Array<string | undefined>): string[] {
+  return Array.from(new Set(origins.filter((origin): origin is string => !!origin)));
+}
+
+function isDefaultHostedAlbumsHost(host: string): boolean {
+  return host === "albums.ente.io" || host === "public-albums.ente.io";
 }
 
 function fromHex(hex: string): Uint8Array {
