@@ -1,9 +1,28 @@
+export type PhotoSource = "local" | "ente";
+export type PhotoOriginalStatus = "pending" | "ready" | "failed";
+export type EnteOriginalMediaKind = "image" | "live-photo";
+
+export interface EntePhotoOriginalData {
+  apiOrigin: string;
+  albumsOrigin: string;
+  accessToken: string;
+  accessTokenJWT?: string;
+  enteFileId: number;
+  mediaKind: EnteOriginalMediaKind;
+  fileKey: string;
+  fileDecryptionHeader: string;
+}
+
 export interface Photo {
   id: string;
   fileName: string;
   width: number;
   height: number;
   dateTaken: number; // timestamp
+  source?: PhotoSource;
+  originalStatus?: PhotoOriginalStatus;
+  originalError?: string;
+  enteOriginal?: EntePhotoOriginalData;
   thumbnailUrl?: string; // runtime only, object URL
   fullUrl?: string; // runtime only, object URL
 }

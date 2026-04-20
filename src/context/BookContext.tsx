@@ -15,6 +15,7 @@ import type {
   BookPage,
   BookState,
   Photo,
+  PhotoOriginalStatus,
   PhotoSlot,
   TextBlock,
 } from "@/lib/types";
@@ -33,8 +34,19 @@ import {
   clearAll,
 } from "@/lib/db";
 import { generateAutoLayout, chooseBestLayout, chooseBestVariantKey, defaultVariantKeyForCount, applyVariant, getDefaultPadding, getVariantsForCount } from "@/lib/layouts";
-import { extractExifDate, createThumbnail } from "@/lib/images";
+import {
+  extractExifDate,
+  createThumbnail,
+  normalizeImportedImageBlob,
+} from "@/lib/images";
 import { clearImageCache } from "@/lib/imageCache";
+import type { EnteCredentials, EnteFileDescriptor } from "@/lib/ente/types";
+import {
+  prepareEnteAlbum,
+  fetchAndDecryptThumbnail,
+  fetchAndDecryptOriginal,
+  extractRenderableImage,
+} from "@/lib/ente/import";
 
 interface BookContextValue {
   // App state
@@ -50,8 +62,28 @@ interface BookContextValue {
   photoUrls: Map<string, string>; // id -> objectURL (preview if loaded, else thumb)
   loadPreviews: (photoIds: string[]) => void;
   addPhotos: (files: File[], replace?: boolean) => Promise<void>;
+  addEntePhotos: (
+    albumUrl: string,
+    requestPassword: () => Promise<string | null>,
+  ) => Promise<void>;
   processingPhotos: boolean;
   processingProgress: number;
+  processingMessage: string;
+  importNotice: string | null;
+  clearImportNotice: () => void;
+  /**
+   * Photo IDs whose full-resolution blob is still being downloaded from Ente.
+   * Empty unless an Ente import is in flight or was interrupted.
+   */
+  pendingEnteOriginals: Set<string>;
+  /**
+   * Await all pending Ente originals; calls back with (done, total) after each
+   * one resolves. If photoIds are provided, waits only for that subset.
+   */
+  waitForEnteOriginals: (
+    photoIds?: string[],
+    onProgress?: (done: number, total: number) => void,
+  ) => Promise<void>;
 
   // Book state
   book: BookState;
@@ -118,11 +150,48 @@ const emptyBook: BookState = {
   currentSpreadIndex: 0,
 };
 
+function isPendingEnteOriginal(photo: Photo): boolean {
+  return photo.source === "ente" && photo.originalStatus === "pending";
+}
+
+function buildEnteOriginalDownloadJob(photo: Photo):
+  | {
+      credentials: EnteCredentials;
+      descriptor: EnteFileDescriptor;
+    }
+  | null {
+  const data = photo.enteOriginal;
+  if (!data) return null;
+
+  return {
+    credentials: {
+      apiOrigin: data.apiOrigin,
+      albumsOrigin: data.albumsOrigin,
+      accessToken: data.accessToken,
+      accessTokenJWT: data.accessTokenJWT,
+      collectionKey: "",
+    },
+    descriptor: {
+      enteFileId: data.enteFileId,
+      fileKey: data.fileKey,
+      mediaKind: data.mediaKind,
+      thumbnailDecryptionHeader: "",
+      fileDecryptionHeader: data.fileDecryptionHeader,
+      fileName: photo.fileName,
+      dateTaken: photo.dateTaken,
+      width: photo.width,
+      height: photo.height,
+    },
+  };
+}
+
 export function BookProvider({ children }: { children: React.ReactNode }) {
   const [appView, setAppViewState] = useState<AppView>("start");
   const [loading, setLoading] = useState(true);
   const [restored, setRestored] = useState(false);
   const [photos, setPhotos] = useState<Photo[]>([]);
+  const photosRef = useRef<Photo[]>(photos);
+  photosRef.current = photos;
   const [thumbnailUrls, setThumbnailUrls] = useState<Map<string, string>>(
     new Map()
   );
@@ -244,18 +313,41 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
   );
   const [processingPhotos, setProcessingPhotos] = useState(false);
   const [processingProgress, setProcessingProgress] = useState(0);
-  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-
+  const [processingMessage, setProcessingMessage] = useState(
+    "Processing your photos...",
+  );
+  const [importNotice, setImportNotice] = useState<string | null>(null);
+  const clearImportNotice = useCallback(() => setImportNotice(null), []);
+  const pendingEnteOriginals = useMemo(() => {
+    const next = new Set<string>();
+    for (const photo of photos) {
+      if (isPendingEnteOriginal(photo)) {
+        next.add(photo.id);
+      }
+    }
+    return next;
+  }, [photos]);
+  const pendingEnteOriginalsRef = useRef<Set<string>>(pendingEnteOriginals);
+  pendingEnteOriginalsRef.current = pendingEnteOriginals;
+  const activeEnteOriginalDownloadsRef = useRef<Set<string>>(new Set());
+  /**
+   * Per-pending-photo resolvers, used by waitForEnteOriginals() so consumers
+   * can block on all outstanding downloads without re-polling.
+   */
+  const enteOriginalWaitersRef = useRef<
+    Map<string, Array<() => void>>
+  >(new Map());
   // Persist on changes (debounced)
   useEffect(() => {
-    if (loading) return;
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(() => {
-      saveBookState({ ...book, currentSpreadIndex });
-      savePhotos(photos);
-      saveAppView(appView);
+    if (loading || processingPhotos) return;
+    const saveTimeout = setTimeout(() => {
+      void saveBookState({ ...book, currentSpreadIndex });
+      void savePhotos(photos);
+      void saveAppView(appView);
     }, 500);
-  }, [book, photos, appView, currentSpreadIndex, loading]);
+
+    return () => clearTimeout(saveTimeout);
+  }, [book, photos, appView, currentSpreadIndex, loading, processingPhotos]);
 
   // Restore session on mount
   useEffect(() => {
@@ -280,7 +372,16 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
             })
           );
 
-          setPhotos(savedPhotos);
+          // Ente photos left in "pending" state across sessions have stale
+          // credentials (tokens likely expired). Mark them as failed and strip
+          // the stored credentials so they don't linger in IndexedDB.
+          const restoredPhotos = savedPhotos.map((photo) =>
+            photo.source === "ente" && photo.originalStatus === "pending"
+              ? { ...photo, originalStatus: "failed" as const, enteOriginal: undefined, originalError: "Session expired — re-import the album to retry." }
+              : photo,
+          );
+
+          setPhotos(restoredPhotos);
           setThumbnailUrls(thumbUrls);
           setBookRaw(savedBook);
           setCurrentSpreadIndex(savedBook.currentSpreadIndex);
@@ -310,6 +411,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
       setProcessingPhotos(true);
       progressRef.current = 0;
       setProcessingProgress(0);
+      setProcessingMessage("Processing your photos...");
 
       if (replace) {
         // Clear previous session when starting fresh from start page
@@ -340,29 +442,14 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
       let completed = 0;
 
       const processPhoto = async (file: File, index: number) => {
-        let blob: Blob = file;
-
-        // Convert HEIC/HEIF
-        if (
-          file.type === "image/heic" ||
-          file.type === "image/heif" ||
-          file.name.toLowerCase().endsWith(".heic") ||
-          file.name.toLowerCase().endsWith(".heif")
-        ) {
-          try {
-            const heic2any = (await import("heic2any")).default;
-            const converted = await heic2any({
-              blob: file,
-              toType: "image/jpeg",
-              quality: 0.92,
-            });
-            blob = Array.isArray(converted) ? converted[0] : converted;
-          } catch (e) {
-            console.warn("HEIC conversion failed for", file.name, e);
-            completed++;
-            scheduleProgressUpdate(Math.round((completed / files.length) * 100));
-            return;
-          }
+        let blob: Blob;
+        try {
+          blob = await normalizeImportedImageBlob(file, file.name);
+        } catch (e) {
+          console.warn("HEIC conversion failed for", file.name, e);
+          completed++;
+          scheduleProgressUpdate(Math.round((completed / files.length) * 100));
+          return;
         }
 
         // Get dimensions (temporary URL, revoked after use to save memory)
@@ -379,6 +466,8 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
           width: img.naturalWidth,
           height: img.naturalHeight,
           dateTaken: dateTaken || file.lastModified || Date.now(),
+          source: "local",
+          originalStatus: "ready",
         };
 
         // Save to IndexedDB
@@ -490,6 +579,386 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
     },
     [photos, thumbnailUrls, previewUrls]
   );
+
+  const markEnteOriginalDone = useCallback((
+    photoId: string,
+    status: PhotoOriginalStatus,
+    originalError?: string,
+  ) => {
+    setPhotos((prev) =>
+      prev.map((photo) => {
+        if (photo.id !== photoId || photo.source !== "ente") {
+          return photo;
+        }
+
+        const next: Photo = {
+          ...photo,
+          originalStatus: status,
+          originalError,
+        };
+        if (status === "ready" || status === "failed") {
+          next.enteOriginal = undefined;
+        }
+        return next;
+      }),
+    );
+    const waiters = enteOriginalWaitersRef.current.get(photoId);
+    if (waiters) {
+      enteOriginalWaitersRef.current.delete(photoId);
+      for (const w of waiters) w();
+    }
+  }, []);
+
+  const startEnteOriginalDownloads = useCallback(
+    async (photoIds: string[]) => {
+      const entries = photoIds
+        .map((photoId) => {
+          const photo = photosRef.current.find((candidate) => candidate.id === photoId);
+          if (!photo || !isPendingEnteOriginal(photo)) {
+            return null;
+          }
+          const job = buildEnteOriginalDownloadJob(photo);
+          if (!job) {
+            markEnteOriginalDone(
+              photoId,
+              "failed",
+              "Missing Ente download metadata.",
+            );
+            return null;
+          }
+          return { photoId, fileName: photo.fileName, ...job };
+        })
+        .filter(
+          (
+            entry,
+          ): entry is {
+            photoId: string;
+            fileName: string;
+            credentials: EnteCredentials;
+            descriptor: EnteFileDescriptor;
+          } => entry !== null,
+        );
+
+      // Ente's CDN tolerates a few parallel requests; match Ente web's default.
+      const CONCURRENCY = 3;
+      let cursor = 0;
+      const workers = Array.from(
+        { length: Math.min(CONCURRENCY, entries.length) },
+        async () => {
+          while (cursor < entries.length) {
+            const i = cursor++;
+            const { photoId, fileName, credentials, descriptor } = entries[i]!;
+            try {
+              const blob = await fetchAndDecryptOriginal(
+                credentials,
+                descriptor,
+              );
+              const renderable = await extractRenderableImage(
+                descriptor,
+                blob,
+              );
+              const normalizedBlob = await normalizeImportedImageBlob(
+                renderable.blob,
+                renderable.fileName,
+              );
+              const normalizedUrl = URL.createObjectURL(normalizedBlob);
+              let previewBlob: Blob;
+              try {
+                const img = await loadImage(normalizedUrl);
+                previewBlob = await createThumbnail(img, 1080);
+              } finally {
+                URL.revokeObjectURL(normalizedUrl);
+              }
+              const currentPhoto = photosRef.current.find(
+                (candidate) => candidate.id === photoId,
+              );
+              if (!currentPhoto || !isPendingEnteOriginal(currentPhoto)) {
+                continue;
+              }
+              await Promise.all([
+                savePhotoBlob(photoId, normalizedBlob),
+                savePreview(photoId, previewBlob),
+              ]);
+              const previewUrl = URL.createObjectURL(previewBlob);
+              setPreviewUrls((prev) => {
+                const next = new Map(prev);
+                const existing = next.get(photoId);
+                if (existing) {
+                  URL.revokeObjectURL(existing);
+                }
+                next.set(photoId, previewUrl);
+                return next;
+              });
+              markEnteOriginalDone(photoId, "ready");
+            } catch (e) {
+              const currentPhoto = photosRef.current.find(
+                (candidate) => candidate.id === photoId,
+              );
+              if (currentPhoto && isPendingEnteOriginal(currentPhoto)) {
+                const message =
+                  e instanceof Error
+                    ? e.message
+                    : "Failed to prepare the original photo.";
+                console.warn(
+                  `Ente: failed to download original for "${fileName}"`,
+                  e,
+                );
+                markEnteOriginalDone(photoId, "failed", message);
+              }
+            } finally {
+              activeEnteOriginalDownloadsRef.current.delete(photoId);
+            }
+          }
+        },
+      );
+      await Promise.all(workers);
+    },
+    [markEnteOriginalDone],
+  );
+
+  const addEntePhotos = useCallback(
+    async (
+      albumUrl: string,
+      requestPassword: () => Promise<string | null>,
+    ) => {
+      setProcessingPhotos(true);
+      progressRef.current = 0;
+      setProcessingProgress(0);
+      setProcessingMessage("Importing your photos...");
+
+      // Ente import always replaces the current session (same convention as
+      // the file picker from StartPage).
+      thumbnailUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      clearImageCache();
+      await clearAll();
+      activeEnteOriginalDownloadsRef.current.clear();
+      enteOriginalWaitersRef.current = new Map();
+
+      let preparation;
+      try {
+        preparation = await prepareEnteAlbum(albumUrl, requestPassword);
+      } catch (e) {
+        setProcessingPhotos(false);
+        setProcessingMessage("Processing your photos...");
+        throw e;
+      }
+
+      const { credentials, files } = preparation;
+      const MAX_PHOTOS = 800;
+      const limited = files.slice(0, MAX_PHOTOS);
+      if (files.length > MAX_PHOTOS) {
+        setImportNotice(
+          `This album has ${files.length} photos. We imported the first ${MAX_PHOTOS}.`,
+        );
+      }
+
+      if (limited.length === 0) {
+        setProcessingPhotos(false);
+        setProcessingMessage("Processing your photos...");
+        throw new Error("This album has no photos we can import.");
+      }
+
+      // Keep the same message throughout.
+
+      type ThumbResult = {
+        photo: Photo;
+        thumbUrl: string;
+        previewUrl: string;
+      };
+      const thumbResults: (ThumbResult | null)[] = new Array(
+        limited.length,
+      ).fill(null);
+      let completed = 0;
+
+      const scheduleProgressUpdate = (value: number) => {
+        progressRef.current = value;
+        if (!rafRef.current) {
+          rafRef.current = requestAnimationFrame(() => {
+            rafRef.current = 0;
+            setProcessingProgress(progressRef.current);
+          });
+        }
+      };
+
+      const processOne = async (index: number) => {
+        const descriptor = limited[index]!;
+        try {
+          const thumbBlob = await fetchAndDecryptThumbnail(
+            credentials,
+            descriptor,
+          );
+
+          // Trust magic-metadata dimensions if present; otherwise fall back to
+          // the thumbnail's own dimensions. The thumbnail preserves aspect
+          // ratio, so that's enough for the photobook's auto-layout picker.
+          let width = descriptor.width;
+          let height = descriptor.height;
+          if (!width || !height) {
+            const tempUrl = URL.createObjectURL(thumbBlob);
+            try {
+              const img = await loadImage(tempUrl);
+              width = img.naturalWidth;
+              height = img.naturalHeight;
+            } finally {
+              URL.revokeObjectURL(tempUrl);
+            }
+          }
+
+          const photoId = uuid();
+          const photo: Photo = {
+            id: photoId,
+            fileName: descriptor.fileName,
+            width,
+            height,
+            dateTaken: descriptor.dateTaken,
+            source: "ente",
+            originalStatus: "pending",
+            enteOriginal: {
+              apiOrigin: credentials.apiOrigin,
+              albumsOrigin: credentials.albumsOrigin,
+              accessToken: credentials.accessToken,
+              accessTokenJWT: credentials.accessTokenJWT,
+              enteFileId: descriptor.enteFileId,
+              mediaKind: descriptor.mediaKind,
+              fileKey: descriptor.fileKey,
+              fileDecryptionHeader: descriptor.fileDecryptionHeader,
+            },
+          };
+
+          // Save the decrypted thumbnail for immediate rendering. The original
+          // blob is written later once the background download succeeds.
+          await Promise.all([
+            saveThumbnail(photoId, thumbBlob),
+            savePreview(photoId, thumbBlob),
+          ]);
+
+          thumbResults[index] = {
+            photo,
+            thumbUrl: URL.createObjectURL(thumbBlob),
+            previewUrl: URL.createObjectURL(thumbBlob),
+          };
+        } catch (e) {
+          console.warn(
+            `Ente: failed to prepare "${descriptor.fileName}"`,
+            e,
+          );
+        } finally {
+          completed++;
+          scheduleProgressUpdate(
+            Math.round((completed / limited.length) * 100),
+          );
+        }
+      };
+
+      const THUMB_CONCURRENCY = 6;
+      let cursor = 0;
+      const workers = Array.from(
+        { length: Math.min(THUMB_CONCURRENCY, limited.length) },
+        async () => {
+          while (cursor < limited.length) {
+            const i = cursor++;
+            await processOne(i);
+          }
+        },
+      );
+      await Promise.all(workers);
+
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = 0;
+      }
+      setProcessingProgress(100);
+
+      const successful = thumbResults.filter(
+        (r): r is ThumbResult => r !== null,
+      );
+      successful.sort((a, b) => a.photo.dateTaken - b.photo.dateTaken);
+
+      if (successful.length === 0) {
+        setProcessingPhotos(false);
+        setProcessingMessage("Processing your photos...");
+        throw new Error("We couldn't prepare any photos from this album.");
+      }
+
+      const newPhotos: Photo[] = successful.map((r) => r.photo);
+      const newThumbUrls = new Map<string, string>();
+      const newPreviewUrls = new Map<string, string>();
+      for (const r of successful) {
+        newThumbUrls.set(r.photo.id, r.thumbUrl);
+        newPreviewUrls.set(r.photo.id, r.previewUrl);
+      }
+
+      const pages = generateAutoLayout(newPhotos);
+      setPhotos(newPhotos);
+      setThumbnailUrls(newThumbUrls);
+      setPreviewUrls(newPreviewUrls);
+      setBookRaw({ pages, currentSpreadIndex: 0 });
+      undoStackRef.current = [];
+      redoStackRef.current = [];
+      setCanUndo(false);
+      setCanRedo(false);
+      setCurrentSpreadIndex(0);
+
+      setProcessingPhotos(false);
+      setProcessingMessage("Processing your photos...");
+      setAppViewState("edit");
+    },
+    [],
+  );
+
+  const waitForEnteOriginals = useCallback(
+    async (
+      photoIds?: string[],
+      onProgress?: (done: number, total: number) => void,
+    ) => {
+      const requested = photoIds ?? Array.from(pendingEnteOriginalsRef.current);
+      const pending = requested.filter((id) => pendingEnteOriginalsRef.current.has(id));
+      if (pending.length === 0) return;
+      const total = pending.length;
+      let done = 0;
+      onProgress?.(done, total);
+      await Promise.all(
+        pending.map(
+          (id) =>
+            new Promise<void>((resolve) => {
+              // If it already resolved between the snapshot and now, short-circuit.
+              if (!pendingEnteOriginalsRef.current.has(id)) {
+                done++;
+                onProgress?.(done, total);
+                resolve();
+                return;
+              }
+              const existing = enteOriginalWaitersRef.current.get(id) ?? [];
+              existing.push(() => {
+                done++;
+                onProgress?.(done, total);
+                resolve();
+              });
+              enteOriginalWaitersRef.current.set(id, existing);
+            }),
+        ),
+      );
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (loading || processingPhotos) return;
+
+    const queue = photos
+      .filter(
+        (photo) =>
+          isPendingEnteOriginal(photo) &&
+          !activeEnteOriginalDownloadsRef.current.has(photo.id),
+      )
+      .map((photo) => photo.id);
+
+    if (queue.length === 0) return;
+
+    queue.forEach((photoId) => activeEnteOriginalDownloadsRef.current.add(photoId));
+    void startEnteOriginalDownloads(queue);
+  }, [loading, photos, processingPhotos, startEnteOriginalDownloads]);
 
   const addPage = useCallback(
     (afterIndex?: number) => {
@@ -852,8 +1321,8 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
 
   const startOver = useCallback(async () => {
     // Revoke all URLs
-    thumbnailUrls.forEach((url) => URL.revokeObjectURL(url));
-    previewUrls.forEach((url) => URL.revokeObjectURL(url));
+    thumbnailUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     clearImageCache();
 
     await clearAll();
@@ -868,7 +1337,9 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
     setCurrentSpreadIndex(0);
     setAppViewState("start");
     setRestored(false);
-  }, [thumbnailUrls, previewUrls]);
+    activeEnteOriginalDownloadsRef.current.clear();
+    enteOriginalWaitersRef.current = new Map();
+  }, []);
 
   return (
     <BookContext.Provider
@@ -883,8 +1354,14 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
         photoUrls,
         loadPreviews,
         addPhotos,
+        addEntePhotos,
         processingPhotos,
         processingProgress,
+        processingMessage,
+        importNotice,
+        clearImportNotice,
+        pendingEnteOriginals,
+        waitForEnteOriginals,
         book,
         setBook,
         currentSpreadIndex,

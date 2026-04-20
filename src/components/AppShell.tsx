@@ -10,7 +10,7 @@ import EditPage from "@/components/EditPage";
 import ResultsPage from "@/components/ResultsPage";
 
 function AppContent() {
-  const { appView, loading, restored, setRestored, startOver } = useBook();
+  const { appView, loading, restored, setRestored, startOver, importNotice, clearImportNotice } = useBook();
   const [showMobileHint, setShowMobileHint] = useState(false);
 
   useEffect(() => {
@@ -73,6 +73,27 @@ function AppContent() {
           }
         >
           Welcome back — your book has been restored.
+        </Alert>
+      </Snackbar>
+
+      {/* Import truncation notice */}
+      <Snackbar
+        open={Boolean(importNotice)}
+        autoHideDuration={10000}
+        onClose={clearImportNotice}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          severity="info"
+          onClose={clearImportNotice}
+          sx={{
+            bgcolor: "white",
+            color: "#1a1c1d",
+            boxShadow: "0px 12px 32px rgba(26, 28, 29, 0.1)",
+            "& .MuiAlert-icon": { color: "#08C225" },
+          }}
+        >
+          {importNotice}
         </Alert>
       </Snackbar>
 

@@ -1,5 +1,7 @@
 import exifr from "exifr";
 
+const HEIC_MIME_TYPES = new Set(["image/heic", "image/heif"]);
+
 export async function extractExifDate(file: File): Promise<number | null> {
   try {
     const exif = await exifr.parse(file, {
@@ -18,6 +20,42 @@ export async function extractExifDate(file: File): Promise<number | null> {
     // EXIF extraction failed, that's fine
   }
   return null;
+}
+
+export function isHeicLike(mimeType: string | undefined, fileName: string): boolean {
+  const normalizedName = fileName.toLowerCase();
+  return (
+    HEIC_MIME_TYPES.has(mimeType ?? "") ||
+    normalizedName.endsWith(".heic") ||
+    normalizedName.endsWith(".heif")
+  );
+}
+
+/**
+ * Converts HEIC/HEIF inputs to JPEG so downstream browser-only flows can
+ * decode, preview, and export them consistently.
+ */
+export async function normalizeImportedImageBlob(
+  blob: Blob,
+  fileName: string
+): Promise<Blob> {
+  if (!isHeicLike(blob.type, fileName)) {
+    return blob;
+  }
+
+  const heic2any = (await import("heic2any")).default;
+  const converted = await heic2any({
+    blob,
+    toType: "image/jpeg",
+    quality: 0.92,
+  });
+  const jpegBlob = (Array.isArray(converted) ? converted[0] : converted) as Blob;
+
+  if (jpegBlob.type === "image/jpeg") {
+    return jpegBlob;
+  }
+
+  return new Blob([jpegBlob], { type: "image/jpeg" });
 }
 
 export async function createThumbnail(

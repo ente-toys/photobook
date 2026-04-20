@@ -13,6 +13,9 @@ import {
   Typography,
   IconButton,
   CircularProgress,
+  LinearProgress,
+  Dialog,
+  DialogContent,
   Menu,
   MenuItem,
   Snackbar,
@@ -35,7 +38,8 @@ import {
 } from "@/lib/export";
 
 export default function ResultsPage() {
-  const { book, setAppView } = useBook();
+  const { book, photos, setAppView, waitForEnteOriginals } =
+    useBook();
   const viewerRef = useRef<BookViewerHandle>(null);
   // pageIndex is the 0-based page-flip index of the current left-most visible page
   const [pageIndex, setPageIndex] = useState(0);
@@ -44,9 +48,16 @@ export default function ResultsPage() {
   const [downloadAnchor, setDownloadAnchor] = useState<null | HTMLElement>(
     null
   );
-  const [exportError, setExportError] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [waitingForOriginals, setWaitingForOriginals] = useState(false);
+  const [originalsProgress, setOriginalsProgress] = useState({
+    done: 0,
+    total: 0,
+  });
   const pages = book.pages;
   const totalPages = pages.length;
+  const photosRef = useRef(photos);
+  photosRef.current = photos;
 
   // With showCover: true, page-flip treats page 0 as front cover (single),
   // last page as back cover (single), and everything in between as spreads.
@@ -68,9 +79,30 @@ export default function ResultsPage() {
   const isAtStart = pageIndex === 0;
   const isAtEnd = pageIndex >= totalPages - 1;
 
+  const usedPhotoIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const page of pages) {
+      for (const slot of page.slots) {
+        if (slot.photoId) {
+          ids.add(slot.photoId);
+        }
+      }
+    }
+    return ids;
+  }, [pages]);
+
   const handlePageChange = useCallback((idx: number) => {
     setPageIndex(idx);
   }, []);
+
+  const getBlockedEntePhotos = useCallback(() => {
+    return photosRef.current.filter(
+      (photo) =>
+        usedPhotoIds.has(photo.id) &&
+        photo.source === "ente" &&
+        photo.originalStatus !== "ready",
+    );
+  }, [usedPhotoIds]);
 
   // Keyboard navigation: left/right arrows flip pages
   useEffect(() => {
@@ -102,6 +134,37 @@ export default function ResultsPage() {
   const handleExport = useCallback(
     async (type: "pdf-a5" | "pdf-a4" | "png-zip" | "png-a4-zip") => {
       setDownloadAnchor(null);
+
+      const initiallyBlocked = getBlockedEntePhotos();
+      const pendingIds = initiallyBlocked
+        .filter((photo) => photo.originalStatus === "pending")
+        .map((photo) => photo.id);
+
+      if (pendingIds.length > 0) {
+        setWaitingForOriginals(true);
+        setOriginalsProgress({ done: 0, total: pendingIds.length });
+        try {
+          await waitForEnteOriginals(pendingIds, (done, total) => {
+            setOriginalsProgress({ done, total });
+          });
+        } finally {
+          setWaitingForOriginals(false);
+        }
+      }
+
+      const remainingBlocked = getBlockedEntePhotos();
+      if (remainingBlocked.length > 0) {
+        const failedCount = remainingBlocked.filter(
+          (photo) => photo.originalStatus === "failed",
+        ).length;
+        setExportError(
+          failedCount > 0
+            ? "Some Ente photos failed to prepare. Re-import the album before exporting."
+            : "Ente originals are still being prepared. Please wait a moment and try again.",
+        );
+        return;
+      }
+
       setExporting(true);
       setExportProgress(0);
 
@@ -134,12 +197,12 @@ export default function ResultsPage() {
         downloadBlob(blob, filename);
       } catch (e) {
         console.error("Export failed:", e);
-        setExportError(true);
+        setExportError("Export failed. Please try again.");
       } finally {
         setExporting(false);
       }
     },
-    [pages]
+    [getBlockedEntePhotos, pages, waitForEnteOriginals]
   );
 
   return (
@@ -443,18 +506,88 @@ export default function ResultsPage() {
         </Box>
       </Box>
 
+      <Dialog
+        open={waitingForOriginals}
+        slotProps={{
+          backdrop: { sx: { bgcolor: "rgba(0,0,0,0.25)" } },
+        }}
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            bgcolor: "#fff",
+            minWidth: 360,
+            boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
+          },
+        }}
+      >
+        <Box sx={{ textAlign: "center", px: 3.5, py: 3.5 }}>
+          <CircularProgress sx={{ color: "#08C225", mb: 2 }} size={36} />
+          <Typography
+            sx={{
+              fontFamily: "var(--font-nunito), 'Nunito', sans-serif",
+              fontWeight: 700,
+              fontSize: "1.05rem",
+              color: "#222",
+              mb: 0.5,
+            }}
+          >
+            Finishing your album download
+          </Typography>
+          <Typography
+            sx={{
+              fontFamily: "var(--font-nunito), 'Nunito', sans-serif",
+              color: "#777",
+              fontSize: "0.8rem",
+              lineHeight: 1.6,
+              mb: 2.5,
+            }}
+          >
+            We need the full-resolution photos before we can
+            build a print-ready file.
+          </Typography>
+          <LinearProgress
+            variant="determinate"
+            value={
+              originalsProgress.total
+                ? (originalsProgress.done / originalsProgress.total) * 100
+                : 0
+            }
+            sx={{
+              height: 6,
+              borderRadius: 3,
+              mb: 1,
+              bgcolor: "#e8e8e8",
+              "& .MuiLinearProgress-bar": {
+                background:
+                  "linear-gradient(135deg, #006E0F 0%, #08C225 100%)",
+                borderRadius: 3,
+              },
+            }}
+          />
+          <Typography
+            sx={{
+              fontFamily: "var(--font-nunito), 'Nunito', sans-serif",
+              color: "#999",
+              fontSize: "0.8rem",
+            }}
+          >
+            {originalsProgress.done} / {originalsProgress.total} photos
+          </Typography>
+        </Box>
+      </Dialog>
+
       <Snackbar
-        open={exportError}
+        open={Boolean(exportError)}
         autoHideDuration={6000}
-        onClose={() => setExportError(false)}
+        onClose={() => setExportError(null)}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
         <Alert
-          onClose={() => setExportError(false)}
+          onClose={() => setExportError(null)}
           severity="error"
           variant="filled"
         >
-          Export failed. Please try again.
+          {exportError}
         </Alert>
       </Snackbar>
     </Box>
