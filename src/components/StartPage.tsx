@@ -6,7 +6,6 @@ import {
   Button,
   Typography,
   LinearProgress,
-  CircularProgress,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -175,7 +174,6 @@ export default function StartPage() {
           pt: 8,
         }}
       >
-        <CircularProgress sx={{ color: "#08C225" }} size={48} />
         <Typography
           sx={{
             fontFamily: "var(--font-sora), 'Avenir Next', 'Segoe UI', sans-serif",
