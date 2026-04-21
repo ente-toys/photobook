@@ -50,3 +50,4 @@ No test framework is configured.
 - Thumbnails are capped at 1080px for performance
 - Static export (`output: "export"` in next.config.js) — no server-side features
 - Canvas is externalized in webpack config to avoid SSR issues with Konva
+- **Dependencies must be pinned to exact versions** (no `^` or `~`) in `package.json` to mitigate supply chain attacks. Always use exact versions when adding or updating a dependency.
