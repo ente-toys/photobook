@@ -9,11 +9,6 @@ function getNunitoFont(): string {
   return getComputedStyle(document.documentElement).getPropertyValue("--font-nunito").trim() || "sans-serif";
 }
 
-function getManropeFont(): string {
-  if (typeof window === "undefined") return "sans-serif";
-  return getComputedStyle(document.documentElement).getPropertyValue("--font-manrope").trim() || "sans-serif";
-}
-
 const DPI = 300;
 const A5_WIDTH_PX = Math.round((A5_WIDTH_MM / 25.4) * DPI);
 const A5_HEIGHT_PX = Math.round((A5_HEIGHT_MM / 25.4) * DPI);
@@ -161,38 +156,29 @@ export async function renderPageToCanvas(
   }
 
   if (isBackCover) {
-    // Draw "By ente" branding on back cover
+    // Draw centered Ente logo on back cover
     try {
       const logo = await loadImage("/ente-branding.svg");
       const logoHeight = height * 0.031;
       const logoWidth = (logo.naturalWidth / logo.naturalHeight) * logoHeight;
-      const byFontSize = Math.round(height * 0.018);
-      const gap = byFontSize * 0.6;
-      const totalWidth = byFontSize * 1.2 + gap + logoWidth;
-      const startX = (width - totalWidth) / 2;
       const stripHeight = logoHeight + height * 0.03;
       const stripY = height - stripHeight;
       const yCenter = stripY + stripHeight / 2;
+      const logoX = (width - logoWidth) / 2;
 
       // White background strip
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, stripY, width, stripHeight);
 
-      ctx.fillStyle = "#999";
-      ctx.font = `${byFontSize}px ${getManropeFont()}, sans-serif`;
-      ctx.textAlign = "left";
-      ctx.textBaseline = "middle";
-      ctx.fillText("By", startX, yCenter + byFontSize * 0.1);
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
       ctx.drawImage(
         logo,
-        startX + byFontSize * 1.2 + gap,
+        logoX,
         yCenter - logoHeight / 2,
         logoWidth,
         logoHeight
       );
-      ctx.textBaseline = "alphabetic";
     } catch (e) {
       console.warn("Failed to draw ente branding:", e);
     }
