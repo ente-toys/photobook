@@ -154,6 +154,60 @@ function isPendingEnteOriginal(photo: Photo): boolean {
   return photo.source === "ente" && photo.originalStatus === "pending";
 }
 
+function pagePhotoIds(page: BookPage): string[] {
+  return page.slots
+    .map((s) => s.photoId)
+    .filter((id): id is string => id !== null);
+}
+
+/**
+ * Force the covers to their canonical single-photo layouts:
+ *   front cover → 1-full (full-bleed)
+ *   back cover  → 1-padded (inset, leaves room for the ente branding)
+ * Migrates older sessions saved before these rules existed.
+ */
+function normalizeCoverLayout(state: BookState): BookState {
+  if (state.pages.length === 0) return state;
+  let pages = state.pages;
+
+  const cover = pages[0];
+  const coverIds = pagePhotoIds(cover);
+  if (coverIds.length === 1 && cover.layoutVariant !== "1-full") {
+    pages = pages.map((p, i) =>
+      i === 0
+        ? {
+            ...p,
+            slots: applyVariant("1-full", coverIds),
+            layoutVariant: "1-full",
+            paddingH: 0,
+            paddingV: 0,
+          }
+        : p
+    );
+  }
+
+  if (pages.length > 1) {
+    const backIdx = pages.length - 1;
+    const back = pages[backIdx];
+    const backIds = pagePhotoIds(back);
+    if (backIds.length === 1 && back.layoutVariant !== "1-padded") {
+      pages = pages.map((p, i) =>
+        i === backIdx
+          ? {
+              ...p,
+              slots: applyVariant("1-padded", backIds),
+              layoutVariant: "1-padded",
+              paddingH: 0,
+              paddingV: 0,
+            }
+          : p
+      );
+    }
+  }
+
+  return pages === state.pages ? state : { ...state, pages };
+}
+
 function buildEnteOriginalDownloadJob(photo: Photo):
   | {
       credentials: EnteCredentials;
@@ -383,7 +437,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
 
           setPhotos(restoredPhotos);
           setThumbnailUrls(thumbUrls);
-          setBookRaw(savedBook);
+          setBookRaw(normalizeCoverLayout(savedBook));
           setCurrentSpreadIndex(savedBook.currentSpreadIndex);
 
           if (savedView === "edit" || savedView === "results") {
@@ -1072,9 +1126,21 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
           };
         }
 
-        // Pick the first layout variant for the new count and re-apply
-        const variants = getVariantsForCount(remainingPhotos.length);
-        const variantKey = variants[0]?.key;
+        const isCoverPage = prev.pages[0]?.id === pageId;
+        const isBackCoverPage =
+          prev.pages.length > 1 &&
+          prev.pages[prev.pages.length - 1]?.id === pageId;
+
+        // Covers with one photo have canonical layouts: full-bleed on the
+        // front cover, 1-padded on the back cover (to sit above the branding).
+        let variantKey: string | undefined;
+        if (remainingPhotos.length === 1 && isCoverPage) {
+          variantKey = "1-full";
+        } else if (remainingPhotos.length === 1 && isBackCoverPage) {
+          variantKey = "1-padded";
+        } else {
+          variantKey = getVariantsForCount(remainingPhotos.length)[0]?.key;
+        }
         if (!variantKey) {
           return {
             ...prev,
@@ -1179,10 +1245,25 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
           return photo || { id: photoId, fileName: "", width: 1, height: 1, dateTaken: 0 };
         };
 
-        const newPages = prev.pages.map((p) => {
+        const lastIdx = prev.pages.length - 1;
+        const newPages = prev.pages.map((p, pIdx) => {
+          const isCover = pIdx === 0;
+          const isBackCover = pIdx === lastIdx && lastIdx > 0;
+          const coverSingleKey = isCover
+            ? "1-full"
+            : isBackCover
+              ? "1-padded"
+              : null;
           if (p.id === fromPageId) {
             if (sourcePhotoIds.length === 0) {
               return { ...p, slots: [], layoutVariant: undefined };
+            }
+            if (coverSingleKey && sourcePhotoIds.length === 1) {
+              return {
+                ...p,
+                slots: applyVariant(coverSingleKey, sourcePhotoIds),
+                layoutVariant: coverSingleKey,
+              };
             }
             const srcPhotos = sourcePhotoIds.map(makePhotoStub);
             return {
@@ -1192,6 +1273,13 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
             };
           }
           if (p.id === toPageId) {
+            if (coverSingleKey && targetPhotoIds.length === 1) {
+              return {
+                ...p,
+                slots: applyVariant(coverSingleKey, targetPhotoIds),
+                layoutVariant: coverSingleKey,
+              };
+            }
             const tgtPhotos = targetPhotoIds.map(makePhotoStub);
             return {
               ...p,

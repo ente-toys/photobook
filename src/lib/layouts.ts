@@ -621,35 +621,48 @@ export function chooseBestLayout(photos: Photo[]): PhotoSlot[] {
   return layout4Grid(photos);
 }
 
+const makeBlankPage = (): BookPage => ({
+  id: uuid(),
+  slots: [],
+  textBlocks: [],
+  topCaption: "",
+  bottomCaption: "",
+});
+
 export function generateAutoLayout(photos: Photo[]): BookPage[] {
   // Sort by dateTaken
   const sorted = [...photos].sort((a, b) => a.dateTaken - b.dateTaken);
 
   const pages: BookPage[] = [];
-  let idx = 0;
 
-  // First page (cover) - single photo
-  if (sorted.length > 0) {
-    pages.push({
-      id: uuid(),
-      slots: layout1([sorted[0]]),
-      layoutVariant: "1-moderate",
-      textBlocks: [],
-      topCaption: "",
-      bottomCaption: "",
-    });
-    idx = 1;
-  }
+  if (sorted.length === 0) return pages;
 
-  // Distribute remaining photos with variety
+  // First page (cover) — single photo, always full-bleed.
+  pages.push({
+    id: uuid(),
+    slots: gen1Full([sorted[0].id]),
+    layoutVariant: "1-full",
+    textBlocks: [],
+    topCaption: "",
+    bottomCaption: "",
+  });
+
+  // Reserve the last photo (by date) for the back cover when there are
+  // at least two photos. The back cover uses the most-padded single-photo
+  // layout so the photo sits inset above the ente branding.
+  const hasBackCoverPhoto = sorted.length >= 2;
+  const interiorEnd = hasBackCoverPhoto ? sorted.length - 1 : sorted.length;
+
+  // Distribute middle photos with variety
   const layoutCycle = [2, 3, 1, 4, 2, 3, 1, 2];
   let cycleIdx = 0;
+  let idx = 1;
 
-  while (idx < sorted.length) {
-    const remaining = sorted.length - idx;
+  while (idx < interiorEnd) {
+    const remaining = interiorEnd - idx;
     let count = Math.min(layoutCycle[cycleIdx % layoutCycle.length], remaining);
 
-    // Don't leave 1 photo for a last page if we can avoid it
+    // Don't leave 1 photo for a last interior page if we can avoid it
     if (remaining - count === 1 && count < 4) {
       count = Math.min(count + 1, remaining, 4);
     }
@@ -671,15 +684,25 @@ export function generateAutoLayout(photos: Photo[]): BookPage[] {
     cycleIdx++;
   }
 
-  // Ensure even number of pages (for spreads) - add blank last page if needed
-  if (pages.length % 2 !== 0) {
+  // Keep total even by padding with a blank interior page before the back
+  // cover, so the reserved back-cover photo always lands on the last page.
+  if ((pages.length + 1) % 2 !== 0) {
+    pages.push(makeBlankPage());
+  }
+
+  if (hasBackCoverPhoto) {
+    const backCoverId = sorted[sorted.length - 1].id;
     pages.push({
       id: uuid(),
-      slots: [],
+      slots: applyVariant("1-padded", [backCoverId]),
+      layoutVariant: "1-padded",
       textBlocks: [],
       topCaption: "",
       bottomCaption: "",
     });
+  } else {
+    // Only one photo in the whole book — back cover is blank (branding only).
+    pages.push(makeBlankPage());
   }
 
   return pages;
