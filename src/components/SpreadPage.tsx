@@ -9,7 +9,7 @@ import PageCanvas from "./PageCanvas";
 import LayoutPicker from "./LayoutPicker";
 import TextToolbar from "./TextToolbar";
 import type { BookPage, TextBlock } from "@/lib/types";
-import { MARGIN_V } from "@/lib/layouts";
+import { getCaptionZones } from "@/lib/layouts";
 import type { CaptionPosition } from "./PageCanvas";
 import type { DragInfo } from "@/hooks/usePhotoDrag";
 
@@ -290,13 +290,20 @@ export default function SpreadPage({
     page.slots.length === 0 || page.slots.every((s) => s.y + s.height < 100);
 
   const captionFontSize = Math.round(pageHeight * 0.016);
-  // Caption zone matches the page's vertical margin so the caption sits
-  // visually centered in the empty band between the page edge and the photo.
-  const captionZoneHeight = pageHeight * (MARGIN_V / 100);
+  // Caption zones span the actual empty band between the page edge and the
+  // nearest photo, so captions stay centered even when the user adds extra
+  // vertical padding (or on the back cover with its larger inset).
+  const captionZones = getCaptionZones(page);
+  const topCaptionZoneHeight = pageHeight * (captionZones.topPct / 100);
+  const bottomCaptionZoneHeight = pageHeight * (captionZones.bottomPct / 100);
   const captionInputHeight = captionFontSize * 1.6;
-  const captionInputOffset = Math.max(
+  const topCaptionInputOffset = Math.max(
     0,
-    (captionZoneHeight - captionInputHeight) / 2
+    (topCaptionZoneHeight - captionInputHeight) / 2
+  );
+  const bottomCaptionInputOffset = Math.max(
+    0,
+    (bottomCaptionZoneHeight - captionInputHeight) / 2
   );
 
   const handleCaptionClick = (position: CaptionPosition) => {
@@ -727,7 +734,7 @@ export default function SpreadPage({
               }}
               style={{
                 position: "absolute",
-                top: captionInputOffset,
+                top: topCaptionInputOffset,
                 left: pageWidth * 0.05,
                 width: pageWidth * 0.9,
                 height: captionInputHeight,
@@ -757,7 +764,7 @@ export default function SpreadPage({
                 top: 0,
                 left: 0,
                 width: pageWidth,
-                height: captionZoneHeight,
+                height: topCaptionZoneHeight,
                 zIndex: 4,
                 cursor: "text",
                 display: "flex",
@@ -795,7 +802,7 @@ export default function SpreadPage({
               }}
               style={{
                 position: "absolute",
-                bottom: captionInputOffset,
+                bottom: bottomCaptionInputOffset,
                 left: pageWidth * 0.05,
                 width: pageWidth * 0.9,
                 height: captionInputHeight,
@@ -825,7 +832,7 @@ export default function SpreadPage({
                 bottom: 0,
                 left: 0,
                 width: pageWidth,
-                height: captionZoneHeight,
+                height: bottomCaptionZoneHeight,
                 zIndex: 4,
                 cursor: "text",
                 display: "flex",

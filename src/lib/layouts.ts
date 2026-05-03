@@ -474,6 +474,22 @@ export function getVariantsForCount(count: number): LayoutVariant[] {
   return ALL_VARIANTS.filter((v) => v.photoCount === count && !HIDDEN_MIRRORS.has(v.key));
 }
 
+/** Caption zone heights (% of page) above and below the photos. Captions are
+ * centered in these bands, so when the user adds extra vertical padding (or
+ * on the back cover with its larger inset), the zones grow with the photo's
+ * actual edges rather than staying pinned to the default MARGIN_V band. */
+export function getCaptionZones(page: BookPage): {
+  topPct: number;
+  bottomPct: number;
+} {
+  if (page.slots.length === 0) {
+    return { topPct: MARGIN_V, bottomPct: MARGIN_V };
+  }
+  const topPct = Math.min(...page.slots.map((s) => s.y));
+  const bottomPct = 100 - Math.max(...page.slots.map((s) => s.y + s.height));
+  return { topPct, bottomPct };
+}
+
 /** Get the slot positions for a variant (for thumbnail previews) */
 export function getVariantPreview(key: string): SlotPosition[] {
   const variant = VARIANT_MAP.get(key);

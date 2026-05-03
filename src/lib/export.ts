@@ -2,7 +2,7 @@ import { jsPDF } from "jspdf";
 import JSZip from "jszip";
 import type { BookPage, Photo } from "./types";
 import { A5_WIDTH_MM, A5_HEIGHT_MM } from "./types";
-import { MARGIN_V } from "./layouts";
+import { getCaptionZones } from "./layouts";
 import { getPhotoBlob } from "./db";
 
 function getNunitoFont(): string {
@@ -148,11 +148,14 @@ export async function renderPageToCanvas(
     }
   }
 
-  // Draw captions — vertically centered within the top/bottom margin band
-  // so they sit calmly in the empty space rather than crowding the page edge.
+  // Draw captions — vertically centered within the actual empty band between
+  // the page edge and the nearest photo, so they stay centered when the user
+  // adds extra padding (or on the back cover with its larger inset).
   const captionFontSize = Math.round(height * 0.016);
-  const captionZoneCenterTop = (height * MARGIN_V) / 100 / 2;
-  const captionZoneCenterBottom = height - (height * MARGIN_V) / 100 / 2;
+  const captionZones = getCaptionZones(page);
+  const captionZoneCenterTop = (height * captionZones.topPct) / 100 / 2;
+  const captionZoneCenterBottom =
+    height - (height * captionZones.bottomPct) / 100 / 2;
 
   if (page.topCaption) {
     ctx.fillStyle = "#555555";

@@ -5,7 +5,7 @@ import { Stage, Layer, Rect, Image as KonvaImage, Text, Group, Transformer } fro
 import Konva from "konva";
 import type { BookPage, PhotoSlot, TextBlock } from "@/lib/types";
 import { A5_ASPECT } from "@/lib/types";
-import { MARGIN_V } from "@/lib/layouts";
+import { getCaptionZones } from "@/lib/layouts";
 import { useBook } from "@/context/BookContext";
 import { getCachedImage, getCachedUrl, loadImageCached } from "@/lib/imageCache";
 
@@ -387,7 +387,9 @@ export default function PageCanvas({
   const urls = photoUrlsProp ?? thumbnailUrls;
 
   const captionFontSize = pageHeight * 0.016;
-  const captionZoneHeight = pageHeight * (MARGIN_V / 100);
+  const captionZones = getCaptionZones(page);
+  const topCaptionZoneHeight = pageHeight * (captionZones.topPct / 100);
+  const bottomCaptionZoneHeight = pageHeight * (captionZones.bottomPct / 100);
 
   return (
     <>
@@ -416,7 +418,7 @@ export default function PageCanvas({
       <CaptionText
         text={page.topCaption}
         zoneY={0}
-        zoneHeight={captionZoneHeight}
+        zoneHeight={topCaptionZoneHeight}
         pageWidth={pageWidth}
         fontSize={captionFontSize}
         isEditing={editingCaption === "top"}
@@ -426,8 +428,8 @@ export default function PageCanvas({
       ) : (
         <CaptionText
           text={page.bottomCaption}
-          zoneY={pageHeight - captionZoneHeight}
-          zoneHeight={captionZoneHeight}
+          zoneY={pageHeight - bottomCaptionZoneHeight}
+          zoneHeight={bottomCaptionZoneHeight}
           pageWidth={pageWidth}
           fontSize={captionFontSize}
           isEditing={editingCaption === "bottom"}
