@@ -150,13 +150,13 @@ export async function renderPageToCanvas(
 
   // Draw captions — vertically centered within the top/bottom margin band
   // so they sit calmly in the empty space rather than crowding the page edge.
-  const captionFontSize = Math.round(height * 0.018);
+  const captionFontSize = Math.round(height * 0.016);
   const captionZoneCenterTop = (height * MARGIN_V) / 100 / 2;
   const captionZoneCenterBottom = height - (height * MARGIN_V) / 100 / 2;
 
   if (page.topCaption) {
     ctx.fillStyle = "#555555";
-    ctx.font = `bold ${captionFontSize}px ${getNunitoFont()}, sans-serif`;
+    ctx.font = `${captionFontSize}px ${getNunitoFont()}, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(page.topCaption, width / 2, captionZoneCenterTop);
@@ -192,7 +192,7 @@ export async function renderPageToCanvas(
     }
   } else if (page.bottomCaption) {
     ctx.fillStyle = "#555555";
-    ctx.font = `bold ${captionFontSize}px ${getNunitoFont()}, sans-serif`;
+    ctx.font = `${captionFontSize}px ${getNunitoFont()}, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(page.bottomCaption, width / 2, captionZoneCenterBottom);

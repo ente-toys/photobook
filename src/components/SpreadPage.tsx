@@ -289,7 +289,7 @@ export default function SpreadPage({
   const hasBottomSpace =
     page.slots.length === 0 || page.slots.every((s) => s.y + s.height < 100);
 
-  const captionFontSize = Math.round(pageHeight * 0.018);
+  const captionFontSize = Math.round(pageHeight * 0.016);
   // Caption zone matches the page's vertical margin so the caption sits
   // visually centered in the empty band between the page edge and the photo.
   const captionZoneHeight = pageHeight * (MARGIN_V / 100);
@@ -737,7 +737,7 @@ export default function SpreadPage({
                 background: "white",
                 fontFamily: "var(--font-nunito), sans-serif",
                 fontSize: captionFontSize,
-                fontWeight: 700,
+                fontWeight: 400,
                 color: "#555555",
                 textAlign: "center" as const,
                 padding: 0,
@@ -771,7 +771,7 @@ export default function SpreadPage({
                   style={{
                     fontFamily: "var(--font-nunito), sans-serif",
                     fontSize: captionFontSize,
-                    fontWeight: 700,
+                    fontWeight: 400,
                     color: "#aaa",
                     pointerEvents: "none",
                   }}
@@ -805,7 +805,7 @@ export default function SpreadPage({
                 background: "white",
                 fontFamily: "var(--font-nunito), sans-serif",
                 fontSize: captionFontSize,
-                fontWeight: 700,
+                fontWeight: 400,
                 color: "#555555",
                 textAlign: "center" as const,
                 padding: 0,
@@ -839,7 +839,7 @@ export default function SpreadPage({
                   style={{
                     fontFamily: "var(--font-nunito), sans-serif",
                     fontSize: captionFontSize,
-                    fontWeight: 700,
+                    fontWeight: 400,
                     color: "#aaa",
                     pointerEvents: "none",
                   }}

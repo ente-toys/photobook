@@ -5,12 +5,12 @@ import type { BookPage, Photo, PhotoSlot } from "./types";
 // long edges get extra room — both for breathing room and so photos remain
 // fully visible when flipping a printed copy past the spine.
 // On A5 portrait (148×210mm) these resolve to ~14.8mm horizontal and
-// ~14.7mm vertical, giving roughly equal absolute padding on all sides.
+// ~16.8mm vertical.
 export const MARGIN_H = 10;
-export const MARGIN_V = 7;
+export const MARGIN_V = 8;
 // Separate horizontal/vertical gaps to produce equal absolute spacing on A5 portrait pages
-const H_GAP = 1.28; // horizontal gap (% of page width)
-const V_GAP = 0.9; // vertical gap (% of page height)
+const H_GAP = 0.64; // horizontal gap (% of page width)
+const V_GAP = 0.45; // vertical gap (% of page height)
 
 type Orientation = "landscape" | "portrait" | "square";
 

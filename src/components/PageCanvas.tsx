@@ -358,7 +358,6 @@ function CaptionText({
       text={text}
       fontSize={fontSize}
       fontFamily={getNunitoFont()}
-      fontStyle="bold"
       fill="#555555"
       align="center"
       verticalAlign="middle"
@@ -387,7 +386,7 @@ export default function PageCanvas({
   const { thumbnailUrls } = useBook();
   const urls = photoUrlsProp ?? thumbnailUrls;
 
-  const captionFontSize = pageHeight * 0.018;
+  const captionFontSize = pageHeight * 0.016;
   const captionZoneHeight = pageHeight * (MARGIN_V / 100);
 
   return (
