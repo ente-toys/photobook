@@ -332,16 +332,14 @@ export default function SpreadPage({
   }, [editingCaption]);
 
   const isBackCover = pageIndex === totalPages - 1;
-  const isFrontCover = pageIndex === 0;
   const isInterior = pageIndex > 0 && !isBackCover;
   const isDragTarget = pageDragTarget === pageIndex && pageDragSource !== null;
   const isDragSource = pageDragSource === pageIndex;
   const photoCount = page.slots.filter((s) => s.photoId !== null).length;
-  // Covers have canonical single-photo layouts (full-bleed on the front,
-  // inset above the branding on the back) — hide the layout picker in that
-  // case since there's nothing meaningful to choose.
-  const hideLayoutPicker =
-    (isFrontCover || isBackCover) && photoCount === 1;
+  // The back cover sits above the Ente branding strip — its layout is
+  // canonical, so hide the picker. The front cover defaults to full-bleed
+  // but the user is free to pick a different single-photo layout.
+  const hideLayoutPicker = isBackCover && photoCount === 1;
   const hasSelectedSlotOnPage =
     selectedPageId === page.id && selectedSlotId !== null;
 
