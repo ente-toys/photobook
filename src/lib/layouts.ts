@@ -552,7 +552,7 @@ export function applyVariant(
 // ── Legacy layout selection (orientation-based auto-pick) ─────────
 
 function layout1(photos: Photo[]): PhotoSlot[] {
-  return gen1Moderate([photos[0].id]);
+  return gen1Padded([photos[0].id]);
 }
 
 function layout2Stacked(photos: Photo[]): PhotoSlot[] {
@@ -582,7 +582,7 @@ function layout4TopOneBotThree(photos: Photo[]): PhotoSlot[] {
 /** Pick the best layout variant key for a set of photos (orientation-based). */
 export function chooseBestVariantKey(photos: Photo[]): string {
   const count = photos.length;
-  if (count <= 1) return "1-moderate";
+  if (count <= 1) return "1-padded";
 
   if (count === 2) {
     const o0 = getOrientation(photos[0]);
@@ -604,7 +604,7 @@ export function chooseBestVariantKey(photos: Photo[]): string {
 
 /** Default variant key for a given photo count (used as a fallback). */
 export function defaultVariantKeyForCount(count: number): string {
-  if (count <= 1) return "1-moderate";
+  if (count <= 1) return "1-padded";
   if (count === 2) return "2-side";
   if (count === 3) return "3-left1-right2";
   return "4-grid";
