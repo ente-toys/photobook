@@ -289,7 +289,11 @@ export default function SpreadPage({
   const hasBottomSpace =
     page.slots.length === 0 || page.slots.every((s) => s.y + s.height < 100);
 
-  const captionFontSize = Math.round(pageHeight * 0.016);
+  const isBackCover = pageIndex === totalPages - 1;
+  const isFrontCover = pageIndex === 0;
+
+  // Front-cover captions act as a title — much larger than interior captions.
+  const captionFontSize = Math.round(pageHeight * (isFrontCover ? 0.05 : 0.016));
   // Caption zones span the actual empty band between the page edge and the
   // nearest photo, so captions stay centered even when the user adds extra
   // vertical padding (or on the back cover with its larger inset).
@@ -331,7 +335,6 @@ export default function SpreadPage({
     }
   }, [editingCaption]);
 
-  const isBackCover = pageIndex === totalPages - 1;
   const isInterior = pageIndex > 0 && !isBackCover;
   const isDragTarget = pageDragTarget === pageIndex && pageDragSource !== null;
   const isDragSource = pageDragSource === pageIndex;
@@ -370,6 +373,7 @@ export default function SpreadPage({
               photoUrls={photoUrls}
               isInteractive
               isBackCover={isBackCover}
+              isFrontCover={isFrontCover}
               selectedSlotId={
                 selectedPageId === page.id ? selectedSlotId : null
               }
@@ -743,7 +747,7 @@ export default function SpreadPage({
                 fontFamily: "var(--font-nunito), sans-serif",
                 fontSize: captionFontSize,
                 fontWeight: 400,
-                color: "#555555",
+                color: "#2a2a2a",
                 textAlign: "center" as const,
                 padding: 0,
                 borderRadius: 2,
@@ -811,7 +815,7 @@ export default function SpreadPage({
                 fontFamily: "var(--font-nunito), sans-serif",
                 fontSize: captionFontSize,
                 fontWeight: 400,
-                color: "#555555",
+                color: "#2a2a2a",
                 textAlign: "center" as const,
                 padding: 0,
                 borderRadius: 2,

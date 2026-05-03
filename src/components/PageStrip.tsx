@@ -190,6 +190,8 @@ export default function PageStrip({
                               page={leftPage}
                               pageWidth={THUMB_PAGE_W}
                               pageHeight={THUMB_PAGE_H}
+                              isFrontCover={spread.left === 0}
+                              isBackCover={spread.left === pages.length - 1}
                             />
                           </Layer>
                         </Stage>
@@ -219,6 +221,8 @@ export default function PageStrip({
                               page={rightPage}
                               pageWidth={THUMB_PAGE_W}
                               pageHeight={THUMB_PAGE_H}
+                              isFrontCover={spread.right === 0}
+                              isBackCover={spread.right === pages.length - 1}
                             />
                           </Layer>
                         </Stage>

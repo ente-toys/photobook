@@ -238,6 +238,7 @@ const BookViewer = forwardRef<BookViewerHandle, BookViewerProps>(
               pageHeight={pageHeight}
               photoUrls={photoUrls}
               isBackCover={i === pages.length - 1}
+              isFrontCover={i === 0}
             />
           ))}
         </Box>
@@ -254,12 +255,14 @@ function PageElement({
   pageHeight,
   photoUrls,
   isBackCover,
+  isFrontCover,
 }: {
   page: BookPage;
   pageWidth: number;
   pageHeight: number;
   photoUrls?: Map<string, string>;
   isBackCover: boolean;
+  isFrontCover: boolean;
 }) {
   return (
     <div
@@ -279,6 +282,7 @@ function PageElement({
             pageWidth={pageWidth}
             pageHeight={pageHeight}
             isBackCover={isBackCover}
+            isFrontCover={isFrontCover}
           />
         </Layer>
       </Stage>

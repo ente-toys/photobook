@@ -93,7 +93,8 @@ export async function renderPageToCanvas(
   resolvePhotoUrl: (photoId: string) => Promise<string | null>,
   width: number,
   height: number,
-  isBackCover = false
+  isBackCover = false,
+  isFrontCover = false
 ): Promise<HTMLCanvasElement> {
   const canvas = document.createElement("canvas");
   canvas.width = width;
@@ -151,14 +152,15 @@ export async function renderPageToCanvas(
   // Draw captions — vertically centered within the actual empty band between
   // the page edge and the nearest photo, so they stay centered when the user
   // adds extra padding (or on the back cover with its larger inset).
-  const captionFontSize = Math.round(height * 0.016);
+  // Front-cover captions act as a title — much larger than interior captions.
+  const captionFontSize = Math.round(height * (isFrontCover ? 0.05 : 0.016));
   const captionZones = getCaptionZones(page);
   const captionZoneCenterTop = (height * captionZones.topPct) / 100 / 2;
   const captionZoneCenterBottom =
     height - (height * captionZones.bottomPct) / 100 / 2;
 
   if (page.topCaption) {
-    ctx.fillStyle = "#555555";
+    ctx.fillStyle = "#2a2a2a";
     ctx.font = `${captionFontSize}px ${getNunitoFont()}, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -194,7 +196,7 @@ export async function renderPageToCanvas(
       console.warn("Failed to draw ente branding:", e);
     }
   } else if (page.bottomCaption) {
-    ctx.fillStyle = "#555555";
+    ctx.fillStyle = "#2a2a2a";
     ctx.font = `${captionFontSize}px ${getNunitoFont()}, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -259,7 +261,8 @@ export async function exportPdfA5(
         resolver.resolve,
         A5_WIDTH_PX,
         A5_HEIGHT_PX,
-        i === pages.length - 1
+        i === pages.length - 1,
+        i === 0
       );
       const imgData = canvas.toDataURL("image/jpeg", 0.95);
       pdf.addImage(imgData, "JPEG", 0, 0, A5_WIDTH_MM, A5_HEIGHT_MM);
@@ -308,7 +311,8 @@ export async function exportPdfA4Spreads(
           resolver.resolve,
           A5_WIDTH_PX,
           A5_HEIGHT_PX,
-          leftIdx === pages.length - 1
+          leftIdx === pages.length - 1,
+          leftIdx === 0
         );
         const imgData = canvas.toDataURL("image/jpeg", 0.95);
         pdf.addImage(imgData, "JPEG", 0, 0, A5_WIDTH_MM, A5_HEIGHT_MM);
@@ -321,7 +325,8 @@ export async function exportPdfA4Spreads(
           resolver.resolve,
           A5_WIDTH_PX,
           A5_HEIGHT_PX,
-          rightIdx === pages.length - 1
+          rightIdx === pages.length - 1,
+          rightIdx === 0
         );
         const imgData = canvas.toDataURL("image/jpeg", 0.95);
         pdf.addImage(
@@ -358,7 +363,8 @@ export async function exportPngZip(
         resolver.resolve,
         A5_WIDTH_PX,
         A5_HEIGHT_PX,
-        i === pages.length - 1
+        i === pages.length - 1,
+        i === 0
       );
 
       const blob = await new Promise<Blob>((resolve) =>
@@ -409,7 +415,8 @@ export async function exportPngA4Zip(
           resolver.resolve,
           A5_WIDTH_PX,
           A5_HEIGHT_PX,
-          leftIdx === pages.length - 1
+          leftIdx === pages.length - 1,
+          leftIdx === 0
         );
         ctx.drawImage(pageCanvas, 0, 0);
       }
@@ -421,7 +428,8 @@ export async function exportPngA4Zip(
           resolver.resolve,
           A5_WIDTH_PX,
           A5_HEIGHT_PX,
-          rightIdx === pages.length - 1
+          rightIdx === pages.length - 1,
+          rightIdx === 0
         );
         ctx.drawImage(pageCanvas, A5_WIDTH_PX, 0);
       }

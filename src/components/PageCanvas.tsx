@@ -25,6 +25,7 @@ interface PageCanvasProps {
   pageHeight: number;
   isInteractive?: boolean;
   isBackCover?: boolean;
+  isFrontCover?: boolean;
   /** Override the URL map used for photo slots. When omitted, falls back to
    *  thumbnailUrls (256px) from BookContext — appropriate for PageStrip.
    *  SpreadPage / BookViewer pass photoUrls (which prefers 1080px previews). */
@@ -358,7 +359,7 @@ function CaptionText({
       text={text}
       fontSize={fontSize}
       fontFamily={getNunitoFont()}
-      fill="#555555"
+      fill="#2a2a2a"
       align="center"
       verticalAlign="middle"
     />
@@ -371,6 +372,7 @@ export default function PageCanvas({
   pageHeight,
   isInteractive = false,
   isBackCover = false,
+  isFrontCover = false,
   selectedSlotId,
   selectedTextId,
   dragOverSlotId,
@@ -386,7 +388,8 @@ export default function PageCanvas({
   const { thumbnailUrls } = useBook();
   const urls = photoUrlsProp ?? thumbnailUrls;
 
-  const captionFontSize = pageHeight * 0.016;
+  // Front-cover captions act as a title — much larger than interior captions.
+  const captionFontSize = pageHeight * (isFrontCover ? 0.05 : 0.016);
   const captionZones = getCaptionZones(page);
   const topCaptionZoneHeight = pageHeight * (captionZones.topPct / 100);
   const bottomCaptionZoneHeight = pageHeight * (captionZones.bottomPct / 100);
