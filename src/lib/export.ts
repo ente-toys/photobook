@@ -159,7 +159,10 @@ export async function renderPageToCanvas(
   const captionZoneCenterBottom =
     height - (height * captionZones.bottomPct) / 100 / 2;
 
-  if (page.topCaption) {
+  // Skip stale captions when the photo edge touches the page (full-bleed) —
+  // there's no band to center the caption in, and rendering it would spill
+  // half off the page.
+  if (page.topCaption && captionZones.topPct > 0) {
     ctx.fillStyle = "#2a2a2a";
     ctx.font = `${captionFontSize}px ${getNunitoFont()}, sans-serif`;
     ctx.textAlign = "center";
@@ -195,7 +198,7 @@ export async function renderPageToCanvas(
     } catch (e) {
       console.warn("Failed to draw ente branding:", e);
     }
-  } else if (page.bottomCaption) {
+  } else if (page.bottomCaption && captionZones.bottomPct > 0) {
     ctx.fillStyle = "#2a2a2a";
     ctx.font = `${captionFontSize}px ${getNunitoFont()}, sans-serif`;
     ctx.textAlign = "center";

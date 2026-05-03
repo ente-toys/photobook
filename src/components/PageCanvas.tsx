@@ -350,6 +350,9 @@ function CaptionText({
   // Hide rendered text while editing (HTML overlay replaces it)
   if (isEditing) return null;
   if (!text) return null;
+  // No room for the caption (e.g. a full-bleed photo touches the page edge).
+  // Stale captions from a previous layout would otherwise spill off the page.
+  if (zoneHeight <= 0) return null;
   return (
     <Text
       x={0}
