@@ -2,6 +2,7 @@ import { jsPDF } from "jspdf";
 import JSZip from "jszip";
 import type { BookPage, Photo } from "./types";
 import { A5_WIDTH_MM, A5_HEIGHT_MM } from "./types";
+import { MARGIN_V } from "./layouts";
 import { getPhotoBlob } from "./db";
 
 function getNunitoFont(): string {
@@ -147,12 +148,19 @@ export async function renderPageToCanvas(
     }
   }
 
-  // Draw captions
+  // Draw captions — vertically centered within the top/bottom margin band
+  // so they sit calmly in the empty space rather than crowding the page edge.
+  const captionFontSize = Math.round(height * 0.018);
+  const captionZoneCenterTop = (height * MARGIN_V) / 100 / 2;
+  const captionZoneCenterBottom = height - (height * MARGIN_V) / 100 / 2;
+
   if (page.topCaption) {
     ctx.fillStyle = "#555555";
-    ctx.font = `bold ${Math.round(height * 0.025)}px ${getNunitoFont()}, sans-serif`;
+    ctx.font = `bold ${captionFontSize}px ${getNunitoFont()}, sans-serif`;
     ctx.textAlign = "center";
-    ctx.fillText(page.topCaption, width / 2, height * 0.04);
+    ctx.textBaseline = "middle";
+    ctx.fillText(page.topCaption, width / 2, captionZoneCenterTop);
+    ctx.textBaseline = "alphabetic";
   }
 
   if (isBackCover) {
@@ -184,10 +192,10 @@ export async function renderPageToCanvas(
     }
   } else if (page.bottomCaption) {
     ctx.fillStyle = "#555555";
-    ctx.font = `bold ${Math.round(height * 0.025)}px ${getNunitoFont()}, sans-serif`;
+    ctx.font = `bold ${captionFontSize}px ${getNunitoFont()}, sans-serif`;
     ctx.textAlign = "center";
-    ctx.textBaseline = "bottom";
-    ctx.fillText(page.bottomCaption, width / 2, height * 0.98);
+    ctx.textBaseline = "middle";
+    ctx.fillText(page.bottomCaption, width / 2, captionZoneCenterBottom);
     ctx.textBaseline = "alphabetic";
   }
 

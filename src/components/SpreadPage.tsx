@@ -9,6 +9,7 @@ import PageCanvas from "./PageCanvas";
 import LayoutPicker from "./LayoutPicker";
 import TextToolbar from "./TextToolbar";
 import type { BookPage, TextBlock } from "@/lib/types";
+import { MARGIN_V } from "@/lib/layouts";
 import type { CaptionPosition } from "./PageCanvas";
 import type { DragInfo } from "@/hooks/usePhotoDrag";
 
@@ -288,8 +289,15 @@ export default function SpreadPage({
   const hasBottomSpace =
     page.slots.length === 0 || page.slots.every((s) => s.y + s.height < 100);
 
-  const captionFontSize = Math.round(pageHeight * 0.025);
-  const captionZoneHeight = pageHeight * 0.055;
+  const captionFontSize = Math.round(pageHeight * 0.018);
+  // Caption zone matches the page's vertical margin so the caption sits
+  // visually centered in the empty band between the page edge and the photo.
+  const captionZoneHeight = pageHeight * (MARGIN_V / 100);
+  const captionInputHeight = captionFontSize * 1.6;
+  const captionInputOffset = Math.max(
+    0,
+    (captionZoneHeight - captionInputHeight) / 2
+  );
 
   const handleCaptionClick = (position: CaptionPosition) => {
     const val = position === "top" ? page.topCaption : page.bottomCaption;
@@ -719,10 +727,10 @@ export default function SpreadPage({
               }}
               style={{
                 position: "absolute",
-                top: pageHeight * 0.01,
+                top: captionInputOffset,
                 left: pageWidth * 0.05,
                 width: pageWidth * 0.9,
-                height: captionFontSize * 1.6,
+                height: captionInputHeight,
                 zIndex: 5,
                 border: "none",
                 outline: "none",
@@ -787,10 +795,10 @@ export default function SpreadPage({
               }}
               style={{
                 position: "absolute",
-                bottom: pageHeight * 0.01,
+                bottom: captionInputOffset,
                 left: pageWidth * 0.05,
                 width: pageWidth * 0.9,
-                height: captionFontSize * 1.6,
+                height: captionInputHeight,
                 zIndex: 5,
                 border: "none",
                 outline: "none",

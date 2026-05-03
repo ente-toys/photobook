@@ -1,8 +1,13 @@
 import { v4 as uuid } from "uuid";
 import type { BookPage, Photo, PhotoSlot } from "./types";
 
-// Margin as percentage of page
-const MARGIN = 6;
+// Outer-edge margins as percentage of page. Horizontal is larger so the
+// long edges get extra room — both for breathing room and so photos remain
+// fully visible when flipping a printed copy past the spine.
+// On A5 portrait (148×210mm) these resolve to ~14.8mm horizontal and
+// ~14.7mm vertical, giving roughly equal absolute padding on all sides.
+export const MARGIN_H = 10;
+export const MARGIN_V = 7;
 // Separate horizontal/vertical gaps to produce equal absolute spacing on A5 portrait pages
 const H_GAP = 1.28; // horizontal gap (% of page width)
 const V_GAP = 0.9; // vertical gap (% of page height)
@@ -37,10 +42,10 @@ function makeSlot(
 }
 
 // Content area boundaries for standard margin
-const LEFT = MARGIN;
-const TOP = MARGIN;
-const RIGHT = 100 - MARGIN;
-const BOTTOM = 100 - MARGIN;
+const LEFT = MARGIN_H;
+const TOP = MARGIN_V;
+const RIGHT = 100 - MARGIN_H;
+const BOTTOM = 100 - MARGIN_V;
 const CW = RIGHT - LEFT;
 const CH = BOTTOM - TOP;
 
@@ -60,8 +65,8 @@ export interface SlotPosition {
   height: number;
 }
 
-function contentArea(margin: number) {
-  const l = margin, t = margin, r = 100 - margin, b = 100 - margin;
+function contentArea(marginH: number, marginV: number = marginH) {
+  const l = marginH, t = marginV, r = 100 - marginH, b = 100 - marginV;
   return { l, t, cw: r - l, ch: b - t };
 }
 
@@ -498,13 +503,13 @@ export function applyPadding(
   if (extraH === 0 && extraV === 0) return slots;
 
   // Scale from the default content area into a smaller one
-  const oldL = MARGIN, oldT = MARGIN;
-  const oldW = 100 - 2 * MARGIN;
-  const oldH = 100 - 2 * MARGIN;
-  const newL = MARGIN + extraH;
-  const newT = MARGIN + extraV;
-  const newW = 100 - 2 * (MARGIN + extraH);
-  const newH = 100 - 2 * (MARGIN + extraV);
+  const oldL = MARGIN_H, oldT = MARGIN_V;
+  const oldW = 100 - 2 * MARGIN_H;
+  const oldH = 100 - 2 * MARGIN_V;
+  const newL = MARGIN_H + extraH;
+  const newT = MARGIN_V + extraV;
+  const newW = 100 - 2 * (MARGIN_H + extraH);
+  const newH = 100 - 2 * (MARGIN_V + extraV);
 
   return slots.map((s) => ({
     ...s,

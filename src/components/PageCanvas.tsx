@@ -5,6 +5,7 @@ import { Stage, Layer, Rect, Image as KonvaImage, Text, Group, Transformer } fro
 import Konva from "konva";
 import type { BookPage, PhotoSlot, TextBlock } from "@/lib/types";
 import { A5_ASPECT } from "@/lib/types";
+import { MARGIN_V } from "@/lib/layouts";
 import { useBook } from "@/context/BookContext";
 import { getCachedImage, getCachedUrl, loadImageCached } from "@/lib/imageCache";
 
@@ -330,48 +331,37 @@ function EnteBranding({
 
 function CaptionText({
   text,
-  y,
+  zoneY,
+  zoneHeight,
   pageWidth,
-  pageHeight,
   fontSize,
   isEditing,
-  anchor = "top",
 }: {
   text: string;
-  y: number;
+  /** Top of the caption zone (the page-edge margin band). */
+  zoneY: number;
+  /** Height of the caption zone — caption is vertically centered within. */
+  zoneHeight: number;
   pageWidth: number;
-  pageHeight: number;
   fontSize: number;
   isEditing?: boolean;
-  anchor?: "top" | "bottom";
 }) {
-  const textRef = React.useRef<any>(null);
-  const [adjustedY, setAdjustedY] = React.useState(y);
-
-  React.useEffect(() => {
-    if (anchor === "bottom" && textRef.current) {
-      const textHeight = textRef.current.height();
-      setAdjustedY(y - textHeight);
-    } else {
-      setAdjustedY(y);
-    }
-  }, [text, y, anchor, fontSize, pageWidth]);
-
   // Hide rendered text while editing (HTML overlay replaces it)
   if (isEditing) return null;
   if (!text) return null;
   return (
     <Text
-      ref={textRef}
       x={0}
-      y={adjustedY}
+      y={zoneY}
       width={pageWidth}
+      height={zoneHeight}
       text={text}
       fontSize={fontSize}
       fontFamily={getNunitoFont()}
       fontStyle="bold"
       fill="#555555"
       align="center"
+      verticalAlign="middle"
     />
   );
 }
@@ -397,7 +387,8 @@ export default function PageCanvas({
   const { thumbnailUrls } = useBook();
   const urls = photoUrlsProp ?? thumbnailUrls;
 
-  const captionFontSize = pageHeight * 0.025;
+  const captionFontSize = pageHeight * 0.018;
+  const captionZoneHeight = pageHeight * (MARGIN_V / 100);
 
   return (
     <>
@@ -421,12 +412,13 @@ export default function PageCanvas({
         />
       ))}
 
-      {/* Captions */}
+      {/* Captions — centered within the top/bottom margin zones so they sit
+          calmly in the empty band rather than crowding the page edge. */}
       <CaptionText
         text={page.topCaption}
-        y={pageHeight * 0.02}
+        zoneY={0}
+        zoneHeight={captionZoneHeight}
         pageWidth={pageWidth}
-        pageHeight={pageHeight}
         fontSize={captionFontSize}
         isEditing={editingCaption === "top"}
       />
@@ -435,12 +427,11 @@ export default function PageCanvas({
       ) : (
         <CaptionText
           text={page.bottomCaption}
-          y={pageHeight * 0.98}
+          zoneY={pageHeight - captionZoneHeight}
+          zoneHeight={captionZoneHeight}
           pageWidth={pageWidth}
-          pageHeight={pageHeight}
           fontSize={captionFontSize}
           isEditing={editingCaption === "bottom"}
-          anchor="bottom"
         />
       )}
 
