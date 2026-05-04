@@ -10,6 +10,7 @@ import React, {
 import {
   Box,
   Button,
+  ButtonGroup,
   Typography,
   IconButton,
   CircularProgress,
@@ -23,6 +24,7 @@ import {
 } from "@mui/material";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import EditIcon from "@mui/icons-material/Edit";
 import DownloadIcon from "@mui/icons-material/Download";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
@@ -30,23 +32,24 @@ import FolderZipIcon from "@mui/icons-material/FolderZip";
 import { useBook } from "@/context/BookContext";
 import BookViewer, { type BookViewerHandle } from "./BookViewer";
 import {
-  exportPdfA5,
-  exportPdfA4Spreads,
+  exportPdfX4A5,
+  exportPdfX4A4Spreads,
   exportPngZip,
   exportPngA4Zip,
   downloadBlob,
 } from "@/lib/export";
 
+type ExportType = "pdf-a5" | "pdf-a4" | "png-zip" | "png-a4-zip";
+
 export default function ResultsPage() {
-  const { book, photos, setAppView, waitForEnteOriginals } =
-    useBook();
+  const { book, photos, setAppView, waitForEnteOriginals } = useBook();
   const viewerRef = useRef<BookViewerHandle>(null);
   // pageIndex is the 0-based page-flip index of the current left-most visible page
   const [pageIndex, setPageIndex] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [downloadAnchor, setDownloadAnchor] = useState<null | HTMLElement>(
-    null
+    null,
   );
   const [exportError, setExportError] = useState<string | null>(null);
   const [waitingForOriginals, setWaitingForOriginals] = useState(false);
@@ -132,7 +135,7 @@ export default function ResultsPage() {
   }, [isAtStart, isAtEnd, downloadAnchor]);
 
   const handleExport = useCallback(
-    async (type: "pdf-a5" | "pdf-a4" | "png-zip" | "png-a4-zip") => {
+    async (type: ExportType) => {
       setDownloadAnchor(null);
 
       const initiallyBlocked = getBlockedEntePhotos();
@@ -174,15 +177,12 @@ export default function ResultsPage() {
 
         switch (type) {
           case "pdf-a5":
-            blob = await exportPdfA5(pages, setExportProgress);
-            filename = "photobook-A5.pdf";
+            blob = await exportPdfX4A5(pages, setExportProgress);
+            filename = "photobook-A5-PDFX4-FOGRA39.pdf";
             break;
           case "pdf-a4":
-            blob = await exportPdfA4Spreads(
-              pages,
-              setExportProgress
-            );
-            filename = "photobook-A4-spreads.pdf";
+            blob = await exportPdfX4A4Spreads(pages, setExportProgress);
+            filename = "photobook-A4-spreads-PDFX4-FOGRA39.pdf";
             break;
           case "png-zip":
             blob = await exportPngZip(pages, setExportProgress);
@@ -202,7 +202,7 @@ export default function ResultsPage() {
         setExporting(false);
       }
     },
-    [getBlockedEntePhotos, pages, waitForEnteOriginals]
+    [getBlockedEntePhotos, pages, waitForEnteOriginals],
   );
 
   return (
@@ -329,7 +329,9 @@ export default function ResultsPage() {
             </Typography>
             {pageIndex > 0 && pageIndex < totalPages - 1 && (
               <>
-                <Typography sx={{ color: "rgba(255,255,255,0.2)" }}>/</Typography>
+                <Typography sx={{ color: "rgba(255,255,255,0.2)" }}>
+                  /
+                </Typography>
                 <Typography
                   sx={{
                     color: "rgba(255,255,255,0.6)",
@@ -360,32 +362,65 @@ export default function ResultsPage() {
               Edit photobook
             </Button>
 
-            <Button
+            <ButtonGroup
               variant="contained"
-              startIcon={
-                exporting ? (
-                  <CircularProgress size={18} sx={{ color: "white" }} />
-                ) : (
-                  <DownloadIcon />
-                )
-              }
-              disabled={exporting}
-              onClick={(e) => setDownloadAnchor(e.currentTarget)}
               sx={{
-                background:
-                  "linear-gradient(135deg, #006E0F 0%, #08C225 100%)",
-                fontWeight: 700,
-                fontSize: "0.85rem",
-                px: 4,
-                py: 1.5,
-                "&:hover": {
-                  background:
-                    "linear-gradient(135deg, #005C0D 0%, #07A820 100%)",
+                borderRadius: 999,
+                background: "linear-gradient(135deg, #006E0F 0%, #08C225 100%)",
+                boxShadow: "none",
+                overflow: "hidden",
+                "& .MuiButtonGroup-grouped": {
+                  borderColor: "rgba(255,255,255,0.16)",
+                  borderRadius: 0,
+                  minWidth: 0,
+                },
+                "& .MuiButton-root": {
+                  background: "transparent",
+                  fontWeight: 700,
+                  boxShadow: "none",
+                  "&:hover": {
+                    background: "rgba(0,0,0,0.08)",
+                    boxShadow: "none",
+                  },
+                  "&.Mui-disabled": {
+                    color: "rgba(255,255,255,0.7)",
+                    background: "transparent",
+                    opacity: 0.65,
+                  },
                 },
               }}
             >
-              {exporting ? `Exporting ${exportProgress}%` : "Download"}
-            </Button>
+              <Button
+                startIcon={
+                  exporting ? (
+                    <CircularProgress size={18} sx={{ color: "white" }} />
+                  ) : (
+                    <DownloadIcon />
+                  )
+                }
+                disabled={exporting}
+                onClick={() => handleExport("pdf-a5")}
+                sx={{
+                  px: 4,
+                  py: 1.5,
+                  fontSize: "1rem",
+                  lineHeight: 1.25,
+                }}
+              >
+                {exporting ? `Exporting ${exportProgress}%` : "Download"}
+              </Button>
+              <Button
+                aria-label="Choose download format"
+                disabled={exporting}
+                onClick={(e) => setDownloadAnchor(e.currentTarget)}
+                sx={{
+                  px: 1.25,
+                  py: 1.5,
+                }}
+              >
+                <ArrowDropDownIcon />
+              </Button>
+            </ButtonGroup>
 
             <Menu
               anchorEl={downloadAnchor}
@@ -402,7 +437,7 @@ export default function ResultsPage() {
                     borderRadius: 3,
                     boxShadow: "0 16px 48px rgba(0,0,0,0.4)",
                     p: 1,
-                    minWidth: 260,
+                    minWidth: 300,
                     mb: 1,
                   },
                 },
@@ -411,16 +446,16 @@ export default function ResultsPage() {
               {[
                 {
                   type: "pdf-a5" as const,
-                  label: "PDF",
+                  label: "Print-ready PDF",
                   detail: "A5 pages",
-                  desc: "One page per PDF page",
+                  desc: "PDF/X-4, FOGRA39 CMYK",
                   icon: <PictureAsPdfIcon sx={{ fontSize: 20 }} />,
                 },
                 {
                   type: "pdf-a4" as const,
-                  label: "PDF",
+                  label: "Print-ready PDF",
                   detail: "A4 spreads",
-                  desc: "Two pages per PDF page",
+                  desc: "PDF/X-4, FOGRA39 CMYK",
                   icon: <PictureAsPdfIcon sx={{ fontSize: 20 }} />,
                 },
                 {
@@ -486,7 +521,8 @@ export default function ResultsPage() {
                           ml: 0.75,
                         }}
                       >
-                        — {opt.detail}
+                        {" - "}
+                        {opt.detail}
                       </Typography>
                     </Typography>
                     <Typography
@@ -542,8 +578,8 @@ export default function ResultsPage() {
               mb: 2.5,
             }}
           >
-            We need the full-resolution photos before we can
-            build a print-ready file.
+            We need the full-resolution photos before we can build a print-ready
+            file.
           </Typography>
           <LinearProgress
             variant="determinate"
@@ -558,8 +594,7 @@ export default function ResultsPage() {
               mb: 1,
               bgcolor: "#e8e8e8",
               "& .MuiLinearProgress-bar": {
-                background:
-                  "linear-gradient(135deg, #006E0F 0%, #08C225 100%)",
+                background: "linear-gradient(135deg, #006E0F 0%, #08C225 100%)",
                 borderRadius: 3,
               },
             }}
