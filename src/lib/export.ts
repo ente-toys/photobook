@@ -24,24 +24,20 @@ const A4_SPREAD_WIDTH_PX = Math.round((A4_SPREAD_WIDTH_MM / 25.4) * DPI);
 const A4_SPREAD_HEIGHT_PX = A5_HEIGHT_PX;
 const A4_SPREAD_GUTTER_PX = A4_SPREAD_WIDTH_PX - A5_WIDTH_PX * 2;
 
-const BLANK_PAGE: BookPage = {
-  id: "__blank",
-  slots: [],
-  textBlocks: [],
-  topCaption: "",
-  bottomCaption: "",
-};
+function isBlankPage(page: BookPage): boolean {
+  return (
+    page.slots.length === 0 &&
+    page.textBlocks.length === 0 &&
+    !page.topCaption &&
+    !page.bottomCaption
+  );
+}
 
-/** Insert a blank page after the cover and before the back cover for print exports. */
-function addBlankPages(pages: BookPage[]): BookPage[] {
-  if (pages.length < 2) return pages;
-  return [
-    pages[0], // cover
-    BLANK_PAGE, // inside front cover
-    ...pages.slice(1, -1),
-    BLANK_PAGE, // inside back cover
-    pages[pages.length - 1], // back cover
-  ];
+function getExportPages(pages: BookPage[]): BookPage[] {
+  const lastIndex = pages.length - 1;
+  return pages.filter(
+    (page, index) => index === 0 || index === lastIndex || !isBlankPage(page),
+  );
 }
 
 async function loadImage(src: string): Promise<HTMLImageElement> {
@@ -305,7 +301,7 @@ export async function exportPdfX4A5(
   inputPages: BookPage[],
   onProgress?: (pct: number) => void,
 ): Promise<Blob> {
-  const pages = addBlankPages(inputPages);
+  const pages = getExportPages(inputPages);
   const resolver = createPhotoUrlResolver();
   try {
     const pageJpegs: Uint8Array[] = [];
@@ -341,7 +337,7 @@ export async function exportPdfX4A4Spreads(
   inputPages: BookPage[],
   onProgress?: (pct: number) => void,
 ): Promise<Blob> {
-  const pages = addBlankPages(inputPages);
+  const pages = getExportPages(inputPages);
   const resolver = createPhotoUrlResolver();
   try {
     const spreadJpegs: Uint8Array[] = [];
@@ -370,7 +366,7 @@ export async function exportPngZip(
   inputPages: BookPage[],
   onProgress?: (pct: number) => void,
 ): Promise<Blob> {
-  const pages = addBlankPages(inputPages);
+  const pages = getExportPages(inputPages);
   const resolver = createPhotoUrlResolver();
   try {
     const zip = new JSZip();
@@ -405,7 +401,7 @@ export async function exportPngA4Zip(
   inputPages: BookPage[],
   onProgress?: (pct: number) => void,
 ): Promise<Blob> {
-  const pages = addBlankPages(inputPages);
+  const pages = getExportPages(inputPages);
   const resolver = createPhotoUrlResolver();
   try {
     const zip = new JSZip();
