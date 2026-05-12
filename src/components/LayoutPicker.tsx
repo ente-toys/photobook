@@ -207,7 +207,7 @@ export default function LayoutPicker({
       sx={{
         display: "flex",
         flexDirection: "column",
-        gap: 0.5,
+        gap: 1,
         alignItems: "center",
         ...(side === "left" ? { pr: 1 } : { pl: 1 }),
       }}
@@ -240,7 +240,7 @@ export default function LayoutPicker({
         sx={{
           display: "flex",
           flexDirection: "column",
-          gap: 0.5,
+          gap: 1,
           mt: 0.5,
           pt: 0.75,
           borderTop: "1px solid rgba(255,255,255,0.15)",
