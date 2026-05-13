@@ -1,16 +1,62 @@
 import { v4 as uuid } from "uuid";
 import type { BookPage, Photo, PhotoSlot } from "./types";
+import {
+  DEFAULT_BOOK_FORMAT_ID,
+  getBookFormat,
+  type BookFormatId,
+} from "./bookFormats";
 
-// Outer-edge margins as percentage of page. Horizontal is larger so the
-// long edges get extra room — both for breathing room and so photos remain
-// fully visible when flipping a printed copy past the spine.
-// On A5 portrait (148×210mm) these resolve to ~14.8mm horizontal and
-// ~16.8mm vertical.
-export const MARGIN_H = 10;
-export const MARGIN_V = 8;
-// Separate horizontal/vertical gaps to produce equal absolute spacing on A5 portrait pages
-const H_GAP = 0.64; // horizontal gap (% of page width)
-const V_GAP = 0.45; // vertical gap (% of page height)
+export interface LayoutMetrics {
+  marginH: number;
+  marginV: number;
+  paddedMarginH: number;
+  paddedMarginV: number;
+  hGap: number;
+  vGap: number;
+  left: number;
+  top: number;
+  cw: number;
+  ch: number;
+  paddingStepsH: number[];
+  paddingStepsV: number[];
+}
+
+function mmToPct(mm: number, totalMm: number): number {
+  return (mm / totalMm) * 100;
+}
+
+export function getLayoutMetrics(
+  formatId: BookFormatId = DEFAULT_BOOK_FORMAT_ID,
+): LayoutMetrics {
+  const format = getBookFormat(formatId);
+  const marginH = mmToPct(format.marginMm.h, format.widthMm);
+  const marginV = mmToPct(format.marginMm.v, format.heightMm);
+
+  return {
+    marginH,
+    marginV,
+    paddedMarginH: mmToPct(
+      format.singlePaddedMarginMm.h,
+      format.widthMm,
+    ),
+    paddedMarginV: mmToPct(
+      format.singlePaddedMarginMm.v,
+      format.heightMm,
+    ),
+    hGap: mmToPct(format.gapMm.h, format.widthMm),
+    vGap: mmToPct(format.gapMm.v, format.heightMm),
+    left: marginH,
+    top: marginV,
+    cw: 100 - 2 * marginH,
+    ch: 100 - 2 * marginV,
+    paddingStepsH: format.paddingStepsMm.h.map((mm) =>
+      mmToPct(mm, format.widthMm),
+    ),
+    paddingStepsV: format.paddingStepsMm.v.map((mm) =>
+      mmToPct(mm, format.heightMm),
+    ),
+  };
+}
 
 type Orientation = "landscape" | "portrait" | "square";
 
@@ -41,20 +87,12 @@ function makeSlot(
   };
 }
 
-// Content area boundaries for standard margin
-const LEFT = MARGIN_H;
-const TOP = MARGIN_V;
-const RIGHT = 100 - MARGIN_H;
-const BOTTOM = 100 - MARGIN_V;
-const CW = RIGHT - LEFT;
-const CH = BOTTOM - TOP;
-
 // ── Layout variant system ──────────────────────────────────────────
 
 export interface LayoutVariant {
   key: string;
   photoCount: number;
-  generate: (photoIds: string[]) => PhotoSlot[];
+  generate: (photoIds: string[], metrics: LayoutMetrics) => PhotoSlot[];
 }
 
 // Slot position (no photo ID) for thumbnail preview rendering
@@ -65,29 +103,33 @@ export interface SlotPosition {
   height: number;
 }
 
-function contentArea(marginH: number, marginV: number = marginH) {
-  const l = marginH, t = marginV, r = 100 - marginH, b = 100 - marginV;
+function contentArea(marginH: number, marginV: number) {
+  const l = marginH;
+  const t = marginV;
+  const r = 100 - marginH;
+  const b = 100 - marginV;
   return { l, t, cw: r - l, ch: b - t };
 }
 
 // ── 1-photo variants ──────────────────────────────────────────────
 
-function gen1Padded(ids: string[]): PhotoSlot[] {
-  const { l, t, cw, ch } = contentArea(14);
+function gen1Padded(ids: string[], m: LayoutMetrics): PhotoSlot[] {
+  const { l, t, cw, ch } = contentArea(m.paddedMarginH, m.paddedMarginV);
   return [makeSlot(ids[0], l, t, cw, ch)];
 }
 
-function gen1Moderate(ids: string[]): PhotoSlot[] {
-  return [makeSlot(ids[0], LEFT, TOP, CW, CH)];
+function gen1Moderate(ids: string[], m: LayoutMetrics): PhotoSlot[] {
+  return [makeSlot(ids[0], m.left, m.top, m.cw, m.ch)];
 }
 
-function gen1Full(ids: string[]): PhotoSlot[] {
+function gen1Full(ids: string[], _m: LayoutMetrics): PhotoSlot[] {
   return [makeSlot(ids[0], 0, 0, 100, 100)];
 }
 
 // ── 2-photo variants ──────────────────────────────────────────────
 
-function gen2Stacked(ids: string[]): PhotoSlot[] {
+function gen2Stacked(ids: string[], m: LayoutMetrics): PhotoSlot[] {
+  const { left: LEFT, top: TOP, cw: CW, ch: CH, vGap: V_GAP } = m;
   const halfH = (CH - V_GAP) / 2;
   return [
     makeSlot(ids[0], LEFT, TOP, CW, halfH),
@@ -95,7 +137,8 @@ function gen2Stacked(ids: string[]): PhotoSlot[] {
   ];
 }
 
-function gen2SideBySide(ids: string[]): PhotoSlot[] {
+function gen2SideBySide(ids: string[], m: LayoutMetrics): PhotoSlot[] {
+  const { left: LEFT, top: TOP, cw: CW, ch: CH, hGap: H_GAP } = m;
   const halfW = (CW - H_GAP) / 2;
   return [
     makeSlot(ids[0], LEFT, TOP, halfW, CH),
@@ -103,7 +146,8 @@ function gen2SideBySide(ids: string[]): PhotoSlot[] {
   ];
 }
 
-function gen2BigTop(ids: string[]): PhotoSlot[] {
+function gen2BigTop(ids: string[], m: LayoutMetrics): PhotoSlot[] {
+  const { left: LEFT, top: TOP, cw: CW, ch: CH, vGap: V_GAP } = m;
   const bigH = CH * 0.62;
   const smallH = CH - bigH - V_GAP;
   return [
@@ -112,7 +156,8 @@ function gen2BigTop(ids: string[]): PhotoSlot[] {
   ];
 }
 
-function gen2BigLeft(ids: string[]): PhotoSlot[] {
+function gen2BigLeft(ids: string[], m: LayoutMetrics): PhotoSlot[] {
+  const { left: LEFT, top: TOP, cw: CW, ch: CH, hGap: H_GAP } = m;
   const bigW = CW * 0.62;
   const smallW = CW - bigW - H_GAP;
   return [
@@ -121,7 +166,8 @@ function gen2BigLeft(ids: string[]): PhotoSlot[] {
   ];
 }
 
-function gen2BigBottom(ids: string[]): PhotoSlot[] {
+function gen2BigBottom(ids: string[], m: LayoutMetrics): PhotoSlot[] {
+  const { left: LEFT, top: TOP, cw: CW, ch: CH, vGap: V_GAP } = m;
   const bigH = CH * 0.62;
   const smallH = CH - bigH - V_GAP;
   return [
@@ -130,7 +176,8 @@ function gen2BigBottom(ids: string[]): PhotoSlot[] {
   ];
 }
 
-function gen2BigRight(ids: string[]): PhotoSlot[] {
+function gen2BigRight(ids: string[], m: LayoutMetrics): PhotoSlot[] {
+  const { left: LEFT, top: TOP, cw: CW, ch: CH, hGap: H_GAP } = m;
   const bigW = CW * 0.62;
   const smallW = CW - bigW - H_GAP;
   return [
@@ -141,7 +188,8 @@ function gen2BigRight(ids: string[]): PhotoSlot[] {
 
 // ── 3-photo variants ──────────────────────────────────────────────
 
-function gen3Top1Bot2(ids: string[]): PhotoSlot[] {
+function gen3Top1Bot2(ids: string[], m: LayoutMetrics): PhotoSlot[] {
+  const { left: LEFT, top: TOP, cw: CW, ch: CH, hGap: H_GAP, vGap: V_GAP } = m;
   const topH = CH * 0.55;
   const botH = CH - topH - V_GAP;
   const halfW = (CW - H_GAP) / 2;
@@ -152,7 +200,8 @@ function gen3Top1Bot2(ids: string[]): PhotoSlot[] {
   ];
 }
 
-function gen3Left1Right2(ids: string[]): PhotoSlot[] {
+function gen3Left1Right2(ids: string[], m: LayoutMetrics): PhotoSlot[] {
+  const { left: LEFT, top: TOP, cw: CW, ch: CH, hGap: H_GAP, vGap: V_GAP } = m;
   const leftW = CW * 0.55;
   const rightW = CW - leftW - H_GAP;
   const halfH = (CH - V_GAP) / 2;
@@ -163,7 +212,8 @@ function gen3Left1Right2(ids: string[]): PhotoSlot[] {
   ];
 }
 
-function gen3Bot1Top2(ids: string[]): PhotoSlot[] {
+function gen3Bot1Top2(ids: string[], m: LayoutMetrics): PhotoSlot[] {
+  const { left: LEFT, top: TOP, cw: CW, ch: CH, hGap: H_GAP, vGap: V_GAP } = m;
   const botH = CH * 0.55;
   const topH = CH - botH - V_GAP;
   const halfW = (CW - H_GAP) / 2;
@@ -174,7 +224,8 @@ function gen3Bot1Top2(ids: string[]): PhotoSlot[] {
   ];
 }
 
-function gen3Right1Left2(ids: string[]): PhotoSlot[] {
+function gen3Right1Left2(ids: string[], m: LayoutMetrics): PhotoSlot[] {
+  const { left: LEFT, top: TOP, cw: CW, ch: CH, hGap: H_GAP, vGap: V_GAP } = m;
   const rightW = CW * 0.55;
   const leftW = CW - rightW - H_GAP;
   const halfH = (CH - V_GAP) / 2;
@@ -185,7 +236,8 @@ function gen3Right1Left2(ids: string[]): PhotoSlot[] {
   ];
 }
 
-function gen3EqualRows(ids: string[]): PhotoSlot[] {
+function gen3EqualRows(ids: string[], m: LayoutMetrics): PhotoSlot[] {
+  const { left: LEFT, top: TOP, cw: CW, ch: CH, vGap: V_GAP } = m;
   const rowH = (CH - V_GAP * 2) / 3;
   return [
     makeSlot(ids[0], LEFT, TOP, CW, rowH),
@@ -194,7 +246,8 @@ function gen3EqualRows(ids: string[]): PhotoSlot[] {
   ];
 }
 
-function gen3EqualCols(ids: string[]): PhotoSlot[] {
+function gen3EqualCols(ids: string[], m: LayoutMetrics): PhotoSlot[] {
+  const { left: LEFT, top: TOP, cw: CW, ch: CH, hGap: H_GAP } = m;
   const colW = (CW - H_GAP * 2) / 3;
   return [
     makeSlot(ids[0], LEFT, TOP, colW, CH),
@@ -203,7 +256,8 @@ function gen3EqualCols(ids: string[]): PhotoSlot[] {
   ];
 }
 
-function gen3DominantTop(ids: string[]): PhotoSlot[] {
+function gen3DominantTop(ids: string[], m: LayoutMetrics): PhotoSlot[] {
+  const { left: LEFT, top: TOP, cw: CW, ch: CH, hGap: H_GAP, vGap: V_GAP } = m;
   const bigH = CH * 0.75;
   const smallH = CH - bigH - V_GAP;
   const halfW = (CW - H_GAP) / 2;
@@ -214,7 +268,8 @@ function gen3DominantTop(ids: string[]): PhotoSlot[] {
   ];
 }
 
-function gen3DominantBottom(ids: string[]): PhotoSlot[] {
+function gen3DominantBottom(ids: string[], m: LayoutMetrics): PhotoSlot[] {
+  const { left: LEFT, top: TOP, cw: CW, ch: CH, hGap: H_GAP, vGap: V_GAP } = m;
   const bigH = CH * 0.75;
   const smallH = CH - bigH - V_GAP;
   const halfW = (CW - H_GAP) / 2;
@@ -225,7 +280,8 @@ function gen3DominantBottom(ids: string[]): PhotoSlot[] {
   ];
 }
 
-function gen3DominantLeft(ids: string[]): PhotoSlot[] {
+function gen3DominantLeft(ids: string[], m: LayoutMetrics): PhotoSlot[] {
+  const { left: LEFT, top: TOP, cw: CW, ch: CH, hGap: H_GAP, vGap: V_GAP } = m;
   const bigW = CW * 0.75;
   const smallW = CW - bigW - H_GAP;
   const halfH = (CH - V_GAP) / 2;
@@ -236,7 +292,8 @@ function gen3DominantLeft(ids: string[]): PhotoSlot[] {
   ];
 }
 
-function gen3DominantRight(ids: string[]): PhotoSlot[] {
+function gen3DominantRight(ids: string[], m: LayoutMetrics): PhotoSlot[] {
+  const { left: LEFT, top: TOP, cw: CW, ch: CH, hGap: H_GAP, vGap: V_GAP } = m;
   const bigW = CW * 0.75;
   const smallW = CW - bigW - H_GAP;
   const halfH = (CH - V_GAP) / 2;
@@ -249,7 +306,8 @@ function gen3DominantRight(ids: string[]): PhotoSlot[] {
 
 // ── 4-photo variants ──────────────────────────────────────────────
 
-function gen4Grid(ids: string[]): PhotoSlot[] {
+function gen4Grid(ids: string[], m: LayoutMetrics): PhotoSlot[] {
+  const { left: LEFT, top: TOP, cw: CW, ch: CH, hGap: H_GAP, vGap: V_GAP } = m;
   const halfW = (CW - H_GAP) / 2;
   const halfH = (CH - V_GAP) / 2;
   return [
@@ -260,7 +318,8 @@ function gen4Grid(ids: string[]): PhotoSlot[] {
   ];
 }
 
-function gen4Top1Bot3(ids: string[]): PhotoSlot[] {
+function gen4Top1Bot3(ids: string[], m: LayoutMetrics): PhotoSlot[] {
+  const { left: LEFT, top: TOP, cw: CW, ch: CH, hGap: H_GAP, vGap: V_GAP } = m;
   const topH = CH * 0.5;
   const botH = CH - topH - V_GAP;
   const thirdW = (CW - H_GAP * 2) / 3;
@@ -272,7 +331,8 @@ function gen4Top1Bot3(ids: string[]): PhotoSlot[] {
   ];
 }
 
-function gen4Bot1Top3(ids: string[]): PhotoSlot[] {
+function gen4Bot1Top3(ids: string[], m: LayoutMetrics): PhotoSlot[] {
+  const { left: LEFT, top: TOP, cw: CW, ch: CH, hGap: H_GAP, vGap: V_GAP } = m;
   const botH = CH * 0.5;
   const topH = CH - botH - V_GAP;
   const thirdW = (CW - H_GAP * 2) / 3;
@@ -284,7 +344,8 @@ function gen4Bot1Top3(ids: string[]): PhotoSlot[] {
   ];
 }
 
-function gen4Left1Right3(ids: string[]): PhotoSlot[] {
+function gen4Left1Right3(ids: string[], m: LayoutMetrics): PhotoSlot[] {
+  const { left: LEFT, top: TOP, cw: CW, ch: CH, hGap: H_GAP, vGap: V_GAP } = m;
   const leftW = CW * 0.5;
   const rightW = CW - leftW - H_GAP;
   const thirdH = (CH - V_GAP * 2) / 3;
@@ -296,7 +357,8 @@ function gen4Left1Right3(ids: string[]): PhotoSlot[] {
   ];
 }
 
-function gen4Right1Left3(ids: string[]): PhotoSlot[] {
+function gen4Right1Left3(ids: string[], m: LayoutMetrics): PhotoSlot[] {
+  const { left: LEFT, top: TOP, cw: CW, ch: CH, hGap: H_GAP, vGap: V_GAP } = m;
   const rightW = CW * 0.5;
   const leftW = CW - rightW - H_GAP;
   const thirdH = (CH - V_GAP * 2) / 3;
@@ -308,7 +370,8 @@ function gen4Right1Left3(ids: string[]): PhotoSlot[] {
   ];
 }
 
-function gen4EqualRows(ids: string[]): PhotoSlot[] {
+function gen4EqualRows(ids: string[], m: LayoutMetrics): PhotoSlot[] {
+  const { left: LEFT, top: TOP, cw: CW, ch: CH, vGap: V_GAP } = m;
   const rowH = (CH - V_GAP * 3) / 4;
   return [
     makeSlot(ids[0], LEFT, TOP, CW, rowH),
@@ -318,7 +381,8 @@ function gen4EqualRows(ids: string[]): PhotoSlot[] {
   ];
 }
 
-function gen4WideLeft(ids: string[]): PhotoSlot[] {
+function gen4WideLeft(ids: string[], m: LayoutMetrics): PhotoSlot[] {
+  const { left: LEFT, top: TOP, cw: CW, ch: CH, hGap: H_GAP, vGap: V_GAP } = m;
   const bigW = CW * 0.62;
   const smallW = CW - bigW - H_GAP;
   const halfH = (CH - V_GAP) / 2;
@@ -330,7 +394,8 @@ function gen4WideLeft(ids: string[]): PhotoSlot[] {
   ];
 }
 
-function gen4WideRight(ids: string[]): PhotoSlot[] {
+function gen4WideRight(ids: string[], m: LayoutMetrics): PhotoSlot[] {
+  const { left: LEFT, top: TOP, cw: CW, ch: CH, hGap: H_GAP, vGap: V_GAP } = m;
   const bigW = CW * 0.62;
   const smallW = CW - bigW - H_GAP;
   const halfH = (CH - V_GAP) / 2;
@@ -342,7 +407,8 @@ function gen4WideRight(ids: string[]): PhotoSlot[] {
   ];
 }
 
-function gen4TallTop(ids: string[]): PhotoSlot[] {
+function gen4TallTop(ids: string[], m: LayoutMetrics): PhotoSlot[] {
+  const { left: LEFT, top: TOP, cw: CW, ch: CH, hGap: H_GAP, vGap: V_GAP } = m;
   const bigH = CH * 0.62;
   const smallH = CH - bigH - V_GAP;
   const halfW = (CW - H_GAP) / 2;
@@ -354,7 +420,8 @@ function gen4TallTop(ids: string[]): PhotoSlot[] {
   ];
 }
 
-function gen4TallBottom(ids: string[]): PhotoSlot[] {
+function gen4TallBottom(ids: string[], m: LayoutMetrics): PhotoSlot[] {
+  const { left: LEFT, top: TOP, cw: CW, ch: CH, hGap: H_GAP, vGap: V_GAP } = m;
   const bigH = CH * 0.62;
   const smallH = CH - bigH - V_GAP;
   const halfW = (CW - H_GAP) / 2;
@@ -366,7 +433,8 @@ function gen4TallBottom(ids: string[]): PhotoSlot[] {
   ];
 }
 
-function gen4EqualCols(ids: string[]): PhotoSlot[] {
+function gen4EqualCols(ids: string[], m: LayoutMetrics): PhotoSlot[] {
+  const { left: LEFT, top: TOP, cw: CW, ch: CH, hGap: H_GAP } = m;
   const colW = (CW - H_GAP * 3) / 4;
   return [
     makeSlot(ids[0], LEFT, TOP, colW, CH),
@@ -477,13 +545,17 @@ export function getVariantsForCount(count: number): LayoutVariant[] {
 /** Caption zone heights (% of page) above and below the photos. Captions are
  * centered in these bands, so when the user adds extra vertical padding (or
  * on the back cover with its larger inset), the zones grow with the photo's
- * actual edges rather than staying pinned to the default MARGIN_V band. */
-export function getCaptionZones(page: BookPage): {
+ * actual edges rather than staying pinned to the default margin band. */
+export function getCaptionZones(
+  page: BookPage,
+  formatId: BookFormatId = DEFAULT_BOOK_FORMAT_ID,
+): {
   topPct: number;
   bottomPct: number;
 } {
   if (page.slots.length === 0) {
-    return { topPct: MARGIN_V, bottomPct: MARGIN_V };
+    const metrics = getLayoutMetrics(formatId);
+    return { topPct: metrics.marginV, bottomPct: metrics.marginV };
   }
   const topPct = Math.min(...page.slots.map((s) => s.y));
   const bottomPct = 100 - Math.max(...page.slots.map((s) => s.y + s.height));
@@ -491,12 +563,15 @@ export function getCaptionZones(page: BookPage): {
 }
 
 /** Get the slot positions for a variant (for thumbnail previews) */
-export function getVariantPreview(key: string): SlotPosition[] {
+export function getVariantPreview(
+  key: string,
+  formatId: BookFormatId = DEFAULT_BOOK_FORMAT_ID,
+): SlotPosition[] {
   const variant = VARIANT_MAP.get(key);
   if (!variant) return [];
   const dummyIds = Array.from({ length: variant.photoCount }, (_, i) => `d${i}`);
   const defaults = getDefaultPadding(key);
-  const slots = applyVariant(key, dummyIds, defaults.h, defaults.v);
+  const slots = applyVariant(key, dummyIds, defaults.h, defaults.v, formatId);
   return slots.map((s) => ({
     x: s.x,
     y: s.y,
@@ -505,27 +580,26 @@ export function getVariantPreview(key: string): SlotPosition[] {
   }));
 }
 
-/** Extra padding per level (percentage of page dimension) */
-const PADDING_STEPS = [0, 4, 8, 12]; // level 0, 1, 2, 3
-
 /** Apply extra padding to slots by scaling them inward */
 export function applyPadding(
   slots: PhotoSlot[],
   paddingH: number,
-  paddingV: number
+  paddingV: number,
+  metrics: LayoutMetrics,
 ): PhotoSlot[] {
-  const extraH = PADDING_STEPS[paddingH] ?? 0;
-  const extraV = PADDING_STEPS[paddingV] ?? 0;
+  const extraH = metrics.paddingStepsH[paddingH] ?? 0;
+  const extraV = metrics.paddingStepsV[paddingV] ?? 0;
   if (extraH === 0 && extraV === 0) return slots;
 
   // Scale from the default content area into a smaller one
-  const oldL = MARGIN_H, oldT = MARGIN_V;
-  const oldW = 100 - 2 * MARGIN_H;
-  const oldH = 100 - 2 * MARGIN_V;
-  const newL = MARGIN_H + extraH;
-  const newT = MARGIN_V + extraV;
-  const newW = 100 - 2 * (MARGIN_H + extraH);
-  const newH = 100 - 2 * (MARGIN_V + extraV);
+  const oldL = metrics.marginH;
+  const oldT = metrics.marginV;
+  const oldW = 100 - 2 * metrics.marginH;
+  const oldH = 100 - 2 * metrics.marginV;
+  const newL = metrics.marginH + extraH;
+  const newT = metrics.marginV + extraV;
+  const newW = 100 - 2 * (metrics.marginH + extraH);
+  const newH = 100 - 2 * (metrics.marginV + extraV);
 
   return slots.map((s) => ({
     ...s,
@@ -541,42 +615,14 @@ export function applyVariant(
   key: string,
   photoIds: string[],
   paddingH = 0,
-  paddingV = 0
+  paddingV = 0,
+  formatId: BookFormatId = DEFAULT_BOOK_FORMAT_ID,
 ): PhotoSlot[] {
   const variant = VARIANT_MAP.get(key);
   if (!variant) return [];
-  const slots = variant.generate(photoIds);
-  return applyPadding(slots, paddingH, paddingV);
-}
-
-// ── Legacy layout selection (orientation-based auto-pick) ─────────
-
-function layout1(photos: Photo[]): PhotoSlot[] {
-  return gen1Padded([photos[0].id]);
-}
-
-function layout2Stacked(photos: Photo[]): PhotoSlot[] {
-  return gen2Stacked(photos.map((p) => p.id));
-}
-
-function layout2SideBySide(photos: Photo[]): PhotoSlot[] {
-  return gen2SideBySide(photos.map((p) => p.id));
-}
-
-function layout3TopOneBottomTwo(photos: Photo[]): PhotoSlot[] {
-  return gen3Top1Bot2(photos.map((p) => p.id));
-}
-
-function layout3LeftOneTwoRight(photos: Photo[]): PhotoSlot[] {
-  return gen3Left1Right2(photos.map((p) => p.id));
-}
-
-function layout4Grid(photos: Photo[]): PhotoSlot[] {
-  return gen4Grid(photos.map((p) => p.id));
-}
-
-function layout4TopOneBotThree(photos: Photo[]): PhotoSlot[] {
-  return gen4Top1Bot3(photos.map((p) => p.id));
+  const metrics = getLayoutMetrics(formatId);
+  const slots = variant.generate(photoIds, metrics);
+  return applyPadding(slots, paddingH, paddingV, metrics);
 }
 
 /** Pick the best layout variant key for a set of photos (orientation-based). */
@@ -610,36 +656,19 @@ export function defaultVariantKeyForCount(count: number): string {
   return "4-grid";
 }
 
-export function chooseBestLayout(photos: Photo[]): PhotoSlot[] {
-  const count = photos.length;
-  if (count === 0) return [];
-  if (count === 1) return layout1(photos);
-
-  if (count === 2) {
-    const o0 = getOrientation(photos[0]);
-    const o1 = getOrientation(photos[1]);
-    if (o0 === "portrait" && o1 === "portrait") {
-      return layout2SideBySide(photos);
-    }
-    if (o0 === "landscape" && o1 === "landscape") {
-      return layout2Stacked(photos);
-    }
-    return layout2SideBySide(photos);
-  }
-
-  if (count === 3) {
-    const o0 = getOrientation(photos[0]);
-    if (o0 === "landscape") {
-      return layout3TopOneBottomTwo(photos);
-    }
-    return layout3LeftOneTwoRight(photos);
-  }
-
-  const landscapes = photos.filter((p) => getOrientation(p) === "landscape");
-  if (landscapes.length >= 1) {
-    return layout4TopOneBotThree(photos);
-  }
-  return layout4Grid(photos);
+export function chooseBestLayout(
+  photos: Photo[],
+  formatId: BookFormatId = DEFAULT_BOOK_FORMAT_ID,
+): PhotoSlot[] {
+  if (photos.length === 0) return [];
+  const variantKey = chooseBestVariantKey(photos);
+  return applyVariant(
+    variantKey,
+    photos.map((p) => p.id),
+    0,
+    0,
+    formatId,
+  );
 }
 
 const makeBlankPage = (): BookPage => ({
@@ -650,7 +679,10 @@ const makeBlankPage = (): BookPage => ({
   bottomCaption: "",
 });
 
-export function generateAutoLayout(photos: Photo[]): BookPage[] {
+export function generateAutoLayout(
+  photos: Photo[],
+  formatId: BookFormatId = DEFAULT_BOOK_FORMAT_ID,
+): BookPage[] {
   // Sort by dateTaken
   const sorted = [...photos].sort((a, b) => a.dateTaken - b.dateTaken);
 
@@ -661,7 +693,7 @@ export function generateAutoLayout(photos: Photo[]): BookPage[] {
   // First page (cover) — single photo, always full-bleed.
   pages.push({
     id: uuid(),
-    slots: gen1Full([sorted[0].id]),
+    slots: applyVariant("1-full", [sorted[0].id], 0, 0, formatId),
     layoutVariant: "1-full",
     textBlocks: [],
     topCaption: "",
@@ -690,7 +722,7 @@ export function generateAutoLayout(photos: Photo[]): BookPage[] {
 
     const pagePhotos = sorted.slice(idx, idx + count);
     const variantKey = chooseBestVariantKey(pagePhotos);
-    const slots = chooseBestLayout(pagePhotos);
+    const slots = chooseBestLayout(pagePhotos, formatId);
 
     pages.push({
       id: uuid(),
@@ -715,7 +747,7 @@ export function generateAutoLayout(photos: Photo[]): BookPage[] {
     const backCoverId = sorted[sorted.length - 1].id;
     pages.push({
       id: uuid(),
-      slots: applyVariant("1-padded", [backCoverId]),
+      slots: applyVariant("1-padded", [backCoverId], 0, 0, formatId),
       layoutVariant: "1-padded",
       textBlocks: [],
       topCaption: "",

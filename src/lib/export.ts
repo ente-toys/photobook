@@ -1,6 +1,6 @@
 import JSZip from "jszip";
 import type { BookPage } from "./types";
-import { A5_WIDTH_MM, A5_HEIGHT_MM } from "./types";
+import type { BookFormat } from "./bookFormats";
 import { getCaptionZones } from "./layouts";
 import { getPhotoBlob } from "./db";
 import { createPdfX4, renderCanvasToFogra39Jpeg } from "./pdfx";
@@ -15,14 +15,44 @@ function getNunitoFont(): string {
 }
 
 const DPI = 300;
-const A5_WIDTH_PX = Math.round((A5_WIDTH_MM / 25.4) * DPI);
-const A5_HEIGHT_PX = Math.round((A5_HEIGHT_MM / 25.4) * DPI);
-const A4_SPREAD_GUTTER_MM = 1;
-const A4_SPREAD_WIDTH_MM = A5_WIDTH_MM * 2 + A4_SPREAD_GUTTER_MM;
-const A4_SPREAD_HEIGHT_MM = A5_HEIGHT_MM;
-const A4_SPREAD_WIDTH_PX = Math.round((A4_SPREAD_WIDTH_MM / 25.4) * DPI);
-const A4_SPREAD_HEIGHT_PX = A5_HEIGHT_PX;
-const A4_SPREAD_GUTTER_PX = A4_SPREAD_WIDTH_PX - A5_WIDTH_PX * 2;
+const MM_PER_INCH = 25.4;
+const SPREAD_GUTTER_MM = 1;
+
+interface RenderSize {
+  widthMm: number;
+  heightMm: number;
+  widthPx: number;
+  heightPx: number;
+}
+
+function mmToPx(mm: number): number {
+  return Math.round((mm / MM_PER_INCH) * DPI);
+}
+
+function getPageRenderSize(format: BookFormat): RenderSize {
+  return {
+    widthMm: format.widthMm,
+    heightMm: format.heightMm,
+    widthPx: mmToPx(format.widthMm),
+    heightPx: mmToPx(format.heightMm),
+  };
+}
+
+function getSpreadRenderSize(format: BookFormat): RenderSize & {
+  gutterPx: number;
+} {
+  const widthMm = format.widthMm * 2 + SPREAD_GUTTER_MM;
+  const heightMm = format.heightMm;
+  const pageWidthPx = mmToPx(format.widthMm);
+  const widthPx = mmToPx(widthMm);
+  return {
+    widthMm,
+    heightMm,
+    widthPx,
+    heightPx: mmToPx(heightMm),
+    gutterPx: widthPx - pageWidthPx * 2,
+  };
+}
 
 function isBlankPage(page: BookPage): boolean {
   return (
@@ -96,6 +126,7 @@ function createPhotoUrlResolver() {
 
 export async function renderPageToCanvas(
   page: BookPage,
+  format: BookFormat,
   resolvePhotoUrl: (photoId: string) => Promise<string | null>,
   width: number,
   height: number,
@@ -160,7 +191,7 @@ export async function renderPageToCanvas(
   // adds extra padding (or on the back cover with its larger inset).
   // Front-cover captions act as a title, much larger than interior captions.
   const captionFontSize = Math.round(height * (isFrontCover ? 0.05 : 0.016));
-  const captionZones = getCaptionZones(page);
+  const captionZones = getCaptionZones(page, format.id);
   const captionZoneCenterTop = (height * captionZones.topPct) / 100 / 2;
   const captionZoneCenterBottom =
     height - (height * captionZones.bottomPct) / 100 / 2;
@@ -254,18 +285,21 @@ function pdfBytesToBlob(pdfBytes: Uint8Array): Blob {
   return new Blob([pdfArrayBuffer], { type: "application/pdf" });
 }
 
-async function renderA4SpreadToCanvas(
+async function renderSpreadToCanvas(
   pages: BookPage[],
   spreadIndex: number,
+  format: BookFormat,
   resolvePhotoUrl: (photoId: string) => Promise<string | null>,
 ): Promise<HTMLCanvasElement> {
+  const pageSize = getPageRenderSize(format);
+  const spreadSize = getSpreadRenderSize(format);
   const canvas = document.createElement("canvas");
-  canvas.width = A4_SPREAD_WIDTH_PX;
-  canvas.height = A4_SPREAD_HEIGHT_PX;
+  canvas.width = spreadSize.widthPx;
+  canvas.height = spreadSize.heightPx;
   const ctx = canvas.getContext("2d")!;
 
   ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, A4_SPREAD_WIDTH_PX, A4_SPREAD_HEIGHT_PX);
+  ctx.fillRect(0, 0, spreadSize.widthPx, spreadSize.heightPx);
 
   const leftIdx = spreadIndex * 2;
   const rightIdx = spreadIndex * 2 + 1;
@@ -273,9 +307,10 @@ async function renderA4SpreadToCanvas(
   if (leftIdx < pages.length) {
     const pageCanvas = await renderPageToCanvas(
       pages[leftIdx],
+      format,
       resolvePhotoUrl,
-      A5_WIDTH_PX,
-      A5_HEIGHT_PX,
+      pageSize.widthPx,
+      pageSize.heightPx,
       leftIdx === pages.length - 1,
       leftIdx === 0,
     );
@@ -285,23 +320,26 @@ async function renderA4SpreadToCanvas(
   if (rightIdx < pages.length) {
     const pageCanvas = await renderPageToCanvas(
       pages[rightIdx],
+      format,
       resolvePhotoUrl,
-      A5_WIDTH_PX,
-      A5_HEIGHT_PX,
+      pageSize.widthPx,
+      pageSize.heightPx,
       rightIdx === pages.length - 1,
       rightIdx === 0,
     );
-    ctx.drawImage(pageCanvas, A5_WIDTH_PX + A4_SPREAD_GUTTER_PX, 0);
+    ctx.drawImage(pageCanvas, pageSize.widthPx + spreadSize.gutterPx, 0);
   }
 
   return canvas;
 }
 
-export async function exportPdfX4A5(
+export async function exportPdfX4Pages(
   inputPages: BookPage[],
+  format: BookFormat,
   onProgress?: (pct: number) => void,
 ): Promise<Blob> {
   const pages = getExportPages(inputPages);
+  const pageSize = getPageRenderSize(format);
   const resolver = createPhotoUrlResolver();
   try {
     const pageJpegs: Uint8Array[] = [];
@@ -309,9 +347,10 @@ export async function exportPdfX4A5(
     for (let i = 0; i < pages.length; i++) {
       const canvas = await renderPageToCanvas(
         pages[i],
+        format,
         resolver.resolve,
-        A5_WIDTH_PX,
-        A5_HEIGHT_PX,
+        pageSize.widthPx,
+        pageSize.heightPx,
         i === pages.length - 1,
         i === 0,
       );
@@ -321,10 +360,10 @@ export async function exportPdfX4A5(
     }
 
     const pdfBytes = await createPdfX4(pageJpegs, {
-      widthMm: A5_WIDTH_MM,
-      heightMm: A5_HEIGHT_MM,
-      widthPx: A5_WIDTH_PX,
-      heightPx: A5_HEIGHT_PX,
+      widthMm: pageSize.widthMm,
+      heightMm: pageSize.heightMm,
+      widthPx: pageSize.widthPx,
+      heightPx: pageSize.heightPx,
     });
     onProgress?.(100);
     return pdfBytesToBlob(pdfBytes);
@@ -333,27 +372,34 @@ export async function exportPdfX4A5(
   }
 }
 
-export async function exportPdfX4A4Spreads(
+export async function exportPdfX4Spreads(
   inputPages: BookPage[],
+  format: BookFormat,
   onProgress?: (pct: number) => void,
 ): Promise<Blob> {
   const pages = getExportPages(inputPages);
+  const spreadSize = getSpreadRenderSize(format);
   const resolver = createPhotoUrlResolver();
   try {
     const spreadJpegs: Uint8Array[] = [];
     const totalSpreads = Math.ceil(pages.length / 2);
 
     for (let s = 0; s < totalSpreads; s++) {
-      const canvas = await renderA4SpreadToCanvas(pages, s, resolver.resolve);
+      const canvas = await renderSpreadToCanvas(
+        pages,
+        s,
+        format,
+        resolver.resolve,
+      );
       spreadJpegs.push(await renderCanvasToFogra39Jpeg(canvas));
       onProgress?.(Math.round(((s + 1) / totalSpreads) * 95));
     }
 
     const pdfBytes = await createPdfX4(spreadJpegs, {
-      widthMm: A4_SPREAD_WIDTH_MM,
-      heightMm: A4_SPREAD_HEIGHT_MM,
-      widthPx: A4_SPREAD_WIDTH_PX,
-      heightPx: A4_SPREAD_HEIGHT_PX,
+      widthMm: spreadSize.widthMm,
+      heightMm: spreadSize.heightMm,
+      widthPx: spreadSize.widthPx,
+      heightPx: spreadSize.heightPx,
     });
     onProgress?.(100);
     return pdfBytesToBlob(pdfBytes);
@@ -362,11 +408,13 @@ export async function exportPdfX4A4Spreads(
   }
 }
 
-export async function exportPngZip(
+export async function exportPngPagesZip(
   inputPages: BookPage[],
+  format: BookFormat,
   onProgress?: (pct: number) => void,
 ): Promise<Blob> {
   const pages = getExportPages(inputPages);
+  const pageSize = getPageRenderSize(format);
   const resolver = createPhotoUrlResolver();
   try {
     const zip = new JSZip();
@@ -374,9 +422,10 @@ export async function exportPngZip(
     for (let i = 0; i < pages.length; i++) {
       const canvas = await renderPageToCanvas(
         pages[i],
+        format,
         resolver.resolve,
-        A5_WIDTH_PX,
-        A5_HEIGHT_PX,
+        pageSize.widthPx,
+        pageSize.heightPx,
         i === pages.length - 1,
         i === 0,
       );
@@ -397,8 +446,9 @@ export async function exportPngZip(
   }
 }
 
-export async function exportPngA4Zip(
+export async function exportPngSpreadsZip(
   inputPages: BookPage[],
+  format: BookFormat,
   onProgress?: (pct: number) => void,
 ): Promise<Blob> {
   const pages = getExportPages(inputPages);
@@ -408,7 +458,12 @@ export async function exportPngA4Zip(
     const totalSpreads = Math.ceil(pages.length / 2);
 
     for (let s = 0; s < totalSpreads; s++) {
-      const canvas = await renderA4SpreadToCanvas(pages, s, resolver.resolve);
+      const canvas = await renderSpreadToCanvas(
+        pages,
+        s,
+        format,
+        resolver.resolve,
+      );
 
       const blob = await new Promise<Blob>((resolve) =>
         canvas.toBlob((b) => resolve(b!), "image/png"),

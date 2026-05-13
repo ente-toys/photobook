@@ -136,7 +136,7 @@ export default function StartPage() {
         .slice(0, MAX_PHOTOS);
 
       if (valid.length > 0) {
-        addPhotos(valid, true);
+        addPhotos(valid, { replace: true });
       }
     },
     [addPhotos]
@@ -409,6 +409,7 @@ export default function StartPage() {
             style={{ display: "none" }}
             onChange={(e) => {
               if (e.target.files) handleFiles(e.target.files);
+              e.currentTarget.value = "";
             }}
           />
 

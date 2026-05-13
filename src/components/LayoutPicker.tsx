@@ -8,9 +8,10 @@ import {
   getMirrorVariant,
   type LayoutVariant,
 } from "@/lib/layouts";
+import { getBookFormatAspect, type BookFormatId } from "@/lib/bookFormats";
+import { useBook } from "@/context/BookContext";
 
 const THUMB_W = 44;
-const THUMB_H = Math.round(THUMB_W / (148 / 210)); // A5 aspect
 
 interface LayoutPickerProps {
   photoCount: number;
@@ -28,14 +29,21 @@ function VariantThumbnail({
   variant,
   isActive,
   thumbnailUrls,
+  formatId,
+  thumbH,
   onClick,
 }: {
   variant: LayoutVariant;
   isActive: boolean;
   thumbnailUrls: string[];
+  formatId: BookFormatId;
+  thumbH: number;
   onClick: () => void;
 }) {
-  const slots = useMemo(() => getVariantPreview(variant.key), [variant.key]);
+  const slots = useMemo(
+    () => getVariantPreview(variant.key, formatId),
+    [variant.key, formatId],
+  );
 
   return (
     <Box
@@ -45,7 +53,7 @@ function VariantThumbnail({
       }}
       sx={{
         width: THUMB_W,
-        height: THUMB_H,
+        height: thumbH,
         bgcolor: "white",
         borderRadius: 0.5,
         position: "relative",
@@ -65,9 +73,9 @@ function VariantThumbnail({
         const url = thumbnailUrls[i];
         const GAP = 1.5; // px gap between slots for visibility
         const left = (slot.x / 100) * THUMB_W + GAP;
-        const top = (slot.y / 100) * THUMB_H + GAP;
+        const top = (slot.y / 100) * thumbH + GAP;
         const width = (slot.width / 100) * THUMB_W - GAP * 2;
-        const height = (slot.height / 100) * THUMB_H - GAP * 2;
+        const height = (slot.height / 100) * thumbH - GAP * 2;
         return (
           <Box
             key={i}
@@ -192,6 +200,8 @@ export default function LayoutPicker({
   side,
   excludeFullScreen = false,
 }: LayoutPickerProps) {
+  const { bookFormat } = useBook();
+  const thumbH = Math.round(THUMB_W / getBookFormatAspect(bookFormat));
   const variants = useMemo(
     () => {
       const all = getVariantsForCount(photoCount);
@@ -222,6 +232,8 @@ export default function LayoutPicker({
             variant={v}
             isActive={isActive}
             thumbnailUrls={thumbnailUrls}
+            formatId={bookFormat.id}
+            thumbH={thumbH}
             onClick={() => {
               if (isActive) {
                 // Toggle to mirror variant if one exists

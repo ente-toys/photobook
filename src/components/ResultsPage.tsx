@@ -32,17 +32,18 @@ import FolderZipIcon from "@mui/icons-material/FolderZip";
 import { useBook } from "@/context/BookContext";
 import BookViewer, { type BookViewerHandle } from "./BookViewer";
 import {
-  exportPdfX4A5,
-  exportPdfX4A4Spreads,
-  exportPngZip,
-  exportPngA4Zip,
+  exportPdfX4Pages,
+  exportPdfX4Spreads,
+  exportPngPagesZip,
+  exportPngSpreadsZip,
   downloadBlob,
 } from "@/lib/export";
+import type { ExportOptionId } from "@/lib/bookFormats";
 
-type ExportType = "pdf-a5" | "pdf-a4" | "png-zip" | "png-a4-zip";
+type ExportType = ExportOptionId;
 
 export default function ResultsPage() {
-  const { book, photos, setAppView, waitForEnteOriginals } = useBook();
+  const { book, bookFormat, photos, setAppView, waitForEnteOriginals } = useBook();
   const viewerRef = useRef<BookViewerHandle>(null);
   // pageIndex is the 0-based page-flip index of the current left-most visible page
   const [pageIndex, setPageIndex] = useState(0);
@@ -78,6 +79,53 @@ export default function ResultsPage() {
     // Interior spread: pages count from 1 after the cover
     return `${pageIndex}-${pageIndex + 1}`;
   }, [pageIndex, totalPages]);
+
+  const exportOptions = useMemo(
+    () =>
+      bookFormat.exportOptions.map((type) => {
+        switch (type) {
+          case "page-pdf":
+            return {
+              type,
+              label: "Print-ready PDF",
+              detail: `${bookFormat.shortLabel} pages`,
+              desc: "PDF/X-4, FOGRA39 CMYK",
+              icon: <PictureAsPdfIcon sx={{ fontSize: 20 }} />,
+            };
+          case "spread-pdf":
+            return {
+              type,
+              label: "Print-ready PDF",
+              detail:
+                bookFormat.id === "a5-portrait"
+                  ? "A4 spreads"
+                  : `${bookFormat.shortLabel} spreads`,
+              desc: "PDF/X-4, FOGRA39 CMYK",
+              icon: <PictureAsPdfIcon sx={{ fontSize: 20 }} />,
+            };
+          case "page-png":
+            return {
+              type,
+              label: "ZIP",
+              detail: `${bookFormat.shortLabel} PNGs`,
+              desc: "High-res PNG per page",
+              icon: <FolderZipIcon sx={{ fontSize: 20 }} />,
+            };
+          case "spread-png":
+            return {
+              type,
+              label: "ZIP",
+              detail:
+                bookFormat.id === "a5-portrait"
+                  ? "A4 spread PNGs"
+                  : `${bookFormat.shortLabel} spread PNGs`,
+              desc: "Two pages per image",
+              icon: <FolderZipIcon sx={{ fontSize: 20 }} />,
+            };
+        }
+      }),
+    [bookFormat],
+  );
 
   const isAtStart = pageIndex === 0;
   const isAtEnd = pageIndex >= totalPages - 1;
@@ -176,21 +224,25 @@ export default function ResultsPage() {
         let filename: string;
 
         switch (type) {
-          case "pdf-a5":
-            blob = await exportPdfX4A5(pages, setExportProgress);
-            filename = "photobook-A5-PDFX4-FOGRA39.pdf";
+          case "page-pdf":
+            blob = await exportPdfX4Pages(pages, bookFormat, setExportProgress);
+            filename = `photobook-${bookFormat.fileSlug}-PDFX4-FOGRA39.pdf`;
             break;
-          case "pdf-a4":
-            blob = await exportPdfX4A4Spreads(pages, setExportProgress);
-            filename = "photobook-A4-spreads-PDFX4-FOGRA39.pdf";
+          case "spread-pdf":
+            blob = await exportPdfX4Spreads(pages, bookFormat, setExportProgress);
+            filename = `photobook-${
+              bookFormat.id === "a5-portrait" ? "A4" : bookFormat.fileSlug
+            }-spreads-PDFX4-FOGRA39.pdf`;
             break;
-          case "png-zip":
-            blob = await exportPngZip(pages, setExportProgress);
-            filename = "photobook-pages.zip";
+          case "page-png":
+            blob = await exportPngPagesZip(pages, bookFormat, setExportProgress);
+            filename = `photobook-${bookFormat.fileSlug}-pages.zip`;
             break;
-          case "png-a4-zip":
-            blob = await exportPngA4Zip(pages, setExportProgress);
-            filename = "photobook-A4-spreads.zip";
+          case "spread-png":
+            blob = await exportPngSpreadsZip(pages, bookFormat, setExportProgress);
+            filename = `photobook-${
+              bookFormat.id === "a5-portrait" ? "A4" : bookFormat.fileSlug
+            }-spreads.zip`;
             break;
         }
 
@@ -202,7 +254,7 @@ export default function ResultsPage() {
         setExporting(false);
       }
     },
-    [getBlockedEntePhotos, pages, waitForEnteOriginals],
+    [bookFormat, getBlockedEntePhotos, pages, waitForEnteOriginals],
   );
 
   return (
@@ -399,7 +451,7 @@ export default function ResultsPage() {
                   )
                 }
                 disabled={exporting}
-                onClick={() => handleExport("pdf-a5")}
+                onClick={() => handleExport(bookFormat.defaultExportOption)}
                 sx={{
                   px: 4,
                   py: 1.5,
@@ -443,36 +495,7 @@ export default function ResultsPage() {
                 },
               }}
             >
-              {[
-                {
-                  type: "pdf-a5" as const,
-                  label: "Print-ready PDF",
-                  detail: "A5 pages",
-                  desc: "PDF/X-4, FOGRA39 CMYK",
-                  icon: <PictureAsPdfIcon sx={{ fontSize: 20 }} />,
-                },
-                {
-                  type: "pdf-a4" as const,
-                  label: "Print-ready PDF",
-                  detail: "A4 spreads",
-                  desc: "PDF/X-4, FOGRA39 CMYK",
-                  icon: <PictureAsPdfIcon sx={{ fontSize: 20 }} />,
-                },
-                {
-                  type: "png-zip" as const,
-                  label: "ZIP",
-                  detail: "A5 PNGs",
-                  desc: "High-res PNG per page",
-                  icon: <FolderZipIcon sx={{ fontSize: 20 }} />,
-                },
-                {
-                  type: "png-a4-zip" as const,
-                  label: "ZIP",
-                  detail: "A4 spread PNGs",
-                  desc: "Two pages per image",
-                  icon: <FolderZipIcon sx={{ fontSize: 20 }} />,
-                },
-              ].map((opt) => (
+              {exportOptions.map((opt) => (
                 <MenuItem
                   key={opt.type}
                   onClick={() => handleExport(opt.type)}

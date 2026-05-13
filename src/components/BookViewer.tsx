@@ -13,6 +13,7 @@ import { Box } from "@mui/material";
 import { PageFlip } from "page-flip";
 import { Stage, Layer } from "react-konva";
 import type { BookPage } from "@/lib/types";
+import { getBookFormatAspect } from "@/lib/bookFormats";
 import { useBook } from "@/context/BookContext";
 import PageCanvas from "./PageCanvas";
 
@@ -26,11 +27,9 @@ interface BookViewerProps {
   onPageChange: (pageIndex: number) => void;
 }
 
-const PAGE_ASPECT = 148 / 210;
-
 const BookViewer = forwardRef<BookViewerHandle, BookViewerProps>(
   function BookViewer({ pages, onPageChange }, ref) {
-    const { photoUrls, loadPreviews } = useBook();
+    const { bookFormat, photoUrls, loadPreviews } = useBook();
     const containerRef = useRef<HTMLDivElement>(null);
     const bookRef = useRef<HTMLDivElement>(null);
     const pageFlipRef = useRef<PageFlip | null>(null);
@@ -89,10 +88,11 @@ const BookViewer = forwardRef<BookViewerHandle, BookViewerProps>(
 
     // Size pages to fill available space — constrained by both height and width
     // Two pages sit side-by-side, so spread width = 2 * pageWidth
+    const pageAspect = getBookFormatAspect(bookFormat);
     const maxByHeight = dimensions.height * 0.6;
-    const maxByWidth = ((dimensions.width - 160) / 2 / PAGE_ASPECT) * 0.6; // 160px for arrow buttons
+    const maxByWidth = ((dimensions.width - 160) / 2 / pageAspect) * 0.6; // 160px for arrow buttons
     const pageHeight = Math.max(300, Math.min(maxByHeight, maxByWidth, 1200));
-    const pageWidth = Math.round(pageHeight * PAGE_ASPECT);
+    const pageWidth = Math.round(pageHeight * pageAspect);
 
     // Expose navigation methods to parent
     useImperativeHandle(

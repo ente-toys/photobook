@@ -6,9 +6,9 @@ import { Stage, Layer } from "react-konva";
 import { useBook } from "@/context/BookContext";
 import PageCanvas from "./PageCanvas";
 import { useSpreads } from "@/hooks/useSpreads";
+import { getBookFormatAspect } from "@/lib/bookFormats";
 
 const THUMB_PAGE_W = 60;
-const THUMB_PAGE_H = Math.round(THUMB_PAGE_W / (148 / 210)); // A5 aspect
 
 interface PageStripProps {
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
@@ -19,8 +19,10 @@ export default function PageStrip({
   scrollContainerRef,
   onSpreadClick,
 }: PageStripProps) {
-  const { book, reorderPages } = useBook();
+  const { book, bookFormat, reorderPages } = useBook();
   const pages = book.pages;
+  const pageAspect = getBookFormatAspect(bookFormat);
+  const thumbPageH = Math.round(THUMB_PAGE_W / pageAspect);
   const dragItem = useRef<number | null>(null);
   const dragOverItem = useRef<number | null>(null);
   const stripContainerRef = useRef<HTMLDivElement | null>(null);
@@ -149,7 +151,7 @@ export default function PageStrip({
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
-                minHeight: THUMB_PAGE_H + 24,
+                minHeight: thumbPageH + 24,
                 "&:hover": {
                   bgcolor: "rgba(255,255,255,0.06)",
                 },
@@ -172,7 +174,7 @@ export default function PageStrip({
                         sx={{
                           flex: "0 0 auto",
                           width: THUMB_PAGE_W,
-                          aspectRatio: `${148}/${210}`,
+                          aspectRatio: `${bookFormat.widthMm}/${bookFormat.heightMm}`,
                           bgcolor: "white",
                           border: "1px solid rgba(255,255,255,0.1)",
                           borderRadius: 0.5,
@@ -181,7 +183,7 @@ export default function PageStrip({
                       >
                         <Stage
                           width={THUMB_PAGE_W}
-                          height={THUMB_PAGE_H}
+                          height={thumbPageH}
                           listening={false}
                           style={{ pointerEvents: "none" }}
                         >
@@ -189,7 +191,7 @@ export default function PageStrip({
                             <PageCanvas
                               page={leftPage}
                               pageWidth={THUMB_PAGE_W}
-                              pageHeight={THUMB_PAGE_H}
+                              pageHeight={thumbPageH}
                               isFrontCover={spread.left === 0}
                               isBackCover={spread.left === pages.length - 1}
                             />
@@ -203,7 +205,7 @@ export default function PageStrip({
                         sx={{
                           flex: "0 0 auto",
                           width: THUMB_PAGE_W,
-                          aspectRatio: `${148}/${210}`,
+                          aspectRatio: `${bookFormat.widthMm}/${bookFormat.heightMm}`,
                           bgcolor: "white",
                           border: "1px solid rgba(255,255,255,0.1)",
                           borderRadius: 0.5,
@@ -212,7 +214,7 @@ export default function PageStrip({
                       >
                         <Stage
                           width={THUMB_PAGE_W}
-                          height={THUMB_PAGE_H}
+                          height={thumbPageH}
                           listening={false}
                           style={{ pointerEvents: "none" }}
                         >
@@ -220,7 +222,7 @@ export default function PageStrip({
                             <PageCanvas
                               page={rightPage}
                               pageWidth={THUMB_PAGE_W}
-                              pageHeight={THUMB_PAGE_H}
+                              pageHeight={thumbPageH}
                               isFrontCover={spread.right === 0}
                               isBackCover={spread.right === pages.length - 1}
                             />

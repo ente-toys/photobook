@@ -4,7 +4,6 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Stage, Layer, Rect, Image as KonvaImage, Text, Group, Transformer } from "react-konva";
 import Konva from "konva";
 import type { BookPage, PhotoSlot, TextBlock } from "@/lib/types";
-import { A5_ASPECT } from "@/lib/types";
 import { getCaptionZones } from "@/lib/layouts";
 import { useBook } from "@/context/BookContext";
 import { getCachedImage, getCachedUrl, loadImageCached } from "@/lib/imageCache";
@@ -388,12 +387,12 @@ export default function PageCanvas({
   photoUrls: photoUrlsProp,
   onDropPhoto,
 }: PageCanvasProps) {
-  const { thumbnailUrls } = useBook();
+  const { bookFormat, thumbnailUrls } = useBook();
   const urls = photoUrlsProp ?? thumbnailUrls;
 
   // Front-cover captions act as a title — much larger than interior captions.
   const captionFontSize = pageHeight * (isFrontCover ? 0.05 : 0.016);
-  const captionZones = getCaptionZones(page);
+  const captionZones = getCaptionZones(page, bookFormat.id);
   const topCaptionZoneHeight = pageHeight * (captionZones.topPct / 100);
   const bottomCaptionZoneHeight = pageHeight * (captionZones.bottomPct / 100);
 

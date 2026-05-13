@@ -13,9 +13,8 @@ import { usePhotoDrag } from "@/hooks/usePhotoDrag";
 import { usePageDrag } from "@/hooks/usePageDrag";
 import { useSpreads } from "@/hooks/useSpreads";
 import type { TextBlock } from "@/lib/types";
+import { getBookFormatAspect } from "@/lib/bookFormats";
 
-// A5 aspect ratio
-const PAGE_ASPECT = 148 / 210;
 const PAGE_GAP = 2;
 // Spreads within this many rows of the current row are always mounted, on
 // top of whatever the IntersectionObserver reports. This keeps the "about
@@ -26,6 +25,7 @@ const NEIGHBORHOOD_RADIUS = 4;
 export default function EditPage() {
   const {
     book,
+    bookFormat,
     currentSpreadIndex,
     setCurrentSpreadIndex,
     addPhotos,
@@ -59,6 +59,7 @@ export default function EditPage() {
   const pages = book.pages;
   const leftPage = pages[currentSpreadIndex];
   const totalPages = pages.length;
+  const pageAspect = getBookFormatAspect(bookFormat);
 
   // Drag hooks
   const autoScroll = useAutoScroll(containerRef);
@@ -166,14 +167,14 @@ export default function EditPage() {
     const availW = containerSize.width - 128 - PAGE_GAP - PICKER_WIDTH * 2;
 
     if (availW <= 0) {
-      return { pageWidth: 380, pageHeight: Math.round(380 / PAGE_ASPECT) };
+      return { pageWidth: 380, pageHeight: Math.round(380 / pageAspect) };
     }
 
     let pw = Math.max(200, Math.min(availW / 2, 500));
-    const ph = Math.round(pw / PAGE_ASPECT);
+    const ph = Math.round(pw / pageAspect);
 
     return { pageWidth: Math.round(pw), pageHeight: ph };
-  }, [containerSize.width]);
+  }, [containerSize.width, pageAspect]);
 
   // Sync sidebar scroll with main area scroll.
   // Coalesced into a single rAF per frame so that raw scroll events (which

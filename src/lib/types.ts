@@ -1,3 +1,5 @@
+import type { BookFormatId } from "./bookFormats";
+
 export type PhotoSource = "local" | "ente";
 export type PhotoOriginalStatus = "pending" | "ready" | "failed";
 export type EnteOriginalMediaKind = "image" | "live-photo";
@@ -68,14 +70,9 @@ export interface BookPage {
 }
 
 export interface BookState {
+  formatId: BookFormatId;
   pages: BookPage[];
   currentSpreadIndex: number; // index of left page (always even)
 }
 
 export type AppView = "start" | "edit" | "results";
-
-// A5 dimensions in mm
-export const A5_WIDTH_MM = 148;
-export const A5_HEIGHT_MM = 210;
-// A5 aspect ratio
-export const A5_ASPECT = A5_WIDTH_MM / A5_HEIGHT_MM; // ~0.705

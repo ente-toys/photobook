@@ -266,7 +266,7 @@ export default function SpreadPage({
   onPageDropOnPage,
   onPageDragEndCleanup,
 }: SpreadPageProps) {
-  const { thumbnailUrls, photoUrls, loadPreviews, removePage, setPageLayout, setPagePadding, updatePage, updateSlot, photos } = useBook();
+  const { bookFormat, thumbnailUrls, photoUrls, loadPreviews, removePage, setPageLayout, setPagePadding, updatePage, updateSlot, photos } = useBook();
 
   // Trigger lazy-loading of 1080px previews for this page's photos
   const pagePhotoIds = useMemo(
@@ -297,7 +297,7 @@ export default function SpreadPage({
   // Caption zones span the actual empty band between the page edge and the
   // nearest photo, so captions stay centered even when the user adds extra
   // vertical padding (or on the back cover with its larger inset).
-  const captionZones = getCaptionZones(page);
+  const captionZones = getCaptionZones(page, bookFormat.id);
   const topCaptionZoneHeight = pageHeight * (captionZones.topPct / 100);
   const bottomCaptionZoneHeight = pageHeight * (captionZones.bottomPct / 100);
   const captionInputHeight = captionFontSize * 1.6;
