@@ -2,6 +2,7 @@ export type BookFormatId = "square-210" | "a5-portrait";
 
 export type ExportOptionId =
   | "page-pdf"
+  | "page-pdf-large"
   | "spread-pdf"
   | "page-png"
   | "spread-png";
@@ -69,7 +70,7 @@ export const BOOK_FORMATS: Record<BookFormatId, BookFormat> = {
     singlePaddedMarginMm: a5SinglePaddedMarginMm,
     paddingStepsMm: a5PaddingStepsMm,
     defaultExportOption: "page-pdf",
-    exportOptions: ["page-pdf", "page-png"],
+    exportOptions: ["page-pdf", "page-pdf-large", "page-png"],
   },
   "a5-portrait": {
     id: "a5-portrait",

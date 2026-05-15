@@ -88,7 +88,18 @@ export default function ResultsPage() {
             return {
               type,
               label: "Print-ready PDF",
-              detail: `${bookFormat.shortLabel} pages`,
+              detail:
+                bookFormat.id === "square-210"
+                  ? "Square pages (210 x 210 mm)"
+                  : `${bookFormat.shortLabel} pages`,
+              desc: "PDF/X-4, FOGRA39 CMYK",
+              icon: <PictureAsPdfIcon sx={{ fontSize: 20 }} />,
+            };
+          case "page-pdf-large":
+            return {
+              type,
+              label: "Print-ready PDF",
+              detail: "Square pages (294 x 294 mm)",
               desc: "PDF/X-4, FOGRA39 CMYK",
               icon: <PictureAsPdfIcon sx={{ fontSize: 20 }} />,
             };
@@ -227,6 +238,13 @@ export default function ResultsPage() {
           case "page-pdf":
             blob = await exportPdfX4Pages(pages, bookFormat, setExportProgress);
             filename = `photobook-${bookFormat.fileSlug}-PDFX4-FOGRA39.pdf`;
+            break;
+          case "page-pdf-large":
+            blob = await exportPdfX4Pages(pages, bookFormat, setExportProgress, {
+              widthMm: 294,
+              heightMm: 294,
+            });
+            filename = `photobook-square-294-PDFX4-FOGRA39.pdf`;
             break;
           case "spread-pdf":
             blob = await exportPdfX4Spreads(pages, bookFormat, setExportProgress);

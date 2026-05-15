@@ -333,13 +333,26 @@ async function renderSpreadToCanvas(
   return canvas;
 }
 
+export interface PdfPageSizeOverrideMm {
+  widthMm: number;
+  heightMm: number;
+}
+
 export async function exportPdfX4Pages(
   inputPages: BookPage[],
   format: BookFormat,
   onProgress?: (pct: number) => void,
+  sizeOverrideMm?: PdfPageSizeOverrideMm,
 ): Promise<Blob> {
   const pages = getExportPages(inputPages);
-  const pageSize = getPageRenderSize(format);
+  const pageSize: RenderSize = sizeOverrideMm
+    ? {
+        widthMm: sizeOverrideMm.widthMm,
+        heightMm: sizeOverrideMm.heightMm,
+        widthPx: mmToPx(sizeOverrideMm.widthMm),
+        heightPx: mmToPx(sizeOverrideMm.heightMm),
+      }
+    : getPageRenderSize(format);
   const resolver = createPhotoUrlResolver();
   try {
     const pageJpegs: Uint8Array[] = [];
