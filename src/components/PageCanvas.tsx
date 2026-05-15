@@ -36,6 +36,7 @@ interface PageCanvasProps {
   onTextDblClick?: (textId: string) => void;
   editingTextId?: string | null;
   editingCaption?: CaptionPosition | null;
+  hideCaptions?: boolean;
   dragOverSlotId?: string | null;
   dragSourceSlotId?: string | null;
   onDropPhoto?: (photoId: string, slotId: string) => void;
@@ -384,6 +385,7 @@ export default function PageCanvas({
   onTextDblClick,
   editingTextId,
   editingCaption,
+  hideCaptions = false,
   photoUrls: photoUrlsProp,
   onDropPhoto,
 }: PageCanvasProps) {
@@ -420,25 +422,29 @@ export default function PageCanvas({
 
       {/* Captions — centered within the top/bottom margin zones so they sit
           calmly in the empty band rather than crowding the page edge. */}
-      <CaptionText
-        text={page.topCaption}
-        zoneY={0}
-        zoneHeight={topCaptionZoneHeight}
-        pageWidth={pageWidth}
-        fontSize={captionFontSize}
-        isEditing={editingCaption === "top"}
-      />
+      {!hideCaptions && (
+        <CaptionText
+          text={page.topCaption}
+          zoneY={0}
+          zoneHeight={topCaptionZoneHeight}
+          pageWidth={pageWidth}
+          fontSize={captionFontSize}
+          isEditing={editingCaption === "top"}
+        />
+      )}
       {isBackCover ? (
         <EnteBranding pageWidth={pageWidth} pageHeight={pageHeight} />
       ) : (
-        <CaptionText
-          text={page.bottomCaption}
-          zoneY={pageHeight - bottomCaptionZoneHeight}
-          zoneHeight={bottomCaptionZoneHeight}
-          pageWidth={pageWidth}
-          fontSize={captionFontSize}
-          isEditing={editingCaption === "bottom"}
-        />
+        !hideCaptions && (
+          <CaptionText
+            text={page.bottomCaption}
+            zoneY={pageHeight - bottomCaptionZoneHeight}
+            zoneHeight={bottomCaptionZoneHeight}
+            pageWidth={pageWidth}
+            fontSize={captionFontSize}
+            isEditing={editingCaption === "bottom"}
+          />
+        )
       )}
 
       {/* Text blocks */}

@@ -384,6 +384,7 @@ export default function SpreadPage({
                 selectedPageId === page.id ? editingTextId : null
               }
               editingCaption={editingCaption}
+              hideCaptions
               dragOverSlotId={
                 dragOverInfo?.pageId === page.id ? dragOverInfo.slotId : null
               }
@@ -775,7 +776,23 @@ export default function SpreadPage({
                 pointerEvents: dragSourceInfo ? "none" : "auto",
               }}
             >
-              {!page.topCaption && topCaptionHovered && (
+              {page.topCaption ? (
+                <span
+                  style={{
+                    maxWidth: pageWidth * 0.9,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    fontFamily: "var(--font-nunito), sans-serif",
+                    fontSize: captionFontSize,
+                    fontWeight: 400,
+                    color: "#2a2a2a",
+                    pointerEvents: "none",
+                  }}
+                >
+                  {page.topCaption}
+                </span>
+              ) : topCaptionHovered ? (
                 <span
                   style={{
                     fontFamily: "var(--font-nunito), sans-serif",
@@ -787,7 +804,7 @@ export default function SpreadPage({
                 >
                   Add caption...
                 </span>
-              )}
+              ) : null}
             </div>
           )
         )}
@@ -843,7 +860,23 @@ export default function SpreadPage({
                 pointerEvents: dragSourceInfo ? "none" : "auto",
               }}
             >
-              {!page.bottomCaption && bottomCaptionHovered && (
+              {page.bottomCaption ? (
+                <span
+                  style={{
+                    maxWidth: pageWidth * 0.9,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    fontFamily: "var(--font-nunito), sans-serif",
+                    fontSize: captionFontSize,
+                    fontWeight: 400,
+                    color: "#2a2a2a",
+                    pointerEvents: "none",
+                  }}
+                >
+                  {page.bottomCaption}
+                </span>
+              ) : bottomCaptionHovered ? (
                 <span
                   style={{
                     fontFamily: "var(--font-nunito), sans-serif",
@@ -855,7 +888,7 @@ export default function SpreadPage({
                 >
                   Add caption...
                 </span>
-              )}
+              ) : null}
             </div>
           )
         )}
