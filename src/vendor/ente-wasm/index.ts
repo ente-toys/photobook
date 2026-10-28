@@ -8,28 +8,21 @@ type EnteWasmModule = typeof import("./ente_wasm");
 let modulePromise: Promise<EnteWasmModule> | undefined;
 let readyPromise: Promise<EnteWasmModule> | undefined;
 
-/**
- * Load the vendored `ente-wasm` module once. Later calls share the promise.
- */
-export function loadEnteWasm(): Promise<EnteWasmModule> {
-  return (modulePromise ??= import("./ente_wasm").catch((err: unknown) => {
-    modulePromise = undefined;
-    throw err;
-  }));
+function loadEnteWasm(): Promise<EnteWasmModule> {
+    return (modulePromise ??= import("./ente_wasm").catch((err: unknown) => {
+        modulePromise = undefined;
+        throw err;
+    }));
 }
 
-/**
- * Load the module and call `crypto_init()` once. All crypto calls should
- * await this helper first.
- */
 export function loadCryptoReady(): Promise<EnteWasmModule> {
-  return (readyPromise ??= loadEnteWasm()
-    .then((m) => {
-      m.crypto_init();
-      return m;
-    })
-    .catch((err: unknown) => {
-      readyPromise = undefined;
-      throw err;
-    }));
+    return (readyPromise ??= loadEnteWasm()
+        .then((m) => {
+            m.crypto_init();
+            return m;
+        })
+        .catch((err: unknown) => {
+            readyPromise = undefined;
+            throw err;
+        }));
 }

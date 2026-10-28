@@ -1,11 +1,10 @@
-import { useMemo } from "react";
-import { getSpreads, type Spread } from "@/lib/spreads";
-import { useBook } from "@/context/BookContext";
+import { useBook } from "@/context/book";
 import { getPrintBinding } from "@/lib/printProducts";
+import { getSpreads, type Spread } from "@/lib/spreads";
+import { useMemo } from "react";
 
-/** Left-aligned covers and printed interior pairings, including printer blanks. */
 export function useSpreads(pageCount: number): Spread[] {
-  const { book } = useBook();
-  const binding = getPrintBinding(book.printSelection);
-  return useMemo(() => getSpreads(pageCount, binding), [pageCount, binding]);
+    const { book } = useBook();
+    const binding = getPrintBinding(book.printSelection);
+    return useMemo(() => getSpreads(pageCount, binding), [pageCount, binding]);
 }
