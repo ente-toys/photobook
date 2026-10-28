@@ -1,8 +1,10 @@
 "use client";
 
+import { uiColors } from "@/theme/colors";
+
 import { useState } from "react";
 import { Box, Typography, Link, Dialog, DialogTitle, DialogContent, IconButton } from "@mui/material";
-import CloseIcon from "@mui/icons-material/Close";
+import { CloseIcon } from "./icons";
 
 export default function Footer({ showPrivacyPolicy = false, light = false }: { showPrivacyPolicy?: boolean; light?: boolean }) {
   const [privacyOpen, setPrivacyOpen] = useState(false);
@@ -11,9 +13,9 @@ export default function Footer({ showPrivacyPolicy = false, light = false }: { s
     <Box
       component="footer"
       sx={{
-        bgcolor: light ? "#f8f8f8" : "#141617",
+        bgcolor: uiColors.background,
         py: 4,
-        borderTop: light ? "1px solid rgba(0,0,0,0.06)" : "1px solid rgba(255,255,255,0.06)",
+        borderTop: `1px solid ${uiColors.border}`,
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -28,7 +30,7 @@ export default function Footer({ showPrivacyPolicy = false, light = false }: { s
           sx={{
             fontFamily: "var(--font-manrope), sans-serif",
             fontSize: "0.85rem",
-            color: light ? "#888" : "#777",
+            color: uiColors.muted,
             border: "none",
             background: "none",
             cursor: "pointer",
@@ -41,7 +43,7 @@ export default function Footer({ showPrivacyPolicy = false, light = false }: { s
         sx={{
           fontFamily: "var(--font-manrope), sans-serif",
           fontSize: "0.75rem",
-          color: light ? "#999" : "#666",
+          color: uiColors.muted,
         }}
       >
         &copy; 2026 Ente Photobook. Handcrafted for your memories.

@@ -1,60 +1,37 @@
 import { v4 as uuid } from "uuid";
 import type { BookPage, Photo, PhotoSlot } from "./types";
-import {
-  DEFAULT_BOOK_FORMAT_ID,
-  getBookFormat,
-  type BookFormatId,
-} from "./bookFormats";
+import { BOOK_LAYOUT, BOOK_SIZE_MM } from "./bookFormats";
+import { makeBlankPage, normalizeBookPages } from "./bookPages";
 
 export interface LayoutMetrics {
   marginH: number;
   marginV: number;
-  paddedMarginH: number;
-  paddedMarginV: number;
   hGap: number;
   vGap: number;
   left: number;
   top: number;
   cw: number;
   ch: number;
-  paddingStepsH: number[];
-  paddingStepsV: number[];
 }
 
 function mmToPct(mm: number, totalMm: number): number {
   return (mm / totalMm) * 100;
 }
 
-export function getLayoutMetrics(
-  formatId: BookFormatId = DEFAULT_BOOK_FORMAT_ID,
-): LayoutMetrics {
-  const format = getBookFormat(formatId);
-  const marginH = mmToPct(format.marginMm.h, format.widthMm);
-  const marginV = mmToPct(format.marginMm.v, format.heightMm);
+export function getLayoutMetrics(): LayoutMetrics {
+  const format = BOOK_LAYOUT;
+  const marginH = mmToPct(format.marginMm.h, BOOK_SIZE_MM);
+  const marginV = mmToPct(format.marginMm.v, BOOK_SIZE_MM);
 
   return {
     marginH,
     marginV,
-    paddedMarginH: mmToPct(
-      format.singlePaddedMarginMm.h,
-      format.widthMm,
-    ),
-    paddedMarginV: mmToPct(
-      format.singlePaddedMarginMm.v,
-      format.heightMm,
-    ),
-    hGap: mmToPct(format.gapMm.h, format.widthMm),
-    vGap: mmToPct(format.gapMm.v, format.heightMm),
+    hGap: mmToPct(format.gapMm.h, BOOK_SIZE_MM),
+    vGap: mmToPct(format.gapMm.v, BOOK_SIZE_MM),
     left: marginH,
     top: marginV,
     cw: 100 - 2 * marginH,
     ch: 100 - 2 * marginV,
-    paddingStepsH: format.paddingStepsMm.h.map((mm) =>
-      mmToPct(mm, format.widthMm),
-    ),
-    paddingStepsV: format.paddingStepsMm.v.map((mm) =>
-      mmToPct(mm, format.heightMm),
-    ),
   };
 }
 
@@ -103,19 +80,12 @@ export interface SlotPosition {
   height: number;
 }
 
-function contentArea(marginH: number, marginV: number) {
-  const l = marginH;
-  const t = marginV;
-  const r = 100 - marginH;
-  const b = 100 - marginV;
-  return { l, t, cw: r - l, ch: b - t };
-}
-
 // ── 1-photo variants ──────────────────────────────────────────────
 
-function gen1Padded(ids: string[], m: LayoutMetrics): PhotoSlot[] {
-  const { l, t, cw, ch } = contentArea(m.paddedMarginH, m.paddedMarginV);
-  return [makeSlot(ids[0], l, t, cw, ch)];
+function gen1Padded(ids: string[], _m: LayoutMetrics): PhotoSlot[] {
+  const left = mmToPct(BOOK_LAYOUT.coverInsetMarginMm.h, BOOK_SIZE_MM);
+  const top = mmToPct(BOOK_LAYOUT.coverInsetMarginMm.v, BOOK_SIZE_MM);
+  return [makeSlot(ids[0], left, top, 100 - 2 * left, 100 - 2 * top)];
 }
 
 function gen1Moderate(ids: string[], m: LayoutMetrics): PhotoSlot[] {
@@ -318,6 +288,32 @@ function gen4Grid(ids: string[], m: LayoutMetrics): PhotoSlot[] {
   ];
 }
 
+function gen4Staggered(ids: string[], m: LayoutMetrics): PhotoSlot[] {
+  const { left, top, cw, ch, hGap, vGap } = m;
+  const largeW = (cw - hGap) / 2;
+  const largeH = (ch - vGap) * 0.56;
+  const smallW = largeW * 0.68;
+  const smallH = (ch - vGap) * 0.32;
+  const rightX = left + largeW + hGap;
+  const lowerY = top + ch - largeH;
+
+  // The large photos anchor opposite corners; the smaller photos sit
+  // against the center gutter, leaving white space at the other corners.
+  return [
+    makeSlot(ids[0], left, top, largeW, largeH),
+    makeSlot(ids[1], rightX, lowerY - vGap - smallH, smallW, smallH),
+    makeSlot(ids[2], left + largeW - smallW, top + largeH + vGap, smallW, smallH),
+    makeSlot(ids[3], rightX, lowerY, largeW, largeH),
+  ];
+}
+
+function gen4StaggeredReverse(ids: string[], m: LayoutMetrics): PhotoSlot[] {
+  return gen4Staggered(ids, m).map((slot) => ({
+    ...slot,
+    x: m.left + m.cw - (slot.x - m.left) - slot.width,
+  }));
+}
+
 function gen4Top1Bot3(ids: string[], m: LayoutMetrics): PhotoSlot[] {
   const { left: LEFT, top: TOP, cw: CW, ch: CH, hGap: H_GAP, vGap: V_GAP } = m;
   const topH = CH * 0.5;
@@ -434,13 +430,13 @@ function gen4TallBottom(ids: string[], m: LayoutMetrics): PhotoSlot[] {
 }
 
 function gen4EqualCols(ids: string[], m: LayoutMetrics): PhotoSlot[] {
-  const { left: LEFT, top: TOP, cw: CW, ch: CH, hGap: H_GAP } = m;
+  const { left: LEFT, top, cw: CW, ch: height, hGap: H_GAP } = m;
   const colW = (CW - H_GAP * 3) / 4;
   return [
-    makeSlot(ids[0], LEFT, TOP, colW, CH),
-    makeSlot(ids[1], LEFT + colW + H_GAP, TOP, colW, CH),
-    makeSlot(ids[2], LEFT + (colW + H_GAP) * 2, TOP, colW, CH),
-    makeSlot(ids[3], LEFT + (colW + H_GAP) * 3, TOP, colW, CH),
+    makeSlot(ids[0], LEFT, top, colW, height),
+    makeSlot(ids[1], LEFT + colW + H_GAP, top, colW, height),
+    makeSlot(ids[2], LEFT + (colW + H_GAP) * 2, top, colW, height),
+    makeSlot(ids[3], LEFT + (colW + H_GAP) * 3, top, colW, height),
   ];
 }
 
@@ -471,6 +467,8 @@ const ALL_VARIANTS: LayoutVariant[] = [
   { key: "3-equal-cols", photoCount: 3, generate: gen3EqualCols },
   // 4 photos
   { key: "4-grid", photoCount: 4, generate: gen4Grid },
+  { key: "4-staggered", photoCount: 4, generate: gen4Staggered },
+  { key: "4-staggered-reverse", photoCount: 4, generate: gen4StaggeredReverse },
   { key: "4-top1-bot3", photoCount: 4, generate: gen4Top1Bot3 },
   { key: "4-bot1-top3", photoCount: 4, generate: gen4Bot1Top3 },
   { key: "4-left1-right3", photoCount: 4, generate: gen4Left1Right3 },
@@ -498,6 +496,8 @@ const MIRROR_MAP = new Map<string, string>([
   ["3-dominant-bottom", "3-dominant-top"],
   ["3-dominant-left", "3-dominant-right"],
   ["3-dominant-right", "3-dominant-left"],
+  ["4-staggered", "4-staggered-reverse"],
+  ["4-staggered-reverse", "4-staggered"],
   ["4-top1-bot3", "4-bot1-top3"],
   ["4-bot1-top3", "4-top1-bot3"],
   ["4-left1-right3", "4-right1-left3"],
@@ -516,45 +516,37 @@ const HIDDEN_MIRRORS = new Set([
   "3-right1-left2",
   "3-dominant-bottom",
   "3-dominant-right",
+  "4-staggered-reverse",
   "4-bot1-top3",
   "4-right1-left3",
   "4-wide-right",
   "4-tall-bottom",
 ]);
 
-/** Default padding for specific variants */
-const DEFAULT_PADDING = new Map<string, { h: number; v: number }>([
-  ["4-equal-cols", { h: 0, v: 3 }],
-]);
-
-/** Get the default padding for a variant */
-export function getDefaultPadding(key: string): { h: number; v: number } {
-  return DEFAULT_PADDING.get(key) ?? { h: 0, v: 0 };
-}
-
 /** Get the mirror variant key, if one exists */
 export function getMirrorVariant(key: string): string | undefined {
   return MIRROR_MAP.get(key);
 }
 
-/** Get all available layout variants for a given photo count (excluding hidden mirrors) */
-export function getVariantsForCount(count: number): LayoutVariant[] {
-  return ALL_VARIANTS.filter((v) => v.photoCount === count && !HIDDEN_MIRRORS.has(v.key));
+/** Get selectable variants, including the optional extra inset only for front covers. */
+export function getVariantsForCount(count: number, isFrontCover = false): LayoutVariant[] {
+  return ALL_VARIANTS.filter((v) =>
+    v.photoCount === count &&
+    !HIDDEN_MIRRORS.has(v.key) &&
+    (isFrontCover || v.key !== "1-padded")
+  );
 }
 
-/** Caption zone heights (% of page) above and below the photos. Captions are
- * centered in these bands, so when the user adds extra vertical padding (or
- * on the back cover with its larger inset), the zones grow with the photo's
- * actual edges rather than staying pinned to the default margin band. */
+/** Available margin heights (% of page) above and below the photos.
+ * printLayout keeps captions within the safe portion of these margins. */
 export function getCaptionZones(
   page: BookPage,
-  formatId: BookFormatId = DEFAULT_BOOK_FORMAT_ID,
 ): {
   topPct: number;
   bottomPct: number;
 } {
   if (page.slots.length === 0) {
-    const metrics = getLayoutMetrics(formatId);
+    const metrics = getLayoutMetrics();
     return { topPct: metrics.marginV, bottomPct: metrics.marginV };
   }
   const topPct = Math.min(...page.slots.map((s) => s.y));
@@ -563,15 +555,11 @@ export function getCaptionZones(
 }
 
 /** Get the slot positions for a variant (for thumbnail previews) */
-export function getVariantPreview(
-  key: string,
-  formatId: BookFormatId = DEFAULT_BOOK_FORMAT_ID,
-): SlotPosition[] {
+export function getVariantPreview(key: string): SlotPosition[] {
   const variant = VARIANT_MAP.get(key);
   if (!variant) return [];
   const dummyIds = Array.from({ length: variant.photoCount }, (_, i) => `d${i}`);
-  const defaults = getDefaultPadding(key);
-  const slots = applyVariant(key, dummyIds, defaults.h, defaults.v, formatId);
+  const slots = applyVariant(key, dummyIds);
   return slots.map((s) => ({
     x: s.x,
     y: s.y,
@@ -580,55 +568,21 @@ export function getVariantPreview(
   }));
 }
 
-/** Apply extra padding to slots by scaling them inward */
-export function applyPadding(
-  slots: PhotoSlot[],
-  paddingH: number,
-  paddingV: number,
-  metrics: LayoutMetrics,
-): PhotoSlot[] {
-  const extraH = metrics.paddingStepsH[paddingH] ?? 0;
-  const extraV = metrics.paddingStepsV[paddingV] ?? 0;
-  if (extraH === 0 && extraV === 0) return slots;
-
-  // Scale from the default content area into a smaller one
-  const oldL = metrics.marginH;
-  const oldT = metrics.marginV;
-  const oldW = 100 - 2 * metrics.marginH;
-  const oldH = 100 - 2 * metrics.marginV;
-  const newL = metrics.marginH + extraH;
-  const newT = metrics.marginV + extraV;
-  const newW = 100 - 2 * (metrics.marginH + extraH);
-  const newH = 100 - 2 * (metrics.marginV + extraV);
-
-  return slots.map((s) => ({
-    ...s,
-    x: newL + ((s.x - oldL) / oldW) * newW,
-    y: newT + ((s.y - oldT) / oldH) * newH,
-    width: (s.width / oldW) * newW,
-    height: (s.height / oldH) * newH,
-  }));
-}
-
 /** Apply a specific layout variant to a set of photo IDs */
 export function applyVariant(
   key: string,
   photoIds: string[],
-  paddingH = 0,
-  paddingV = 0,
-  formatId: BookFormatId = DEFAULT_BOOK_FORMAT_ID,
 ): PhotoSlot[] {
   const variant = VARIANT_MAP.get(key);
   if (!variant) return [];
-  const metrics = getLayoutMetrics(formatId);
-  const slots = variant.generate(photoIds, metrics);
-  return applyPadding(slots, paddingH, paddingV, metrics);
+  const metrics = getLayoutMetrics();
+  return variant.generate(photoIds, metrics);
 }
 
 /** Pick the best layout variant key for a set of photos (orientation-based). */
 export function chooseBestVariantKey(photos: Photo[]): string {
   const count = photos.length;
-  if (count <= 1) return "1-padded";
+  if (count <= 1) return "1-moderate";
 
   if (count === 2) {
     const o0 = getOrientation(photos[0]);
@@ -650,39 +604,72 @@ export function chooseBestVariantKey(photos: Photo[]): string {
 
 /** Default variant key for a given photo count (used as a fallback). */
 export function defaultVariantKeyForCount(count: number): string {
-  if (count <= 1) return "1-padded";
+  if (count <= 1) return "1-moderate";
   if (count === 2) return "2-side";
   if (count === 3) return "3-left1-right2";
   return "4-grid";
 }
 
-export function chooseBestLayout(
-  photos: Photo[],
-  formatId: BookFormatId = DEFAULT_BOOK_FORMAT_ID,
-): PhotoSlot[] {
+export function chooseBestLayout(photos: Photo[]): PhotoSlot[] {
   if (photos.length === 0) return [];
   const variantKey = chooseBestVariantKey(photos);
   return applyVariant(
     variantKey,
     photos.map((p) => p.id),
-    0,
-    0,
-    formatId,
   );
 }
 
-const makeBlankPage = (): BookPage => ({
-  id: uuid(),
-  slots: [],
-  textBlocks: [],
-  topCaption: "",
-  bottomCaption: "",
-});
+/** Fraction of each photo lost to cover-fit cropping in its chosen layout. */
+function layoutCropLoss(photos: Photo[]): number {
+  const slots = chooseBestLayout(photos);
+  return photos.reduce((loss, photo, index) => {
+    const photoRatio = photo.width / photo.height;
+    const slotRatio = slots[index].width / slots[index].height;
+    return loss + 1 - Math.min(photoRatio / slotRatio, slotRatio / photoRatio);
+  }, 0);
+}
 
-export function generateAutoLayout(
-  photos: Photo[],
-  formatId: BookFormatId = DEFAULT_BOOK_FORMAT_ID,
-): BookPage[] {
+/** Plan an even number of populated content pages before creating the book. */
+function groupInteriorPhotos(photos: Photo[]): Photo[][] {
+  const groups: Photo[][] = [];
+  const layoutCycle = [2, 3, 1, 4, 2, 3, 1, 2];
+  let idx = 0;
+
+  while (idx < photos.length) {
+    const remaining = photos.length - idx;
+    let count = Math.min(layoutCycle[groups.length % layoutCycle.length], remaining);
+
+    // Avoid a lone final photo in the initial grouping where possible.
+    if (remaining - count === 1 && count < 4) {
+      count = Math.min(count + 1, remaining, 4);
+    }
+    groups.push(photos.slice(idx, idx + count));
+    idx += count;
+  }
+
+  if (groups.length % 2 !== 0) {
+    // Split the last multi-photo group, keeping photo order and the rest of
+    // the book intact. With only one interior photo, a blank is unavoidable.
+    let groupIndex = groups.length - 1;
+    while (groupIndex >= 0 && groups[groupIndex].length < 2) groupIndex--;
+    if (groupIndex >= 0) {
+      const group = groups[groupIndex];
+      const splits = Array.from({ length: group.length - 1 }, (_, i) => {
+        const left = group.slice(0, i + 1);
+        const right = group.slice(i + 1);
+        return { left, right, loss: layoutCropLoss(left) + layoutCropLoss(right) };
+      });
+      splits.sort((a, b) => a.loss - b.loss ||
+        Math.abs(a.left.length - a.right.length) - Math.abs(b.left.length - b.right.length));
+      const best = splits[0];
+      groups.splice(groupIndex, 1, best.left, best.right);
+    }
+  }
+
+  return groups;
+}
+
+export function generateAutoLayout(photos: Photo[]): BookPage[] {
   // Sort by dateTaken
   const sorted = [...photos].sort((a, b) => a.dateTaken - b.dateTaken);
 
@@ -693,70 +680,28 @@ export function generateAutoLayout(
   // First page (cover) — single photo, always full-bleed.
   pages.push({
     id: uuid(),
-    slots: applyVariant("1-full", [sorted[0].id], 0, 0, formatId),
+    slots: applyVariant("1-full", [sorted[0].id]),
     layoutVariant: "1-full",
     textBlocks: [],
     topCaption: "",
     bottomCaption: "",
   });
 
-  // Reserve the last photo (by date) for the back cover when there are
-  // at least two photos. The back cover uses the most-padded single-photo
-  // layout so the photo sits inset above the ente branding.
-  const hasBackCoverPhoto = sorted.length >= 2;
-  const interiorEnd = hasBackCoverPhoto ? sorted.length - 1 : sorted.length;
-
-  // Distribute middle photos with variety
-  const layoutCycle = [2, 3, 1, 4, 2, 3, 1, 2];
-  let cycleIdx = 0;
-  let idx = 1;
-
-  while (idx < interiorEnd) {
-    const remaining = interiorEnd - idx;
-    let count = Math.min(layoutCycle[cycleIdx % layoutCycle.length], remaining);
-
-    // Don't leave 1 photo for a last interior page if we can avoid it
-    if (remaining - count === 1 && count < 4) {
-      count = Math.min(count + 1, remaining, 4);
-    }
-
-    const pagePhotos = sorted.slice(idx, idx + count);
+  // All remaining photos belong to the interior, including the last photo.
+  for (const pagePhotos of groupInteriorPhotos(sorted.slice(1))) {
     const variantKey = chooseBestVariantKey(pagePhotos);
-    const slots = chooseBestLayout(pagePhotos, formatId);
 
     pages.push({
       id: uuid(),
-      slots,
+      slots: applyVariant(variantKey, pagePhotos.map((photo) => photo.id)),
       layoutVariant: variantKey,
       textBlocks: [],
       topCaption: "",
       bottomCaption: "",
     });
-
-    idx += count;
-    cycleIdx++;
   }
 
-  // Keep total even by padding with a blank interior page before the back
-  // cover, so the reserved back-cover photo always lands on the last page.
-  if ((pages.length + 1) % 2 !== 0) {
-    pages.push(makeBlankPage());
-  }
-
-  if (hasBackCoverPhoto) {
-    const backCoverId = sorted[sorted.length - 1].id;
-    pages.push({
-      id: uuid(),
-      slots: applyVariant("1-padded", [backCoverId], 0, 0, formatId),
-      layoutVariant: "1-padded",
-      textBlocks: [],
-      topCaption: "",
-      bottomCaption: "",
-    });
-  } else {
-    // Only one photo in the whole book — back cover is blank (branding only).
-    pages.push(makeBlankPage());
-  }
-
-  return pages;
+  // Branding is rendered separately on the photo-free back cover.
+  pages.push(makeBlankPage());
+  return normalizeBookPages(pages);
 }

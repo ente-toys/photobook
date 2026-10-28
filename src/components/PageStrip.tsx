@@ -1,30 +1,31 @@
 "use client";
 
-import React, { useRef, useState, useEffect, useCallback, type RefCallback } from "react";
-import { Box, Typography } from "@mui/material";
+import { thumbnailShadow, toolbarColors, uiColors } from "@/theme/colors";
+
+import { useRef, useState, useEffect, useCallback, type RefCallback } from "react";
+import { Box, Typography, useMediaQuery } from "@mui/material";
 import { Stage, Layer } from "react-konva";
 import { useBook } from "@/context/BookContext";
 import PageCanvas from "./PageCanvas";
+import PrinterBlankPage from "./PrinterBlankPage";
+import { EDITOR_SCROLLBAR_SX } from "./editorLayout";
 import { useSpreads } from "@/hooks/useSpreads";
-import { getBookFormatAspect } from "@/lib/bookFormats";
-
-const THUMB_PAGE_W = 60;
+import { usePageDrag } from "@/hooks/usePageDrag";
 
 interface PageStripProps {
-  scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
   onSpreadClick?: (spreadIdx: number) => void;
 }
 
 export default function PageStrip({
-  scrollContainerRef,
   onSpreadClick,
 }: PageStripProps) {
-  const { book, bookFormat, reorderPages } = useBook();
+  const { book } = useBook();
+  const isCompact = useMediaQuery("(max-width: 599px)");
+  const thumbnailWidth = isCompact ? 52 : 136;
+  const rowPadding = isCompact ? 8 : 12;
+  const labelLineHeight = isCompact ? 16 : 18;
   const pages = book.pages;
-  const pageAspect = getBookFormatAspect(bookFormat);
-  const thumbPageH = Math.round(THUMB_PAGE_W / pageAspect);
-  const dragItem = useRef<number | null>(null);
-  const dragOverItem = useRef<number | null>(null);
+  const pageDrag = usePageDrag();
   const stripContainerRef = useRef<HTMLDivElement | null>(null);
 
   const spreads = useSpreads(pages.length);
@@ -33,17 +34,6 @@ export default function PageStrip({
   const [visibleSpreads, setVisibleSpreads] = useState<Set<number>>(() => new Set([0, 1, 2, 3, 4, 5, 6, 7]));
   const stripElsRef = useRef<Map<number, Element>>(new Map());
   const stripObserverRef = useRef<IntersectionObserver | null>(null);
-
-  // Combine external scrollContainerRef with our internal ref
-  const setScrollRef = useCallback(
-    (el: HTMLDivElement | null) => {
-      stripContainerRef.current = el;
-      if (scrollContainerRef && "current" in scrollContainerRef) {
-        (scrollContainerRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
-      }
-    },
-    [scrollContainerRef]
-  );
 
   useEffect(() => {
     const root = stripContainerRef.current;
@@ -93,184 +83,109 @@ export default function PageStrip({
     []
   );
 
-  const handleDragStart = (idx: number) => {
-    dragItem.current = idx;
-  };
-
-  const handleDragEnter = (idx: number) => {
-    dragOverItem.current = idx;
-  };
-
-  const handleDragEnd = () => {
-    if (
-      dragItem.current !== null &&
-      dragOverItem.current !== null &&
-      dragItem.current !== dragOverItem.current
-    ) {
-      reorderPages(dragItem.current, dragOverItem.current);
-    }
-    dragItem.current = null;
-    dragOverItem.current = null;
-  };
-
   return (
     <Box
-      ref={setScrollRef}
+      ref={stripContainerRef}
       sx={{
-        width: 192,
-        bgcolor: "#141617",
+        width: "100%",
         display: "flex",
         flexDirection: "column",
-        pt: 1,
-        pb: 3,
-        px: 2,
+        px: { xs: 1, sm: 2 },
+        py: 3,
         flex: 1,
+        minHeight: 0,
+        overflowX: "hidden",
         overflowY: "auto",
+        scrollbarGutter: "stable both-edges",
+        ...EDITOR_SCROLLBAR_SX,
       }}
     >
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-        {spreads.map((spread, spreadIdx) => {
-          const isVisible = visibleSpreads.has(spreadIdx);
-          const leftPage = spread.left !== null ? pages[spread.left] : null;
-          const rightPage = spread.right !== null ? pages[spread.right] : null;
+      {pages.length === 0 && (
+        <Typography sx={{ px: 1, pt: 3, fontSize: 12, lineHeight: 1.5, color: uiColors.muted, textAlign: "center" }}>
+          Your pages will appear here
+        </Typography>
+      )}
+      <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: { xs: 1, sm: 1.5 } }}>
+        {spreads.map((spread, spreadIdx) => (
+          <Box
+            key={spreadIdx}
+            ref={stripSpreadRefCallback(spreadIdx)}
+            data-strip-spread-index={spreadIdx}
+            onClick={() => onSpreadClick?.(spreadIdx)}
+            sx={{
+              cursor: "pointer",
+              borderRadius: `${rowPadding + 4}px`,
+              p: `${rowPadding}px`,
+              width: (spread.left !== null && spread.right !== null
+                ? thumbnailWidth * 2 + 2
+                : thumbnailWidth) + rowPadding * 2,
+              ml: spread.left === null ? `${thumbnailWidth + 2}px` : 0,
+              mr: spread.right === null ? `${thumbnailWidth + 2}px` : 0,
+              display: "flex",
+              gap: "2px",
+              minHeight: thumbnailWidth + rowPadding * 2 + labelLineHeight + 4,
+              "&:hover": { bgcolor: toolbarColors.control },
+              transition: "background-color 120ms ease",
+            }}
+          >
+            {visibleSpreads.has(spreadIdx) && (["left", "right"] as const).map((side) => {
+              const entry = spread[side];
+              if (entry === null) return null;
+              const pageIndex = typeof entry === "number" ? entry : null;
+              const page = pageIndex !== null ? pages[pageIndex] : null;
+              const canDrag = pageIndex !== null && pageIndex > 0 && pageIndex < pages.length - 1;
+              const label = entry === "printer-blank" ? "Blank"
+                : pageIndex === null ? ""
+                : pageIndex === 0 ? "Cover"
+                : pageIndex === pages.length - 1 ? "Back cover" : pageIndex;
 
-          return (
-            <Box
-              key={spreadIdx}
-              ref={stripSpreadRefCallback(spreadIdx)}
-              data-strip-spread-index={spreadIdx}
-              onClick={() => onSpreadClick?.(spreadIdx)}
-              draggable
-              onDragStart={() => handleDragStart(spreadIdx)}
-              onDragEnter={() => handleDragEnter(spreadIdx)}
-              onDragEnd={handleDragEnd}
-              sx={{
-                cursor: "pointer",
-                borderRadius: 1.5,
-                p: 1,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                minHeight: thumbPageH + 24,
-                "&:hover": {
-                  bgcolor: "rgba(255,255,255,0.06)",
-                },
-                transition: "all 0.2s",
-              }}
-            >
-              {isVisible && (
-                <>
-                  <Box
-                    sx={{
-                      display: "flex",
-                      gap: "2px",
-                      justifyContent: leftPage ? "flex-start" : "flex-end",
-                      width: THUMB_PAGE_W * 2 + 2,
-                    }}
+              return (
+                <Box key={side} sx={{ width: thumbnailWidth, flexShrink: 0 }}>
+                  {entry === "printer-blank" ? (
+                    <PrinterBlankPage width={thumbnailWidth} height={thumbnailWidth} />
+                  ) : page && pageIndex !== null ? (
+                    <Box
+                      draggable={canDrag}
+                      onDragStart={(e) => pageDrag.handlePageDragStart(e, pageIndex)}
+                      onDragOver={(e) => pageDrag.handlePageDragOverPage(e, pageIndex)}
+                      onDrop={(e) => pageDrag.handlePageDropOnPage(e, pageIndex)}
+                      onDragEnd={pageDrag.handlePageDragEndCleanup}
+                      sx={{
+                        width: thumbnailWidth,
+                        height: thumbnailWidth,
+                        bgcolor: uiColors.paper,
+                        boxShadow: thumbnailShadow,
+                        borderRadius: 0.5,
+                        overflow: "hidden",
+                        cursor: canDrag ? "grab" : "pointer",
+                        outline: pageDrag.pageDragTarget === pageIndex ? "2px solid #08C225" : undefined,
+                        opacity: pageDrag.pageDragSource === pageIndex ? 0.4 : 1,
+                      }}
+                    >
+                      <Stage width={thumbnailWidth} height={thumbnailWidth} listening={false} style={{ pointerEvents: "none" }}>
+                        <Layer>
+                          <PageCanvas
+                            page={page}
+                            pageWidth={thumbnailWidth}
+                            pageHeight={thumbnailWidth}
+                            isFrontCover={pageIndex === 0}
+                            isBackCover={pageIndex === pages.length - 1}
+                          />
+                        </Layer>
+                      </Stage>
+                    </Box>
+                  ) : null}
+                  <Typography
+                    title={entry === "printer-blank" ? "Blank page (required)" : undefined}
+                    sx={{ mt: 0.5, fontSize: isCompact ? 12 : 14, lineHeight: `${labelLineHeight}px`, fontWeight: 600, color: uiColors.muted, textAlign: "center" }}
                   >
-                    {/* Left page thumbnail */}
-                    {leftPage && (
-                      <Box
-                        sx={{
-                          flex: "0 0 auto",
-                          width: THUMB_PAGE_W,
-                          aspectRatio: `${bookFormat.widthMm}/${bookFormat.heightMm}`,
-                          bgcolor: "white",
-                          border: "1px solid rgba(255,255,255,0.1)",
-                          borderRadius: 0.5,
-                          overflow: "hidden",
-                        }}
-                      >
-                        <Stage
-                          width={THUMB_PAGE_W}
-                          height={thumbPageH}
-                          listening={false}
-                          style={{ pointerEvents: "none" }}
-                        >
-                          <Layer>
-                            <PageCanvas
-                              page={leftPage}
-                              pageWidth={THUMB_PAGE_W}
-                              pageHeight={thumbPageH}
-                              isFrontCover={spread.left === 0}
-                              isBackCover={spread.left === pages.length - 1}
-                            />
-                          </Layer>
-                        </Stage>
-                      </Box>
-                    )}
-                    {/* Right page thumbnail */}
-                    {rightPage && (
-                      <Box
-                        sx={{
-                          flex: "0 0 auto",
-                          width: THUMB_PAGE_W,
-                          aspectRatio: `${bookFormat.widthMm}/${bookFormat.heightMm}`,
-                          bgcolor: "white",
-                          border: "1px solid rgba(255,255,255,0.1)",
-                          borderRadius: 0.5,
-                          overflow: "hidden",
-                        }}
-                      >
-                        <Stage
-                          width={THUMB_PAGE_W}
-                          height={thumbPageH}
-                          listening={false}
-                          style={{ pointerEvents: "none" }}
-                        >
-                          <Layer>
-                            <PageCanvas
-                              page={rightPage}
-                              pageWidth={THUMB_PAGE_W}
-                              pageHeight={thumbPageH}
-                              isFrontCover={spread.right === 0}
-                              isBackCover={spread.right === pages.length - 1}
-                            />
-                          </Layer>
-                        </Stage>
-                      </Box>
-                    )}
-                  </Box>
-                  <Box
-                    sx={{
-                      display: "flex",
-                      width: THUMB_PAGE_W * 2 + 2,
-                      mt: 0.5,
-                    }}
-                  >
-                    {leftPage && (
-                      <Typography
-                        sx={{
-                          width: THUMB_PAGE_W,
-                          fontSize: "0.75rem",
-                          fontWeight: 600,
-                          color: "rgba(255,255,255,0.45)",
-                          textAlign: "center",
-                        }}
-                      >
-                        {spread.left! === 0 ? "Cover" : spread.left! === pages.length - 1 ? "Back cover" : spread.left!}
-                      </Typography>
-                    )}
-                    {rightPage && (
-                      <Typography
-                        sx={{
-                          width: THUMB_PAGE_W,
-                          fontSize: "0.75rem",
-                          fontWeight: 600,
-                          color: "rgba(255,255,255,0.45)",
-                          textAlign: "center",
-                          ml: leftPage ? "2px" : "auto",
-                        }}
-                      >
-                        {spread.right! === 0 ? "Cover" : spread.right! === pages.length - 1 ? "Back cover" : spread.right!}
-                      </Typography>
-                    )}
-                  </Box>
-                </>
-              )}
-            </Box>
-          );
-        })}
+                    {label}
+                  </Typography>
+                </Box>
+              );
+            })}
+          </Box>
+        ))}
       </Box>
     </Box>
   );

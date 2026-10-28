@@ -30,7 +30,21 @@ declare module "page-flip" {
     turnToNextPage(): void;
     turnToPrevPage(): void;
     getCurrentPageIndex(): number;
+    getState(): "read" | "fold_corner" | "user_fold" | "flipping";
     getPageCount(): number;
+    getPage(pageIndex: number): {
+      setDensity(density: "hard" | "soft"): void;
+      getDensity(): "hard" | "soft";
+      simpleDraw(orientation: number): void;
+      getElement(): HTMLElement;
+    };
+    getRender(): { getRect(): { pageWidth: number; height: number } };
+    getFlipController(): {
+      getCalculation(): {
+        getDirection(): number;
+        getBottomClipArea(): ({ x: number; y: number } | null)[];
+      } | null;
+    };
     on(event: string, callback: (e: any) => void): PageFlip;
     destroy(): void;
     flip(page: number, corner?: "top" | "bottom"): void;

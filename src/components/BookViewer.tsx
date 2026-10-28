@@ -3,19 +3,42 @@
 import React, {
   useRef,
   useEffect,
+  useLayoutEffect,
   useState,
-  useCallback,
   useMemo,
+  useCallback,
   forwardRef,
   useImperativeHandle,
 } from "react";
-import { Box } from "@mui/material";
+import { createPortal } from "react-dom";
+import { Box, IconButton } from "@mui/material";
 import { PageFlip } from "page-flip";
 import { Stage, Layer } from "react-konva";
 import type { BookPage } from "@/lib/types";
-import { getBookFormatAspect } from "@/lib/bookFormats";
+import { getFlipPages, getFlipPageIndex, getSpreads, getSpreadPageIndices } from "@/lib/spreads";
+import { getPrintBinding } from "@/lib/printProducts";
+import { clipSoftcoverInsidePages } from "@/lib/softcoverPreview";
 import { useBook } from "@/context/BookContext";
 import PageCanvas from "./PageCanvas";
+import BookPageNavigation from "./BookPageNavigation";
+import { ChevronLeftIcon, ChevronRightIcon } from "./icons";
+import { uiColors } from "@/theme/colors";
+import styles from "./BookViewer.module.css";
+
+const PAGE_NAVIGATION_SPACE = 72;
+
+const navigationButtonSx = {
+  position: "absolute",
+  top: 0,
+  transform: "translateY(-50%)",
+  pointerEvents: "auto",
+  width: { xs: 40, sm: 48 },
+  height: { xs: 40, sm: 48 },
+  color: uiColors.text,
+  bgcolor: uiColors.control,
+  "&:hover": { bgcolor: uiColors.controlHover },
+  "&.Mui-disabled": { opacity: 0.3 },
+} as const;
 
 export interface BookViewerHandle {
   flipNext: () => void;
@@ -24,268 +47,261 @@ export interface BookViewerHandle {
 
 interface BookViewerProps {
   pages: BookPage[];
-  onPageChange: (pageIndex: number) => void;
+  onSpreadChange: (spreadIndex: number) => void;
 }
 
 const BookViewer = forwardRef<BookViewerHandle, BookViewerProps>(
-  function BookViewer({ pages, onPageChange }, ref) {
-    const { bookFormat, photoUrls, loadPreviews } = useBook();
+  function BookViewer({ pages, onSpreadChange }, ref) {
+    const { book: bookState, photoUrls, loadPreviews } = useBook();
+    const binding = getPrintBinding(bookState.printSelection);
+    const flipPages = useMemo(() => getFlipPages(pages.length, binding), [pages.length, binding]);
+    const spreads = useMemo(() => getSpreads(pages.length, binding), [pages.length, binding]);
     const containerRef = useRef<HTMLDivElement>(null);
-    const bookRef = useRef<HTMLDivElement>(null);
+    const mountRef = useRef<HTMLDivElement>(null);
     const pageFlipRef = useRef<PageFlip | null>(null);
-    const [dimensions, setDimensions] = useState({ width: 800, height: 500 });
-    // Ref to hold latest onPageChange to avoid stale closures in event handler
-    const onPageChangeRef = useRef(onPageChange);
-    onPageChangeRef.current = onPageChange;
-    // Remembered page index so re-initializing PageFlip (e.g. after a resize)
-    // does not jump the reader back to the cover.
+    const [pageElements, setPageElements] = useState<HTMLElement[]>([]);
+    const [pageSize, setPageSize] = useState(1);
+    const [currentPage, setCurrentPage] = useState(0);
+    const [turning, setTurning] = useState(false);
+    const onSpreadChangeRef = useRef(onSpreadChange);
+    onSpreadChangeRef.current = onSpreadChange;
     const startPageRef = useRef(0);
 
-    // Load 1080px previews for all pages in the book
     const allPhotoIds = useMemo(
-      () => pages.flatMap((p) => p.slots.filter((s) => s.photoId).map((s) => s.photoId!)),
+      () => [...new Set(pages.flatMap((page) =>
+        page.slots.flatMap((slot) => slot.photoId ? [slot.photoId] : [])
+      ))],
       [pages]
     );
     useEffect(() => {
-      if (allPhotoIds.length > 0) loadPreviews(allPhotoIds);
+      if (allPhotoIds.length > 0) void loadPreviews(allPhotoIds);
     }, [allPhotoIds, loadPreviews]);
 
-    useEffect(() => {
-      let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-
-      const applySize = () => {
-        if (!containerRef.current) return;
-        const rect = containerRef.current.getBoundingClientRect();
-        setDimensions((prev) => {
-          // Ignore no-op resize events — browsers fire `resize` for layout
-          // changes that don't actually change our container size. Re-running
-          // the PageFlip init effect on no-op resizes is what caused the book
-          // view to randomly vanish.
-          if (
-            Math.abs(prev.width - rect.width) < 0.5 &&
-            Math.abs(prev.height - rect.height) < 0.5
-          ) {
-            return prev;
-          }
-          return { width: rect.width, height: rect.height };
-        });
+    // Measure the space remaining after the responsive navigation margins.
+    // Observe the container, since panel changes need not resize the window.
+    useLayoutEffect(() => {
+      const container = containerRef.current;
+      if (!container) return;
+      const measure = () => {
+        const { width, height } = container.getBoundingClientRect();
+        setPageSize(Math.max(1, Math.floor(Math.min(width / 2, Math.max(1, height - PAGE_NAVIGATION_SPACE), 1200) * 0.768)));
       };
-
-      // Initial measurement runs synchronously so the first render uses real
-      // dimensions as soon as possible.
-      applySize();
-
-      const onResize = () => {
-        if (debounceTimer) clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(applySize, 150);
-      };
-      window.addEventListener("resize", onResize);
-      return () => {
-        if (debounceTimer) clearTimeout(debounceTimer);
-        window.removeEventListener("resize", onResize);
-      };
+      measure();
+      const observer = new ResizeObserver(measure);
+      observer.observe(container);
+      return () => observer.disconnect();
     }, []);
 
-    // Size pages to fill available space — constrained by both height and width
-    // Two pages sit side-by-side, so spread width = 2 * pageWidth
-    const pageAspect = getBookFormatAspect(bookFormat);
-    const maxByHeight = dimensions.height * 0.6;
-    const maxByWidth = ((dimensions.width - 160) / 2 / pageAspect) * 0.6; // 160px for arrow buttons
-    const pageHeight = Math.max(300, Math.min(maxByHeight, maxByWidth, 1200));
-    const pageWidth = Math.round(pageHeight * pageAspect);
+    const flipNext = useCallback(() => {
+      const book = pageFlipRef.current;
+      if (book?.getState() === "read") book.flipNext("bottom");
+    }, []);
+    const flipPrev = useCallback(() => {
+      const book = pageFlipRef.current;
+      if (book?.getState() === "read") book.flipPrev("bottom");
+    }, []);
+    useImperativeHandle(ref, () => ({ flipNext, flipPrev }), [flipNext, flipPrev]);
 
-    // Expose navigation methods to parent
-    useImperativeHandle(
-      ref,
-      () => ({
-        flipNext: () => {
-          pageFlipRef.current?.flipNext("bottom");
-        },
-        flipPrev: () => {
-          pageFlipRef.current?.flipPrev("top");
-        },
-      }),
-      []
-    );
+    const goToSpread = useCallback((spreadIndex: number) => {
+      const book = pageFlipRef.current;
+      const physicalIndex = flipPages.findIndex((page) => page.spreadIndex === spreadIndex);
+      if (book?.getState() === "read" && physicalIndex >= 0) book.turnToPage(physicalIndex);
+    }, [flipPages]);
 
-    const safeDestroy = useCallback(() => {
-      if (pageFlipRef.current) {
-        try {
-          // Remember the current page so we can restore it after a re-init
-          // (e.g. triggered by a window resize).
-          const current = pageFlipRef.current.getCurrentPageIndex?.();
-          if (typeof current === "number" && current >= 0) {
-            startPageRef.current = current;
-          }
-        } catch {
-          // ignore — fall back to last remembered value
+    useEffect(() => {
+      const mount = mountRef.current;
+      if (!mount || flipPages.length === 0) return;
+
+      // PageFlip moves pages and removes its root on destroy. Give it its own
+      // DOM subtree; portals keep React's canvas content attached to those pages.
+      const root = document.createElement("div");
+      root.className = "book-preview-root";
+      const elements = flipPages.map(({ pageIndex }, index) => {
+        const element = document.createElement("div");
+        element.className = `book-preview-page ${styles.page}`;
+        if (index > 0 && index < flipPages.length - 1) {
+          element.dataset.spineEdge = index % 2 === 0 ? "left" : "right";
         }
-        try {
-          pageFlipRef.current.destroy();
-        } catch {
-          // page-flip can throw if UI wasn't fully initialized
-        }
+        element.dataset.density = binding === "Hardcover" && (index < 2 || index >= flipPages.length - 2) ? "hard" : "soft";
+        if (pageIndex === null) element.setAttribute("aria-label", "Blank page (required)");
+        root.appendChild(element);
+        return element;
+      });
+      mount.appendChild(root);
+
+      const book = new PageFlip(root, {
+        width: 600,
+        height: 600,
+        size: "stretch",
+        minWidth: 1,
+        minHeight: 1,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        autoSize: false,
+        showCover: true,
+        mobileScrollSupport: true,
+        flippingTime: 450,
+        useMouseEvents: true,
+        swipeDistance: 30,
+        startPage: getFlipPageIndex(pages.length, Math.min(startPageRef.current, pages.length - 1), binding) ?? 0,
+        // Page-local gutter shading follows the paper's clipping and stacking.
+        // Keep the library's changing turn shadows from doubling its strength.
+        drawShadow: false,
+        showPageCorners: false,
+        // Preserve paired spreads at every size. Portrait mode clones DOM
+        // pages, which cannot copy the bitmap contents of our Konva canvases.
+        usePortrait: false,
+      });
+      book.on("flip", (event: { data: number }) => {
+        startPageRef.current = getSpreadPageIndices(spreads[flipPages[event.data]?.spreadIndex ?? 0])[0]
+          ?? (event.data < flipPages.length / 2 ? 0 : pages.length - 1);
+        setCurrentPage(event.data);
+        onSpreadChangeRef.current(flipPages[event.data]?.spreadIndex ?? 0);
+      });
+      book.on("changeState", (event: { data: string }) => {
+        setTurning(event.data !== "read");
+      });
+      book.loadFromHTML(elements);
+      // showCover forces rigid covers; restore the selected density on both sides.
+      elements.forEach((element, index) => book.getPage(index).setDensity(element.dataset.density as "hard" | "soft"));
+      const restoreCoverDrawing = binding === "Softcover" ? clipSoftcoverInsidePages(book) : undefined;
+      book.update();
+      pageFlipRef.current = book;
+      setPageElements(elements);
+      setCurrentPage(book.getCurrentPageIndex());
+      setTurning(false);
+
+      return () => {
+        const index = book.getCurrentPageIndex();
+        startPageRef.current = getSpreadPageIndices(spreads[flipPages[index]?.spreadIndex ?? 0])[0]
+          ?? (index < flipPages.length / 2 ? 0 : pages.length - 1);
         pageFlipRef.current = null;
-      }
-    }, []);
-
-    // Initialize page-flip
-    useEffect(() => {
-      if (!bookRef.current || pages.length === 0 || pageWidth <= 0) return;
-
-      safeDestroy();
-
-      const timerId = setTimeout(() => {
-        if (!bookRef.current) return;
-
-        const pageElements =
-          bookRef.current.querySelectorAll(".page-flip-page");
-        if (pageElements.length === 0) return;
-
-        // Clamp remembered start page against the current page count in case
-        // pages were removed while we were unmounted.
-        const startPage = Math.min(
-          Math.max(startPageRef.current, 0),
-          Math.max(pages.length - 1, 0)
-        );
-
-        try {
-          const pf = new PageFlip(bookRef.current, {
-            width: pageWidth,
-            height: pageHeight,
-            size: "fixed",
-            showCover: true,
-            maxShadowOpacity: 0.3,
-            mobileScrollSupport: false,
-            flippingTime: 800,
-            useMouseEvents: true,
-            swipeDistance: 30,
-            startPage,
-            drawShadow: true,
-            showPageCorners: true,
-            usePortrait: false,
-          });
-
-          pf.loadFromHTML(Array.from(pageElements) as HTMLElement[]);
-
-          pf.on("flip", (e: any) => {
-            const pageIndex = e.data as number;
-            startPageRef.current = pageIndex;
-            onPageChangeRef.current(pageIndex);
-          });
-
-          pageFlipRef.current = pf;
-
-          // Report initial page so the parent label matches what is shown.
-          onPageChangeRef.current(startPage);
-        } catch (e) {
-          console.warn("PageFlip initialization failed:", e);
-        }
-      }, 100);
-
-      return () => {
-        clearTimeout(timerId);
-        safeDestroy();
+        restoreCoverDrawing?.();
+        book.destroy();
       };
-    }, [pageWidth, pageHeight, pages.length, safeDestroy]);
+    }, [flipPages, spreads, binding, pages.length]);
+
+    // Stretch updates the existing instance and preserves the current spread.
+    useLayoutEffect(() => {
+      pageFlipRef.current?.update();
+    }, [pageSize]);
+
+    const frontCover = currentPage === 0 && flipPages.length > 1;
+    const backCover = currentPage === flipPages.length - 1;
+    const closed = frontCover || backCover;
+    const showSpread = !closed || turning;
+    const shift = turning ? 0 : frontCover ? "-25%" : backCover ? "25%" : 0;
 
     return (
       <Box
         ref={containerRef}
+        data-binding={binding}
         sx={{
           flex: 1,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
+          minWidth: 0,
+          minHeight: 0,
           position: "relative",
-          minHeight: 400,
+          mx: { xs: 0, sm: 7 },
+          my: 3,
+          "& .book-preview-root, & .book-preview-mount": {
+            width: "100%",
+            height: "100%",
+          },
+          // PageFlip replaces style.cssText on every frame. Paper appearance
+          // must stay in CSS, including blanks that have no canvas background.
+          "& .book-preview-page": {
+            backgroundColor: uiColors.paper,
+            overflow: "hidden",
+          },
         }}
       >
         <Box
-          // CRITICAL: key includes every value the PageFlip init effect
-          // depends on. PageFlip.destroy() removes this very element from the
-          // DOM (see node_modules/page-flip/src/PageFlip.ts: `this.block.remove()`
-          // and UI.destroy clearing its children). Without a key, React
-          // keeps reusing the detached element across re-inits and the book
-          // silently vanishes. Re-keying guarantees a fresh, attached DOM
-          // subtree every time the effect runs.
-          key={`book-${pageWidth}x${pageHeight}-${pages.length}`}
-          ref={bookRef}
           sx={{
-            width: pageWidth * 2,
-            height: pageHeight,
-            position: "relative",
-            boxShadow: "0 40px 100px -20px rgba(0,0,0,0.6)",
-            borderRadius: 0.5,
-            "&::after": {
-              content: '""',
-              position: "absolute",
-              top: 0,
-              left: "50%",
-              width: "1px",
-              height: "100%",
-              backgroundColor: "rgba(0,0,0,0.12)",
-              zIndex: 10,
-              pointerEvents: "none",
-            },
+            position: "absolute",
+            left: "50%",
+            top: "50%",
+            width: pageSize * 2,
+            height: pageSize + PAGE_NAVIGATION_SPACE,
+            transform: "translate(-50%, -50%)",
           }}
         >
-          {pages.map((page, i) => (
-            <PageElement
-              key={page.id}
-              page={page}
-              pageWidth={pageWidth}
-              pageHeight={pageHeight}
-              photoUrls={photoUrls}
-              isBackCover={i === pages.length - 1}
-              isFrontCover={i === 0}
+          <Box
+            sx={{
+              width: "100%",
+              height: pageSize,
+              transform: `translateX(${shift})`,
+              transition: "transform 300ms ease",
+              "@media (prefers-reduced-motion: reduce)": { transition: "none" },
+            }}
+          >
+            <div ref={mountRef} className="book-preview-mount" />
+          </Box>
+          <Box sx={{
+            position: "absolute",
+            left: "50%",
+            top: pageSize / 2,
+            // Percentages stay constant during initial measurement and resizing,
+            // so only opening or closing the book animates the arrow spacing.
+            width: showSpread ? "100%" : "50%",
+            height: 0,
+            transform: "translate(-50%, -50%)",
+            transition: "width 300ms ease",
+            "@media (prefers-reduced-motion: reduce)": { transition: "none" },
+            zIndex: 20,
+            pointerEvents: "none",
+          }}>
+            <IconButton
+              aria-label="Previous pages"
+              onClick={flipPrev}
+              disabled={currentPage === 0 || turning || flipPages.length === 0}
+              sx={{ ...navigationButtonSx, right: "100%", mr: { xs: 1, sm: 3 } }}
+            >
+              <ChevronLeftIcon sx={{ fontSize: { xs: 28, sm: 32 } }} />
+            </IconButton>
+            <IconButton
+              aria-label="Next pages"
+              onClick={flipNext}
+              disabled={currentPage >= flipPages.length - 1 || turning}
+              sx={{ ...navigationButtonSx, left: "100%", ml: { xs: 1, sm: 3 } }}
+            >
+              <ChevronRightIcon sx={{ fontSize: { xs: 28, sm: 32 } }} />
+            </IconButton>
+          </Box>
+          <Box sx={{ position: "absolute", top: pageSize + 24, left: "50%", transform: "translateX(-50%)" }}>
+            <BookPageNavigation
+              pageCount={pages.length}
+              spreads={spreads}
+              spreadIndex={flipPages[currentPage]?.spreadIndex ?? 0}
+              disabled={pageElements.length === 0}
+              turning={turning}
+              onGoToSpread={goToSpread}
             />
-          ))}
+          </Box>
         </Box>
+        {flipPages.map(({ pageIndex, spreadIndex }, index) => {
+          const element = pageElements[index];
+          const page = pageIndex === null ? null : pages[pageIndex];
+          if (!element || !page) return null;
+          return createPortal(
+            <Stage width={pageSize} height={pageSize} listening={false}>
+              <Layer>
+                <PageCanvas
+                  page={page}
+                  photoUrls={photoUrls}
+                  pageWidth={pageSize}
+                  pageHeight={pageSize}
+                  isBackCover={pageIndex === pages.length - 1}
+                  isFrontCover={pageIndex === 0}
+                />
+              </Layer>
+            </Stage>,
+            element,
+            `${page.id}-${spreadIndex}`
+          );
+        })}
       </Box>
     );
   }
 );
 
 export default BookViewer;
-
-function PageElement({
-  page,
-  pageWidth,
-  pageHeight,
-  photoUrls,
-  isBackCover,
-  isFrontCover,
-}: {
-  page: BookPage;
-  pageWidth: number;
-  pageHeight: number;
-  photoUrls?: Map<string, string>;
-  isBackCover: boolean;
-  isFrontCover: boolean;
-}) {
-  return (
-    <div
-      className="page-flip-page"
-      style={{
-        width: pageWidth,
-        height: pageHeight,
-        background: "white",
-        overflow: "hidden",
-      }}
-    >
-      <Stage width={pageWidth} height={pageHeight} listening={false}>
-        <Layer>
-          <PageCanvas
-            page={page}
-            photoUrls={photoUrls}
-            pageWidth={pageWidth}
-            pageHeight={pageHeight}
-            isBackCover={isBackCover}
-            isFrontCover={isFrontCover}
-          />
-        </Layer>
-      </Stage>
-    </div>
-  );
-}

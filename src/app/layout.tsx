@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
-import { Manrope, Nunito, Sora } from "next/font/google";
+import "@fontsource/gochi-hand";
+import { Manrope, Nunito, Outfit, Sora } from "next/font/google";
 import { AppRouterCacheProvider } from "@mui/material-nextjs/v15-appRouter";
 import { ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
 import theme from "@/theme/theme";
+import { BookProvider } from "@/context/BookContext";
+import { PhotoImportProvider } from "@/hooks/usePhotoImport";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -15,7 +18,7 @@ const manrope = Manrope({
 
 const nunito = Nunito({
   subsets: ["latin"],
-  weight: ["400", "700"],
+  weight: ["300", "400", "700"],
   display: "swap",
   variable: "--font-nunito",
 });
@@ -25,6 +28,13 @@ const sora = Sora({
   weight: ["400", "500", "600", "700"],
   display: "swap",
   variable: "--font-sora",
+});
+
+const outfit = Outfit({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600"],
+  display: "swap",
+  variable: "--font-outfit",
 });
 
 export const metadata: Metadata = {
@@ -43,11 +53,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${manrope.variable} ${nunito.variable} ${sora.variable}`}>
+      <body className={`${manrope.variable} ${nunito.variable} ${sora.variable} ${outfit.variable}`}>
         <AppRouterCacheProvider>
           <ThemeProvider theme={theme}>
             <CssBaseline />
-            {children}
+            <BookProvider><PhotoImportProvider>{children}</PhotoImportProvider></BookProvider>
           </ThemeProvider>
         </AppRouterCacheProvider>
       </body>

@@ -1,14 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Box, Button, IconButton, Menu, MenuItem, Typography } from "@mui/material";
-import ViewSidebarIcon from "@mui/icons-material/ViewSidebar";
-import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
-import { useBook } from "@/context/BookContext";
-import {
-  BOOK_FORMAT_CHOICES,
-  type BookFormatId,
-} from "@/lib/bookFormats";
+import { Box } from "@mui/material";
+import { MenuIcon, CloseIcon } from "./icons";
 
 const mobileNavQuery = "(max-width: 640px)";
 
@@ -22,12 +16,7 @@ const navItems: NavItem[] = [
   { label: "Download", href: "https://ente.com/download" },
 ];
 
-const editFormatLabels: Record<BookFormatId, string> = {
-  "square-210": "Square",
-  "a5-portrait": "Portrait",
-};
-
-function StartNavBar({ onLogoClick }: { onLogoClick: () => void }) {
+export default function NavBar() {
   const [isMobileNav, setIsMobileNav] = useState(
     () =>
       typeof window !== "undefined" &&
@@ -156,38 +145,7 @@ function StartNavBar({ onLogoClick }: { onLogoClick: () => void }) {
                 },
               }}
             >
-              <Box
-                component="span"
-                aria-hidden="true"
-                sx={{
-                  display: "grid",
-                  gap: "4px",
-                  "& span": {
-                    display: "block",
-                    width: 18,
-                    height: 2,
-                    borderRadius: "999px",
-                    background: "currentColor",
-                    transformOrigin: "center",
-                    transition: "transform 220ms ease, opacity 220ms ease",
-                  },
-                  ...(isNavOpen && {
-                    "& span:nth-of-type(1)": {
-                      transform: "translateY(6px) rotate(45deg)",
-                    },
-                    "& span:nth-of-type(2)": {
-                      opacity: 0,
-                    },
-                    "& span:nth-of-type(3)": {
-                      transform: "translateY(-6px) rotate(-45deg)",
-                    },
-                  }),
-                }}
-              >
-                <span />
-                <span />
-                <span />
-              </Box>
+              {isNavOpen ? <CloseIcon /> : <MenuIcon />}
             </Box>
           )}
         </Box>
@@ -248,196 +206,6 @@ function StartNavBar({ onLogoClick }: { onLogoClick: () => void }) {
               </Box>
             ))}
           </Box>
-        )}
-      </Box>
-    </Box>
-  );
-}
-
-export default function NavBar() {
-  const {
-    appView,
-    setAppView,
-    bookFormat,
-    setBookFormat,
-    showPageStrip,
-    setShowPageStrip,
-  } = useBook();
-  const [formatAnchor, setFormatAnchor] = useState<HTMLElement | null>(null);
-  const isStart = appView === "start";
-
-  if (isStart) {
-    return <StartNavBar onLogoClick={() => setAppView("start")} />;
-  }
-
-  const closeFormatMenu = () => setFormatAnchor(null);
-
-  const handleFormatSelect = (formatId: BookFormatId) => {
-    closeFormatMenu();
-    if (formatId !== bookFormat.id) {
-      setBookFormat(formatId);
-    }
-  };
-
-  return (
-    <Box
-      component="header"
-      sx={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        zIndex: 50,
-        bgcolor: "#141617",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        px: 4,
-        height: 64,
-        borderBottom: "1px solid rgba(255,255,255,0.06)",
-      }}
-    >
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          gap: 1,
-          cursor: "pointer",
-        }}
-        onClick={() => setAppView("start")}
-      >
-        <Typography
-          sx={{
-            fontSize: "1.25rem",
-            fontWeight: 700,
-            fontFamily: "var(--font-manrope), sans-serif",
-            color: "#E2E2E4",
-          }}
-        >
-          Ente Photobook
-        </Typography>
-      </Box>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-        {appView === "edit" && (
-          <>
-            {!showPageStrip && (
-              <IconButton
-                onClick={() => setShowPageStrip(true)}
-                size="small"
-                sx={{
-                  color: "rgba(255,255,255,0.6)",
-                  "&:hover": { color: "rgba(255,255,255,0.9)" },
-                }}
-              >
-                <ViewSidebarIcon fontSize="small" />
-              </IconButton>
-            )}
-            <Button
-              variant="outlined"
-              endIcon={<ArrowDropDownIcon sx={{ fontSize: 18 }} />}
-              onClick={(e) => setFormatAnchor(e.currentTarget)}
-              sx={{
-                height: 42,
-                color: "#F2F3F3",
-                borderColor: "rgba(255,255,255,0.22)",
-                borderRadius: 999,
-                px: 2,
-                minWidth: 108,
-                bgcolor: "rgba(255,255,255,0.04)",
-                justifyContent: "center",
-                textTransform: "none",
-                fontWeight: 800,
-                fontSize: "0.9rem",
-                lineHeight: 1,
-                "& .MuiButton-endIcon": {
-                  ml: 0.5,
-                  color: "rgba(255,255,255,0.72)",
-                },
-                "&:hover": {
-                  borderColor: "rgba(255,255,255,0.34)",
-                  bgcolor: "rgba(255,255,255,0.08)",
-                },
-              }}
-            >
-              {editFormatLabels[bookFormat.id]}
-            </Button>
-            <Menu
-              anchorEl={formatAnchor}
-              open={Boolean(formatAnchor)}
-              onClose={closeFormatMenu}
-              anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-              transformOrigin={{ vertical: "top", horizontal: "right" }}
-              slotProps={{
-                paper: {
-                  sx: {
-                    mt: 1,
-                    minWidth: 164,
-                    borderRadius: 2,
-                    bgcolor: "#1B1D1E",
-                    color: "#F2F3F3",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    boxShadow: "0 16px 40px rgba(0,0,0,0.35)",
-                    p: 1,
-                    "& .MuiList-root": {
-                      p: 0,
-                      display: "grid",
-                      gap: 0.85,
-                    },
-                  },
-                },
-              }}
-            >
-              {BOOK_FORMAT_CHOICES.map((format) => {
-                const selected = format.id === bookFormat.id;
-                return (
-                  <MenuItem
-                    key={format.id}
-                    selected={selected}
-                    onClick={() => handleFormatSelect(format.id)}
-                    sx={{
-                      minHeight: 42,
-                      borderRadius: 1.5,
-                      px: 2,
-                      color: "#F2F3F3",
-                      justifyContent: "center",
-                      textAlign: "center",
-                      lineHeight: 1,
-                      fontWeight: selected ? 800 : 700,
-                      "&.Mui-selected": {
-                        bgcolor: "rgba(255,255,255,0.08)",
-                      },
-                      "&.Mui-selected:hover": {
-                        bgcolor: "rgba(255,255,255,0.11)",
-                      },
-                      "&:hover": {
-                        bgcolor: "rgba(255,255,255,0.08)",
-                      },
-                    }}
-                  >
-                    {editFormatLabels[format.id]}
-                  </MenuItem>
-                );
-              })}
-            </Menu>
-            <Button
-              variant="contained"
-              onClick={() => setAppView("results")}
-              sx={{
-                height: 42,
-                borderRadius: 999,
-                background:
-                  "linear-gradient(135deg, #006E0F 0%, #08C225 100%)",
-                fontWeight: 700,
-                px: 4,
-                "&:hover": {
-                  background:
-                    "linear-gradient(135deg, #005309 0%, #06A81F 100%)",
-                },
-              }}
-            >
-              Next
-            </Button>
-          </>
         )}
       </Box>
     </Box>

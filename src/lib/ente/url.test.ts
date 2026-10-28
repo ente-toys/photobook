@@ -41,20 +41,22 @@ function withEnteEnv(
   }
 }
 
-test("uses official Ente origins for hosted album links", () => {
-  withEnteEnv(
-    {
-      NEXT_PUBLIC_ENTE_API_ENDPOINT: undefined,
-      NEXT_PUBLIC_ENTE_ALBUMS_ENDPOINT: undefined,
-    },
-    () => {
-      const parsed = parseEnteAlbumUrl(`https://albums.ente.io/?t=token123#${HEX_KEY}`);
+for (const host of ["albums.ente.com", "albums.ente.io", "public-albums.ente.io"]) {
+  test(`uses official Ente origins for ${host} links`, () => {
+    withEnteEnv(
+      {
+        NEXT_PUBLIC_ENTE_API_ENDPOINT: undefined,
+        NEXT_PUBLIC_ENTE_ALBUMS_ENDPOINT: undefined,
+      },
+      () => {
+        const parsed = parseEnteAlbumUrl(`https://${host}/?t=token123#${HEX_KEY}`);
 
-      assert.equal(parsed.albumsOrigin, "https://public-albums.ente.io");
-      assert.deepEqual(parsed.apiOrigins, ["https://api.ente.io"]);
-    },
-  );
-});
+        assert.equal(parsed.albumsOrigin, "https://public-albums.ente.io");
+        assert.deepEqual(parsed.apiOrigins, ["https://api.ente.io"]);
+      },
+    );
+  });
+}
 
 test("prefers the sibling api host for self-hosted album domains", () => {
   withEnteEnv(

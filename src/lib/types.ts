@@ -1,4 +1,4 @@
-import type { BookFormatId } from "./bookFormats";
+import type { PrintSelection } from "./printProducts";
 
 export type PhotoSource = "local" | "ente";
 export type PhotoOriginalStatus = "pending" | "ready" | "failed";
@@ -64,15 +64,16 @@ export interface BookPage {
   textBlocks: TextBlock[];
   topCaption: string;
   bottomCaption: string;
+  /** Centered text shown only while the page has no photos. */
+  centerText?: string;
   layoutVariant?: string;
-  paddingH?: number; // extra horizontal padding level (0-2), default 0
-  paddingV?: number; // extra vertical padding level (0-2), default 0
 }
 
 export interface BookState {
-  formatId: BookFormatId;
+  title?: string;
   pages: BookPage[];
-  currentSpreadIndex: number; // index of left page (always even)
+  currentSpreadIndex: number; // first real book-page index in the visible spread
+  printSelection?: PrintSelection;
 }
 
 export type AppView = "start" | "edit" | "results";

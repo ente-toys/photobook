@@ -1,20 +1,12 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Stage, Layer, Rect, Image as KonvaImage, Text, Group, Transformer } from "react-konva";
+import React, { useEffect, useMemo, useState } from "react";
+import { Rect, Image as KonvaImage, Text, Group } from "react-konva";
 import Konva from "konva";
 import type { BookPage, PhotoSlot, TextBlock } from "@/lib/types";
-import { getCaptionZones } from "@/lib/layouts";
+import { CAPTION_FONT_WEIGHT, CENTER_TEXT_FONT_WEIGHT, getBrandingLayout, getCaptionLayout, getCenterTextLayout, getNunitoFont, getOutfitFont, getTextBlockLayout, SAFE_AREA, TEXT_LINE_HEIGHT, type CaptionLayout } from "@/lib/printLayout";
 import { useBook } from "@/context/BookContext";
 import { getCachedImage, getCachedUrl, loadImageCached } from "@/lib/imageCache";
-
-let _canvasNunito: string | null = null;
-function getNunitoFont(): string {
-  if (_canvasNunito) return _canvasNunito;
-  if (typeof window === "undefined") return "sans-serif";
-  _canvasNunito = getComputedStyle(document.documentElement).getPropertyValue("--font-nunito").trim() || "sans-serif";
-  return _canvasNunito;
-}
 
 export type CaptionPosition = "top" | "bottom";
 
@@ -37,6 +29,7 @@ interface PageCanvasProps {
   editingTextId?: string | null;
   editingCaption?: CaptionPosition | null;
   hideCaptions?: boolean;
+  hideCenterText?: boolean;
   dragOverSlotId?: string | null;
   dragSourceSlotId?: string | null;
   onDropPhoto?: (photoId: string, slotId: string) => void;
@@ -223,14 +216,15 @@ function TextBlockRenderer({
   isSelected: boolean;
   isEditing: boolean;
 }) {
-  const textRef = useRef<any>(null);
-  const bx = (block.x / 100) * pageWidth;
-  const by = (block.y / 100) * pageHeight;
-  const bw = (block.width / 100) * pageWidth;
+  const layout = getTextBlockLayout(block);
+  const bx = (layout.x / 100) * pageWidth;
+  const by = (layout.y / 100) * pageHeight;
+  const bw = (layout.width / 100) * pageWidth;
+  const bh = (layout.height / 100) * pageHeight;
 
-  const fontSize = pageHeight * ((block.fontSize ?? 2.5) / 100);
+  const fontSize = pageHeight * (layout.fontSize / 100);
   const color = block.color ?? "#555555";
-  const rotation = block.rotation ?? 0;
+  const rotation = layout.rotation;
 
   // Hide text while inline editing
   if (isEditing) return null;
@@ -239,32 +233,32 @@ function TextBlockRenderer({
   const displayColor = block.text ? color : "#bbb";
 
   return (
-    <>
+    <Group x={bx} y={by} rotation={rotation}>
       <Text
-        ref={textRef}
-        x={bx}
-        y={by}
+        x={layout.padding / 100 * pageWidth}
+        y={0}
         text={displayText}
         fontSize={fontSize}
         fontFamily={getNunitoFont()}
         fontStyle="bold"
         fill={displayColor}
-        rotation={rotation}
+        lineHeight={TEXT_LINE_HEIGHT}
+        verticalAlign="middle"
+        wrap="none"
         listening={false}
       />
       {isSelected && (
         <Rect
-          x={bx - 3}
-          y={by - 3}
-          width={(textRef.current?.width() ?? fontSize * 4) + 6}
-          height={(textRef.current?.height() ?? fontSize) + 6}
+          x={-3}
+          y={-3}
+          width={bw + 6}
+          height={bh + 6}
           stroke="#08C225"
           strokeWidth={3}
-          rotation={rotation}
           listening={false}
         />
       )}
-    </>
+    </Group>
   );
 }
 
@@ -279,7 +273,6 @@ function EnteBranding({
 
   useEffect(() => {
     const img = new window.Image();
-    img.src = "/ente-branding.svg";
     img.onload = () => {
       // Pre-scale to target size in an offscreen canvas to avoid
       // aliasing from extreme downscaling (1024px → ~60px).
@@ -294,35 +287,20 @@ function EnteBranding({
       ctx.drawImage(img, 0, 0, targetW, targetH);
       setLogo(offscreen);
     };
+    img.src = "/ente-branding.svg";
   }, [pageHeight]);
 
-  const logoHeight = pageHeight * 0.031;
-  const logoWidth = logo
-    ? (logo.width / logo.height) * logoHeight
-    : logoHeight * 2;
-  const logoX = (pageWidth - logoWidth) / 2;
-  const stripHeight = logoHeight + pageHeight * 0.03;
-  const stripY = pageHeight - stripHeight;
-  const yCenter = stripY + stripHeight / 2;
+  const layout = getBrandingLayout();
 
   return (
     <>
-      {/* White background strip so branding is readable over photos */}
-      <Rect
-        x={0}
-        y={stripY}
-        width={pageWidth}
-        height={stripHeight}
-        fill="#ffffff"
-        listening={false}
-      />
       {logo && (
         <KonvaImage
           image={logo as unknown as HTMLImageElement}
-          x={logoX}
-          y={yCenter - logoHeight / 2}
-          width={logoWidth}
-          height={logoHeight}
+          x={layout.x / 100 * pageWidth}
+          y={layout.y / 100 * pageHeight}
+          width={layout.width / 100 * pageWidth}
+          height={layout.height / 100 * pageHeight}
           listening={false}
         />
       )}
@@ -332,40 +310,51 @@ function EnteBranding({
 
 function CaptionText({
   text,
-  zoneY,
-  zoneHeight,
+  layout,
   pageWidth,
-  fontSize,
+  pageHeight,
   isEditing,
+  lineHeight = TEXT_LINE_HEIGHT,
+  fontFamily = getOutfitFont(),
+  fontWeight = CAPTION_FONT_WEIGHT,
 }: {
   text: string;
-  /** Top of the caption zone (the page-edge margin band). */
-  zoneY: number;
-  /** Height of the caption zone — caption is vertically centered within. */
-  zoneHeight: number;
+  layout: CaptionLayout | null;
   pageWidth: number;
-  fontSize: number;
+  pageHeight: number;
   isEditing?: boolean;
+  lineHeight?: number;
+  fontFamily?: string;
+  fontWeight?: number;
 }) {
   // Hide rendered text while editing (HTML overlay replaces it)
   if (isEditing) return null;
   if (!text) return null;
   // No room for the caption (e.g. a full-bleed photo touches the page edge).
   // Stale captions from a previous layout would otherwise spill off the page.
-  if (zoneHeight <= 0) return null;
+  if (!layout) return null;
+  const x = layout.x / 100 * pageWidth;
+  const y = layout.y / 100 * pageHeight;
+  const width = layout.width / 100 * pageWidth;
+  const height = layout.height / 100 * pageHeight;
   return (
-    <Text
-      x={0}
-      y={zoneY}
-      width={pageWidth}
-      height={zoneHeight}
-      text={text}
-      fontSize={fontSize}
-      fontFamily={getNunitoFont()}
-      fill="#2a2a2a"
-      align="center"
-      verticalAlign="middle"
-    />
+    <Group clipX={x} clipY={y} clipWidth={width} clipHeight={height}>
+      <Text
+        x={x}
+        y={y}
+        width={width}
+        height={height}
+        text={text}
+        fontSize={layout.fontSize / 100 * pageHeight}
+        lineHeight={lineHeight}
+        wrap="none"
+        fontFamily={fontFamily}
+        fontStyle={String(fontWeight)}
+        fill="#2a2a2a"
+        align="center"
+        verticalAlign="middle"
+      />
+    </Group>
   );
 }
 
@@ -386,22 +375,27 @@ export default function PageCanvas({
   editingTextId,
   editingCaption,
   hideCaptions = false,
+  hideCenterText = false,
   photoUrls: photoUrlsProp,
   onDropPhoto,
 }: PageCanvasProps) {
-  const { bookFormat, thumbnailUrls } = useBook();
+  const { thumbnailUrls } = useBook();
   const urls = photoUrlsProp ?? thumbnailUrls;
 
-  // Front-cover captions act as a title — much larger than interior captions.
-  const captionFontSize = pageHeight * (isFrontCover ? 0.05 : 0.016);
-  const captionZones = getCaptionZones(page, bookFormat.id);
-  const topCaptionZoneHeight = pageHeight * (captionZones.topPct / 100);
-  const bottomCaptionZoneHeight = pageHeight * (captionZones.bottomPct / 100);
+  const [, setFontsReady] = useState(false);
+  useEffect(() => {
+    let active = true;
+    void document.fonts.ready.then(() => { if (active) setFontsReady(true); });
+    return () => { active = false; };
+  }, []);
+  const topCaption = getCaptionLayout(page, "top", isFrontCover);
+  const bottomCaption = getCaptionLayout(page, "bottom", isFrontCover);
+  const centerText = getCenterTextLayout(page);
 
   return (
     <>
       {/* White page background */}
-      <Rect x={0} y={0} width={pageWidth} height={pageHeight} fill="#ffffff" />
+      <Rect x={0} y={0} width={pageWidth} height={pageHeight} fill="#ffffff" listening={false} />
 
       {/* Photo slots */}
       {page.slots.map((slot) => (
@@ -420,16 +414,27 @@ export default function PageCanvas({
         />
       ))}
 
-      {/* Captions — centered within the top/bottom margin zones so they sit
-          calmly in the empty band rather than crowding the page edge. */}
+      {/* Captions — centered in the safe part of each photo margin. */}
+      {!hideCenterText && page.centerText && (
+        <CaptionText
+          text={centerText?.lines.join("\n") ?? ""}
+          layout={centerText}
+          pageWidth={pageWidth}
+          pageHeight={pageHeight}
+          lineHeight={centerText?.lineHeight}
+          fontFamily={getOutfitFont()}
+          fontWeight={CENTER_TEXT_FONT_WEIGHT}
+        />
+      )}
       {!hideCaptions && (
         <CaptionText
           text={page.topCaption}
-          zoneY={0}
-          zoneHeight={topCaptionZoneHeight}
+          layout={topCaption}
           pageWidth={pageWidth}
-          fontSize={captionFontSize}
+          pageHeight={pageHeight}
           isEditing={editingCaption === "top"}
+          fontFamily={getOutfitFont()}
+          fontWeight={isFrontCover ? CENTER_TEXT_FONT_WEIGHT : CAPTION_FONT_WEIGHT}
         />
       )}
       {isBackCover ? (
@@ -438,26 +443,34 @@ export default function PageCanvas({
         !hideCaptions && (
           <CaptionText
             text={page.bottomCaption}
-            zoneY={pageHeight - bottomCaptionZoneHeight}
-            zoneHeight={bottomCaptionZoneHeight}
+            layout={bottomCaption}
             pageWidth={pageWidth}
-            fontSize={captionFontSize}
+            pageHeight={pageHeight}
             isEditing={editingCaption === "bottom"}
+            fontFamily={getOutfitFont()}
+            fontWeight={isFrontCover ? CENTER_TEXT_FONT_WEIGHT : CAPTION_FONT_WEIGHT}
           />
         )
       )}
 
       {/* Text blocks */}
-      {page.textBlocks.map((block) => (
-        <TextBlockRenderer
-          key={block.id}
-          block={block}
-          pageWidth={pageWidth}
-          pageHeight={pageHeight}
-          isSelected={selectedTextId === block.id}
-          isEditing={editingTextId === block.id}
-        />
-      ))}
+      <Group
+        clipX={SAFE_AREA.x / 100 * pageWidth}
+        clipY={SAFE_AREA.y / 100 * pageHeight}
+        clipWidth={SAFE_AREA.width / 100 * pageWidth}
+        clipHeight={SAFE_AREA.height / 100 * pageHeight}
+      >
+        {page.textBlocks.map((block) => (
+          <TextBlockRenderer
+            key={block.id}
+            block={block}
+            pageWidth={pageWidth}
+            pageHeight={pageHeight}
+            isSelected={selectedTextId === block.id}
+            isEditing={editingTextId === block.id}
+          />
+        ))}
+      </Group>
 
       {/* Page number */}
       <Text

@@ -20,7 +20,7 @@ export interface ParsedEnteAlbumUrl {
 /**
  * Parse an Ente public album URL like:
  *
- *     https://albums.ente.io/?t=ABC0123xyz#<collectionKey>
+ *     https://albums.ente.com/?t=ABC0123xyz#<collectionKey>
  *
  * The access token is the `?t=` query param. The collection key lives in the
  * URL fragment (never sent to the server), encoded either as base58 (newer
@@ -78,23 +78,23 @@ function resolveOrigins(url: URL): {
     process.env.NEXT_PUBLIC_ENTE_ALBUMS_ENDPOINT,
   );
   const inputOrigin = sanitizeOrigin(url.origin)!;
-  const host = url.hostname;
-  const siblingApiOrigin = inferSiblingApiOrigin(url);
+  const isHosted = isDefaultHostedAlbumsHost(url.hostname);
+  const siblingApiOrigin = isHosted ? undefined : inferSiblingApiOrigin(url);
 
   const apiOrigins = uniqueOrigins([
     configuredAlbumsOrigin && configuredAlbumsOrigin === inputOrigin
       ? configuredApiOrigin
       : undefined,
-    isDefaultHostedAlbumsHost(host) ? DEFAULT_API_ORIGIN : undefined,
+    isHosted ? DEFAULT_API_ORIGIN : undefined,
     siblingApiOrigin,
-    !isDefaultHostedAlbumsHost(host) ? inputOrigin : undefined,
+    !isHosted ? inputOrigin : undefined,
     configuredApiOrigin,
     DEFAULT_API_ORIGIN,
   ]);
 
   return {
     apiOrigins,
-    albumsOrigin: isDefaultHostedAlbumsHost(host) ? DEFAULT_ALBUMS_ORIGIN : inputOrigin,
+    albumsOrigin: isHosted ? DEFAULT_ALBUMS_ORIGIN : inputOrigin,
   };
 }
 
@@ -116,7 +116,11 @@ function uniqueOrigins(origins: Array<string | undefined>): string[] {
 }
 
 function isDefaultHostedAlbumsHost(host: string): boolean {
-  return host === "albums.ente.io" || host === "public-albums.ente.io";
+  return (
+    host === "albums.ente.com" ||
+    host === "albums.ente.io" ||
+    host === "public-albums.ente.io"
+  );
 }
 
 function fromHex(hex: string): Uint8Array {

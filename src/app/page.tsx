@@ -1,25 +1,5 @@
-"use client";
-
-import dynamic from "next/dynamic";
-import { Box, CircularProgress } from "@mui/material";
-
-// Dynamic import the entire app to avoid SSR issues with Konva/canvas
-const AppShell = dynamic(() => import("@/components/AppShell"), {
-  ssr: false,
-  loading: () => (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      <CircularProgress sx={{ color: "#08C225" }} />
-    </Box>
-  ),
-});
+import StartPage from "@/components/StartPage";
 
 export default function Home() {
-  return <AppShell />;
+  return <StartPage />;
 }

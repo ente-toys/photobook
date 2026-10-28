@@ -1,28 +1,41 @@
 "use client";
 
 import { createTheme } from "@mui/material/styles";
+import { createElement } from "react";
+import { ChevronDownIcon, CloseIcon, SuccessIcon, InfoIcon, WarningIcon, ErrorIcon } from "@/components/icons";
+
+import { accentGreen, accentGreenHover } from "./buttons";
+import { uiColors } from "./colors";
 
 const theme = createTheme({
   palette: {
     mode: "dark",
     primary: {
-      main: "#08C225",
-      dark: "#006E0F",
+      main: accentGreen,
+      dark: accentGreenHover,
       contrastText: "#ffffff",
     },
     secondary: {
       main: "#1E6D1D",
     },
     background: {
-      default: "#1a1c1d",
-      paper: "#242627",
+      default: uiColors.background,
+      paper: uiColors.surface,
     },
     text: {
-      primary: "#E2E2E4",
-      secondary: "#888",
+      primary: uiColors.text,
+      secondary: uiColors.muted,
+    },
+    divider: uiColors.border,
+    action: {
+      active: uiColors.text,
+      hover: "rgba(233,237,239,0.06)",
+      selected: "rgba(233,237,239,0.1)",
+      disabled: "rgba(233,237,239,0.3)",
+      disabledBackground: uiColors.control,
     },
     error: {
-      main: "#ba1a1a",
+      main: uiColors.danger,
     },
   },
   typography: {
@@ -58,6 +71,27 @@ const theme = createTheme({
     borderRadius: 8,
   },
   components: {
+    MuiPaper: {
+      styleOverrides: {
+        root: { backgroundImage: "none" },
+      },
+    },
+    MuiSelect: {
+      defaultProps: {
+        IconComponent: ChevronDownIcon,
+      },
+    },
+    MuiAlert: {
+      defaultProps: {
+        iconMapping: {
+          success: createElement(SuccessIcon, { fontSize: "inherit" }),
+          info: createElement(InfoIcon, { fontSize: "inherit" }),
+          warning: createElement(WarningIcon, { fontSize: "inherit" }),
+          error: createElement(ErrorIcon, { fontSize: "inherit" }),
+        },
+        slots: { closeIcon: CloseIcon },
+      },
+    },
     MuiButton: {
       styleOverrides: {
         root: {
@@ -65,10 +99,17 @@ const theme = createTheme({
           padding: "10px 24px",
         },
         containedPrimary: {
-          background: "linear-gradient(135deg, #006E0F 0%, #08C225 100%)",
-          boxShadow: "0px 12px 32px rgba(0, 0, 0, 0.3)",
+          backgroundColor: accentGreen,
+          backgroundImage: "none",
+          boxShadow: "none",
+          "&.Mui-disabled": {
+            backgroundColor: accentGreen,
+            color: "#FFFFFF",
+            opacity: 0.45,
+          },
           "&:hover": {
-            background: "linear-gradient(135deg, #005309 0%, #06A81F 100%)",
+            backgroundColor: accentGreenHover,
+            boxShadow: "none",
           },
         },
       },

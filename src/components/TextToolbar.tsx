@@ -1,6 +1,9 @@
 "use client";
 
+import { uiColors, popupShadow } from "@/theme/colors";
+
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import { CloseIcon, EditIcon, RotateIcon, DeleteIcon } from "./icons";
 import type { TextBlock } from "@/lib/types";
 
 const PRESET_COLORS = [
@@ -73,7 +76,7 @@ export default function TextToolbar({
     height: 28,
     border: "none",
     background: "transparent",
-    color: "rgba(255,255,255,0.8)",
+    color: uiColors.text,
     cursor: "pointer",
     borderRadius: 4,
     display: "flex",
@@ -87,8 +90,8 @@ export default function TextToolbar({
 
   const activeBtnStyle: React.CSSProperties = {
     ...btnStyle,
-    background: "rgba(255,255,255,0.15)",
-    color: "#fff",
+    background: uiColors.control,
+    color: uiColors.text,
   };
 
   const handleSizeChange = () => {
@@ -115,11 +118,11 @@ export default function TextToolbar({
         display: "flex",
         alignItems: "center",
         gap: 2,
-        background: "rgba(30,32,34,0.95)",
+        background: uiColors.surface,
         backdropFilter: "blur(12px)",
         borderRadius: 8,
         padding: "3px 4px",
-        boxShadow: "0 4px 20px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.08)",
+        boxShadow: popupShadow,
       }}
       onMouseDown={(e) => e.stopPropagation()}
     >
@@ -127,22 +130,20 @@ export default function TextToolbar({
       <button
         style={btnStyle}
         onClick={onEdit}
-        onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.1)")}
+        onMouseEnter={(e) => (e.currentTarget.style.background = uiColors.background)}
         onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
         title="Edit text"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-          <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor"/>
-        </svg>
+        <EditIcon sx={{ fontSize: 14 }} />
       </button>
 
-      <div style={{ width: 1, height: 18, background: "rgba(255,255,255,0.12)" }} />
+      <div style={{ width: 1, height: 18, background: uiColors.border }} />
 
       {/* Font size cycle */}
       <button
         style={{ ...btnStyle, fontWeight: 700, fontSize: 12, width: 32 }}
         onClick={handleSizeChange}
-        onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.1)")}
+        onMouseEnter={(e) => (e.currentTarget.style.background = uiColors.background)}
         onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
         title="Font size"
       >
@@ -154,7 +155,7 @@ export default function TextToolbar({
         <button
           style={btnStyle}
           onClick={() => { setShowColors(!showColors); setShowRotation(false); }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.1)")}
+          onMouseEnter={(e) => (e.currentTarget.style.background = uiColors.background)}
           onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
           title="Text color"
         >
@@ -164,7 +165,7 @@ export default function TextToolbar({
               height: 16,
               borderRadius: 3,
               background: block.color ?? "#555555",
-              border: "2px solid rgba(255,255,255,0.3)",
+              border: `2px solid ${uiColors.border}`,
             }}
           />
         </button>
@@ -175,14 +176,14 @@ export default function TextToolbar({
               top: "calc(100% + 6px)",
               left: "50%",
               transform: "translateX(-50%)",
-              background: "rgba(30,32,34,0.95)",
+              background: uiColors.surface,
               backdropFilter: "blur(12px)",
               borderRadius: 8,
               padding: 6,
               display: "grid",
               gridTemplateColumns: "repeat(4, 1fr)",
               gap: 4,
-              boxShadow: "0 4px 20px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.08)",
+              boxShadow: popupShadow,
             }}
           >
             {PRESET_COLORS.map((c) => (
@@ -201,8 +202,8 @@ export default function TextToolbar({
                     (block.color ?? "#555555") === c
                       ? "2px solid #08C225"
                       : c === "#ffffff"
-                        ? "1px solid rgba(255,255,255,0.3)"
-                        : "1px solid rgba(255,255,255,0.1)",
+                        ? `1px solid ${uiColors.muted}`
+                        : `1px solid ${uiColors.border}`,
                   cursor: "pointer",
                   padding: 0,
                 }}
@@ -219,7 +220,7 @@ export default function TextToolbar({
           onClick={() => { setShowRotation(!showRotation); setShowColors(false); }}
           onMouseEnter={(e) => {
             if (rotation === 0)
-              e.currentTarget.style.background = "rgba(255,255,255,0.1)";
+              e.currentTarget.style.background = uiColors.background;
           }}
           onMouseLeave={(e) => {
             if (rotation === 0)
@@ -227,9 +228,7 @@ export default function TextToolbar({
           }}
           title={`Rotate (${Math.round(rotation)}°)`}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M7.11 8.53L5.7 7.11C4.8 8.27 4.24 9.61 4.07 11h2.02c.14-.87.49-1.72 1.02-2.47zM6.09 13H4.07c.17 1.39.72 2.73 1.62 3.89l1.41-1.42c-.52-.75-.87-1.59-1.01-2.47zm1.01 5.32c1.16.9 2.51 1.44 3.9 1.61V17.9c-.87-.15-1.71-.49-2.46-1.03L7.1 18.32zM13 4.07V1L8.45 5.55 13 10V6.09c2.84.48 5 2.94 5 5.91s-2.16 5.43-5 5.91v2.02c3.95-.49 7-3.85 7-7.93s-3.05-7.44-7-7.93z"/>
-          </svg>
+          <RotateIcon sx={{ fontSize: 14 }} />
         </button>
         {showRotation && (
           <div
@@ -238,11 +237,11 @@ export default function TextToolbar({
               top: "calc(100% + 6px)",
               left: "50%",
               transform: "translateX(-50%)",
-              background: "rgba(30,32,34,0.95)",
+              background: uiColors.surface,
               backdropFilter: "blur(12px)",
               borderRadius: 8,
               padding: "8px 12px",
-              boxShadow: "0 4px 20px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.08)",
+              boxShadow: popupShadow,
               display: "flex",
               alignItems: "center",
               gap: 8,
@@ -264,7 +263,7 @@ export default function TextToolbar({
             />
             <span
               style={{
-                color: "rgba(255,255,255,0.7)",
+                color: uiColors.muted,
                 fontSize: 11,
                 fontFamily: "var(--font-manrope), sans-serif",
                 minWidth: 32,
@@ -281,32 +280,30 @@ export default function TextToolbar({
                   width: 20,
                   height: 20,
                   fontSize: 11,
-                  color: "rgba(255,255,255,0.5)",
+                  color: uiColors.muted,
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.1)")}
+                onMouseEnter={(e) => (e.currentTarget.style.background = uiColors.background)}
                 onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                 title="Reset rotation"
               >
-                ×
+                <CloseIcon sx={{ fontSize: 12 }} />
               </button>
             )}
           </div>
         )}
       </div>
 
-      <div style={{ width: 1, height: 18, background: "rgba(255,255,255,0.12)" }} />
+      <div style={{ width: 1, height: 18, background: uiColors.border }} />
 
       {/* Delete */}
       <button
-        style={{ ...btnStyle, color: "rgba(255,120,120,0.8)" }}
+        style={{ ...btnStyle, color: uiColors.danger }}
         onClick={onDelete}
         onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,80,80,0.15)")}
         onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
         title="Delete text"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-        </svg>
+        <DeleteIcon sx={{ fontSize: 14 }} />
       </button>
     </div>
   );
