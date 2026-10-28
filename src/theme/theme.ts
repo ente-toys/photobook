@@ -39,30 +39,30 @@ const theme = createTheme({
     },
   },
   typography: {
-    fontFamily: "var(--font-manrope), sans-serif",
+    fontFamily: "var(--font-inter), sans-serif",
     h1: {
-      fontFamily: "var(--font-manrope), sans-serif",
+      fontFamily: "var(--font-inter), sans-serif",
       fontWeight: 800,
     },
     h2: {
-      fontFamily: "var(--font-manrope), sans-serif",
+      fontFamily: "var(--font-inter), sans-serif",
       fontWeight: 700,
     },
     h3: {
-      fontFamily: "var(--font-manrope), sans-serif",
+      fontFamily: "var(--font-inter), sans-serif",
       fontWeight: 700,
     },
     h4: {
-      fontFamily: "var(--font-manrope), sans-serif",
+      fontFamily: "var(--font-inter), sans-serif",
     },
     body1: {
-      fontFamily: "var(--font-manrope), sans-serif",
+      fontFamily: "var(--font-inter), sans-serif",
     },
     body2: {
-      fontFamily: "var(--font-manrope), sans-serif",
+      fontFamily: "var(--font-inter), sans-serif",
     },
     button: {
-      fontFamily: "var(--font-manrope), sans-serif",
+      fontFamily: "var(--font-inter), sans-serif",
       fontWeight: 700,
       textTransform: "none",
     },

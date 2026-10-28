@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Rect, Image as KonvaImage, Text, Group } from "react-konva";
 import Konva from "konva";
 import type { BookPage, PhotoSlot, TextBlock } from "@/lib/types";
-import { CAPTION_FONT_WEIGHT, CENTER_TEXT_FONT_WEIGHT, getBrandingLayout, getCaptionLayout, getCenterTextLayout, getNunitoFont, getOutfitFont, getTextBlockLayout, SAFE_AREA, TEXT_LINE_HEIGHT, type CaptionLayout } from "@/lib/printLayout";
+import { CAPTION_FONT_WEIGHT, CENTER_TEXT_FONT_WEIGHT, getBrandingLayout, getCaptionLayout, getCenterTextLayout, getInterFont, getOutfitFont, getTextBlockLayout, SAFE_AREA, TEXT_LINE_HEIGHT, type CaptionLayout } from "@/lib/printLayout";
 import { useBook } from "@/context/BookContext";
 import { getCachedImage, getCachedUrl, loadImageCached } from "@/lib/imageCache";
 
@@ -194,6 +194,7 @@ function PhotoSlotRenderer({
           width={sw}
           text={isDragOver ? "Drop here" : "Empty slot"}
           fontSize={12}
+          fontFamily={getInterFont()}
           fill={isDragOver ? "#08C225" : "#999"}
           fontStyle={isDragOver ? "bold" : "normal"}
           align="center"
@@ -239,7 +240,7 @@ function TextBlockRenderer({
         y={0}
         text={displayText}
         fontSize={fontSize}
-        fontFamily={getNunitoFont()}
+        fontFamily={getInterFont()}
         fontStyle="bold"
         fill={displayColor}
         lineHeight={TEXT_LINE_HEIGHT}
@@ -315,7 +316,7 @@ function CaptionText({
   pageHeight,
   isEditing,
   lineHeight = TEXT_LINE_HEIGHT,
-  fontFamily = getOutfitFont(),
+  fontFamily = getInterFont(),
   fontWeight = CAPTION_FONT_WEIGHT,
 }: {
   text: string;
@@ -433,7 +434,7 @@ export default function PageCanvas({
           pageWidth={pageWidth}
           pageHeight={pageHeight}
           isEditing={editingCaption === "top"}
-          fontFamily={getOutfitFont()}
+          fontFamily={isFrontCover ? getOutfitFont() : getInterFont()}
           fontWeight={isFrontCover ? CENTER_TEXT_FONT_WEIGHT : CAPTION_FONT_WEIGHT}
         />
       )}
@@ -447,7 +448,7 @@ export default function PageCanvas({
             pageWidth={pageWidth}
             pageHeight={pageHeight}
             isEditing={editingCaption === "bottom"}
-            fontFamily={getOutfitFont()}
+            fontFamily={isFrontCover ? getOutfitFont() : getInterFont()}
             fontWeight={isFrontCover ? CENTER_TEXT_FONT_WEIGHT : CAPTION_FONT_WEIGHT}
           />
         )
@@ -479,7 +480,7 @@ export default function PageCanvas({
         text=""
         fontSize={8}
         fill="#ccc"
-        fontFamily={getNunitoFont()}
+        fontFamily={getInterFont()}
       />
     </>
   );

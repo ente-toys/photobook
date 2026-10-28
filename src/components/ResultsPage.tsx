@@ -236,7 +236,7 @@ export default function ResultsPage() {
           <CircularProgress sx={{ color: "#08C225", mb: 2 }} size={36} />
           <Typography
             sx={{
-              fontFamily: "var(--font-nunito), 'Nunito', sans-serif",
+              fontFamily: "var(--font-inter), sans-serif",
               fontWeight: 700,
               fontSize: "1.05rem",
               color: uiColors.text,
@@ -247,7 +247,7 @@ export default function ResultsPage() {
           </Typography>
           <Typography
             sx={{
-              fontFamily: "var(--font-nunito), 'Nunito', sans-serif",
+              fontFamily: "var(--font-inter), sans-serif",
               color: uiColors.muted,
               fontSize: "0.8rem",
               lineHeight: 1.6,
@@ -277,7 +277,7 @@ export default function ResultsPage() {
           />
           <Typography
             sx={{
-              fontFamily: "var(--font-nunito), 'Nunito', sans-serif",
+              fontFamily: "var(--font-inter), sans-serif",
               color: uiColors.muted,
               fontSize: "0.8rem",
             }}

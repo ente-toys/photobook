@@ -39,7 +39,7 @@ No test framework is configured.
 
 **UI stack:** MUI v7 + Emotion, Konva (`react-konva`) for the page canvas editor. HEIC/HEIF conversion via `heic2any`. Page flip animation via `page-flip`.
 
-**Design system:** Ente-aligned — accent green `#08C225`, charcoal editor and preview with white book pages. Shared interface colors live in `src/theme/colors.ts`. Font: Nunito for book content.
+**Design system:** Ente-aligned — accent green `#08C225`, charcoal editor and preview with white book pages. Shared interface colors live in `src/theme/colors.ts`. Fonts: Fontsource Inter for UI, page captions, and custom text; Fontsource Outfit only for cover titles and empty-page center titles; Fontsource Gochi Hand for the photobook logo.
 
 ## Key Conventions
 

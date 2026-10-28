@@ -21,7 +21,7 @@ export default function EntePasswordDialog({
     <Dialog open={open} onClose={onCancel} maxWidth="xs" fullWidth>
       <DialogTitle
         sx={{
-          fontFamily: "var(--font-sora), sans-serif",
+          fontFamily: "var(--font-inter), sans-serif",
           fontWeight: 700,
         }}
       >

@@ -2,7 +2,7 @@ import JSZip from "jszip";
 import type { BookPage } from "./types";
 import { BOOK_SIZE_MM } from "./bookFormats";
 import { preparePrintExport, type PrintSelection } from "./printProducts";
-import { CAPTION_FONT_WEIGHT, CENTER_TEXT_FONT_WEIGHT, getBrandingLayout, getCaptionLayout, getCenterTextLayout, getNunitoFont, getOutfitFont, getTextBlockLayout, SAFE_AREA, TEXT_LINE_HEIGHT } from "./printLayout";
+import { CAPTION_FONT_WEIGHT, CENTER_TEXT_FONT_WEIGHT, getBrandingLayout, getCaptionLayout, getCenterTextLayout, getInterFont, getOutfitFont, getTextBlockLayout, SAFE_AREA, TEXT_LINE_HEIGHT } from "./printLayout";
 import { getPhotoBlob } from "./db";
 import { createPdfX4, renderCanvasToFogra39Jpeg } from "./pdfx";
 
@@ -129,8 +129,10 @@ export async function renderPageToCanvas(
     ctx.rect(layout.x / 100 * width, layout.y / 100 * height, layout.width / 100 * width, layout.height / 100 * height);
     ctx.clip();
     ctx.fillStyle = "#2a2a2a";
-    const fontWeight = position === "center" || isFrontCover ? CENTER_TEXT_FONT_WEIGHT : CAPTION_FONT_WEIGHT;
-    ctx.font = `${fontWeight} ${layout.fontSize / 100 * height}px ${getOutfitFont()}, sans-serif`;
+    const isTitle = position === "center" || isFrontCover;
+    const fontFamily = isTitle ? getOutfitFont() : getInterFont();
+    const fontWeight = isTitle ? CENTER_TEXT_FONT_WEIGHT : CAPTION_FONT_WEIGHT;
+    ctx.font = `${fontWeight} ${layout.fontSize / 100 * height}px ${fontFamily}, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     const lines = position === "center" ? centerText!.lines : [text];
@@ -183,7 +185,7 @@ export async function renderPageToCanvas(
     }
 
     ctx.fillStyle = color;
-    ctx.font = `bold ${fontSize}px ${getNunitoFont()}, sans-serif`;
+    ctx.font = `bold ${fontSize}px ${getInterFont()}, sans-serif`;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
 

@@ -26,7 +26,7 @@ export default function BookTitleInput() {
         width: "max-content",
         maxWidth: { xs: "min(38vw, 160px)", md: "min(360px, 100%)" },
         minWidth: 0,
-        fontFamily: "var(--font-manrope), sans-serif",
+        fontFamily: "var(--font-inter), sans-serif",
         fontSize: 14,
         fontWeight: 600,
         lineHeight: "20px",

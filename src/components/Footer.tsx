@@ -28,7 +28,7 @@ export default function Footer({ showPrivacyPolicy = false, light = false }: { s
           underline="hover"
           onClick={() => setPrivacyOpen(true)}
           sx={{
-            fontFamily: "var(--font-manrope), sans-serif",
+            fontFamily: "var(--font-inter), sans-serif",
             fontSize: "0.85rem",
             color: uiColors.muted,
             border: "none",
@@ -41,7 +41,7 @@ export default function Footer({ showPrivacyPolicy = false, light = false }: { s
       )}
       <Typography
         sx={{
-          fontFamily: "var(--font-manrope), sans-serif",
+          fontFamily: "var(--font-inter), sans-serif",
           fontSize: "0.75rem",
           color: uiColors.muted,
         }}

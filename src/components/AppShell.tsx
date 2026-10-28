@@ -126,10 +126,10 @@ export default function AppShell() {
           >
             <CloseIcon sx={{ fontSize: 18 }} />
           </IconButton>
-          <Typography variant="subtitle1" sx={{ fontFamily: "var(--font-nunito)", fontWeight: 700, mb: 0.5, color: uiColors.text, fontSize: "1rem" }}>
+          <Typography variant="subtitle1" sx={{ fontFamily: "var(--font-inter)", fontWeight: 700, mb: 0.5, color: uiColors.text, fontSize: "1rem" }}>
             Best on desktop
           </Typography>
-          <Typography variant="body2" sx={{ fontFamily: "var(--font-nunito)", color: uiColors.muted, lineHeight: 1.55, fontSize: "0.835rem" }}>
+          <Typography variant="body2" sx={{ fontFamily: "var(--font-inter)", color: uiColors.muted, lineHeight: 1.55, fontSize: "0.835rem" }}>
             The photobook editor works best on a larger screen. For the full experience, try it on a desktop or laptop.
           </Typography>
         </DialogContent>

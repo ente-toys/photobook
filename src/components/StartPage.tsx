@@ -29,10 +29,10 @@ export default function StartPage() {
             </Box>
           )}
           <Box sx={{ position: "relative", zIndex: 10, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", maxWidth: 1100, width: "100%" }}>
-            <Typography component="h1" sx={{ fontFamily: "var(--font-sora), sans-serif", fontSize: { xs: "2.5rem", md: "4rem" }, fontWeight: 800, letterSpacing: "-0.02em", mb: 2, lineHeight: 1.1, color: "#1A1C1D" }}>
+            <Typography component="h1" sx={{ fontFamily: "var(--font-inter), sans-serif", fontSize: { xs: "2.5rem", md: "4rem" }, fontWeight: 800, letterSpacing: "-0.02em", mb: 2, lineHeight: 1.1, color: "#1A1C1D" }}>
               Your memories deserve a book
             </Typography>
-            <Typography sx={{ fontFamily: "var(--font-sora), sans-serif", fontSize: "1.15rem", color: "#666", maxWidth: 560, lineHeight: 1.7, mb: 6 }}>
+            <Typography sx={{ fontFamily: "var(--font-inter), sans-serif", fontSize: "1.15rem", color: "#666", maxWidth: 560, lineHeight: 1.7, mb: 6 }}>
               Drop in your photos and get a print-ready photobook.<br />Beautifully arranged, completely private, and free.
             </Typography>
             <Box sx={{ mb: 8, position: "relative", "& .card": { transition: "transform 0.5s ease" }, "&:hover .card": { transform: "rotate(0deg) !important" } }}>
@@ -40,7 +40,7 @@ export default function StartPage() {
                 sx={{ width: { xs: 260, md: 380 }, maxWidth: "100%", height: "auto", borderRadius: 2, boxShadow: "0px 16px 40px rgba(0,0,0,0.15), 0px 4px 12px rgba(0,0,0,0.08)", transform: "rotate(-3deg)", position: "relative", zIndex: 20, userSelect: "none", pointerEvents: "none" }} />
             </Box>
             <Button variant="contained" size="large" disabled={busy} onClick={() => fileInputRef.current?.click()}
-              sx={{ bgcolor: "#08C225", fontFamily: "var(--font-sora), sans-serif", fontSize: "1.15rem", fontWeight: 700, px: 6, py: 2, boxShadow: "none", "&:hover": { transform: "scale(1.02)", bgcolor: "#07AE22" }, "&:active": { transform: "scale(0.95)" }, transition: "transform 0.3s ease, background-color 0.3s ease" }}>
+              sx={{ bgcolor: "#08C225", fontFamily: "var(--font-inter), sans-serif", fontSize: "1.15rem", fontWeight: 700, px: 6, py: 2, boxShadow: "none", "&:hover": { transform: "scale(1.02)", bgcolor: "#07AE22" }, "&:active": { transform: "scale(0.95)" }, transition: "transform 0.3s ease, background-color 0.3s ease" }}>
               Add photos
             </Button>
             {importError && <Alert severity="error" sx={{ mt: 2, maxWidth: 480 }}>{importError}</Alert>}
@@ -54,7 +54,7 @@ export default function StartPage() {
               </Box>
               {enteError && <Alert id="landing-import-error" severity="error" sx={{ mt: 2, borderRadius: 2, textAlign: "left" }}>{enteError}</Alert>}
             </Box>
-            <Typography sx={{ fontFamily: "var(--font-sora), sans-serif", fontSize: "0.85rem", color: "#999", letterSpacing: "0.04em" }}>
+            <Typography sx={{ fontFamily: "var(--font-inter), sans-serif", fontSize: "0.85rem", color: "#999", letterSpacing: "0.04em" }}>
               Print-ready. Auto-arranged. 100% in your browser.
             </Typography>
           </Box>

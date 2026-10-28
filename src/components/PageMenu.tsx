@@ -3,7 +3,7 @@
 import { uiColors, pageMenuColors, popupShadow } from "@/theme/colors";
 
 import { useState } from "react";
-import { IconButton, Menu, MenuItem, Tooltip } from "@mui/material";
+import { IconButton, Menu, MenuItem } from "@mui/material";
 import { AddPageIcon, AddPhotosIcon, DeleteIcon, EditPhotoIcon, MoreIcon } from "./icons";
 import RequiredPageDialog from "./RequiredPageDialog";
 import { MAX_PAGE_PHOTOS } from "@/lib/photoPlacement";
@@ -68,36 +68,34 @@ export default function PageMenu({
 
   return (
     <>
-      <Tooltip title="Page options" enterDelay={150} enterNextDelay={150} slotProps={{ transition: { timeout: 100 } }}>
-        <IconButton
-          id={buttonId}
-          className={styles.hoverControl}
-          data-open={open ? "true" : undefined}
-          aria-label={`${label} options`}
-          aria-haspopup="menu"
-          aria-controls={open ? menuId : undefined}
-          aria-expanded={open ? true : undefined}
-          onClick={(event) => {
-            event.stopPropagation();
-            setRestoreFocus(true);
-            setAnchorEl(event.currentTarget);
-          }}
-          sx={{
-            bgcolor: open ? pageMenuColors.active : pageMenuColors.hover,
-            borderRadius: "14px",
-            color: open ? pageMenuColors.text : uiColors.muted,
-            width: 44,
-            height: 44,
-            flexShrink: 0,
-            mt: "auto",
-            p: 0,
-            "&:hover": { bgcolor: pageMenuColors.active, color: pageMenuColors.text },
-            "&.Mui-focusVisible": { opacity: 1, pointerEvents: "auto" },
-          }}
-        >
-          <MoreIcon sx={{ fontSize: 20 }} />
-        </IconButton>
-      </Tooltip>
+      <IconButton
+        id={buttonId}
+        className={styles.hoverControl}
+        data-open={open ? "true" : undefined}
+        aria-label={`${label} options`}
+        aria-haspopup="menu"
+        aria-controls={open ? menuId : undefined}
+        aria-expanded={open ? true : undefined}
+        onClick={(event) => {
+          event.stopPropagation();
+          setRestoreFocus(true);
+          setAnchorEl(event.currentTarget);
+        }}
+        sx={{
+          bgcolor: open ? pageMenuColors.active : pageMenuColors.hover,
+          borderRadius: "14px",
+          color: open ? pageMenuColors.text : uiColors.muted,
+          width: 44,
+          height: 44,
+          flexShrink: 0,
+          mt: "auto",
+          p: 0,
+          "&:hover": { bgcolor: pageMenuColors.active, color: pageMenuColors.text },
+          "&.Mui-focusVisible": { opacity: 1, pointerEvents: "auto" },
+        }}
+      >
+        <MoreIcon sx={{ fontSize: 20 }} />
+      </IconButton>
       <Menu
         id={menuId}
         anchorEl={anchorEl}

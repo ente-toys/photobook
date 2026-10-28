@@ -83,7 +83,7 @@ export default function TextToolbar({
     alignItems: "center",
     justifyContent: "center",
     fontSize: 13,
-    fontFamily: "var(--font-manrope), sans-serif",
+    fontFamily: "var(--font-inter), sans-serif",
     padding: 0,
     transition: "background 0.15s",
   };
@@ -265,7 +265,7 @@ export default function TextToolbar({
               style={{
                 color: uiColors.muted,
                 fontSize: 11,
-                fontFamily: "var(--font-manrope), sans-serif",
+                fontFamily: "var(--font-inter), sans-serif",
                 minWidth: 32,
                 textAlign: "right",
               }}

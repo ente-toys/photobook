@@ -16,9 +16,9 @@ export const SAFE_AREA = {
   height: 100 - 2 * PRINT_SAFE_MARGIN_PCT,
 };
 
-export function getNunitoFont(): string {
+export function getInterFont(): string {
   if (typeof window === "undefined") return "sans-serif";
-  return getComputedStyle(document.body).getPropertyValue("--font-nunito").trim() || "sans-serif";
+  return getComputedStyle(document.body).getPropertyValue("--font-inter").trim() || "sans-serif";
 }
 
 export function getOutfitFont(): string {
@@ -39,9 +39,9 @@ function measureTextWithFont(text: string, fontSize: number, fontFamily: string,
 }
 
 const measureBookText: MeasureText = (text, fontSize, bold) =>
-  measureTextWithFont(text, fontSize, getNunitoFont(), bold ? 700 : 400);
+  measureTextWithFont(text, fontSize, getInterFont(), bold ? 700 : 400);
 const measureCaptionText: MeasureText = (text, fontSize) =>
-  measureTextWithFont(text, fontSize, getOutfitFont(), CAPTION_FONT_WEIGHT);
+  measureTextWithFont(text, fontSize, getInterFont(), CAPTION_FONT_WEIGHT);
 const measureCenterText: MeasureText = (text, fontSize) =>
   measureTextWithFont(text, fontSize, getOutfitFont(), CENTER_TEXT_FONT_WEIGHT);
 

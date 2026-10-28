@@ -186,7 +186,7 @@ export default function NavBar() {
                     ? "rgba(255, 255, 255, 0.52)"
                     : "transparent",
                   color: "rgba(21, 21, 21, 0.76)",
-                  fontFamily: "var(--font-sora), 'Avenir Next', 'Segoe UI', sans-serif",
+                  fontFamily: "var(--font-inter), sans-serif",
                   fontSize: "0.92rem",
                   fontWeight: 500,
                   letterSpacing: 0,

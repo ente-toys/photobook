@@ -1,9 +1,6 @@
-@font-face {
-  font-family: "Inter Variable";
-  font-style: normal;
-  font-display: fallback;
-  font-weight: 100 900;
-  src: url("/fonts/inter-latin-wght-normal.woff2") format("woff2-variations");
+:root {
+  --font-inter: "Inter Variable";
+  --font-outfit: "Outfit Variable";
 }
 
 * {
@@ -20,10 +17,14 @@ html, body {
 
 body {
   background-color: #161616;
-  font-family: var(--font-manrope), sans-serif;
+  font-family: var(--font-inter), sans-serif;
   color: #E9EDEF;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+button, input, select, textarea {
+  font-family: var(--font-inter), sans-serif;
 }
 
 ::selection {
