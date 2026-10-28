@@ -1,3 +1,8 @@
+:root {
+  --font-inter: "Inter Variable";
+  --font-outfit: "Outfit Variable";
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -7,14 +12,19 @@
 html, body {
   height: 100%;
   overflow-x: hidden;
+  color-scheme: dark;
 }
 
 body {
-  background-color: #F5F5F7;
-  font-family: var(--font-manrope), sans-serif;
-  color: #1a1c1d;
+  background-color: #161616;
+  font-family: var(--font-inter), sans-serif;
+  color: #E9EDEF;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+button, input, select, textarea {
+  font-family: var(--font-inter), sans-serif;
 }
 
 ::selection {
@@ -32,10 +42,10 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #c8c8cc;
+  background: #4b555a;
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #a0a0a4;
+  background: #657177;
 }

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Ente Photobook — a fully private, browser-only photobook maker. Photos never leave the device. Users import photos, arrange them into an A5 portrait book with auto-layout, edit pages, then export as PDF or PNG ZIP. Intended to eventually integrate into the Ente Photos ecosystem and deploy on `photobook.ente.com`.
+Ente Photobook — a fully private, browser-only photobook maker. Photos never leave the device. Users import photos, arrange them into a square book with auto-layout, edit pages, then export as PDF or PNG ZIP. Intended to eventually integrate into the Ente Photos ecosystem and deploy on `photobook.ente.com`.
 
 ## Repository Structure
 
@@ -34,17 +34,17 @@ No test framework is configured.
 - **`lib/types.ts`** — core data model. `BookState` contains `BookPage[]`, each page has `PhotoSlot[]` (positioned as percentages 0-100) and `TextBlock[]`. All coordinates are percentages of page dimensions.
 - **`lib/layouts.ts`** — auto-layout engine that distributes photos across pages (1-4 per page) choosing layout variants based on photo orientation. First page is always a single cover photo.
 - **`lib/db.ts`** — persistence via `localforage` (IndexedDB). Three stores: `photo_blobs`, `thumbnails`, `metadata`. Session restores on mount.
-- **`lib/export.ts`** — renders pages to canvas then exports as A5 PDF, A4 spread PDF, or PNG ZIP. Uses jsPDF and JSZip.
+- **`lib/export.ts`** — renders 210 × 210 mm square pages to canvas, then exports as PDF/X-4 or as a PNG ZIP. Uses ImageMagick for CMYK conversion and JSZip for PNG archives.
 - **`lib/images.ts`** — EXIF date extraction (via `exifr`) and thumbnail generation.
 
 **UI stack:** MUI v7 + Emotion, Konva (`react-konva`) for the page canvas editor. HEIC/HEIF conversion via `heic2any`. Page flip animation via `page-flip`.
 
-**Design system:** Ente-aligned — accent green `#08C225`, light mode only, grey app background with white book pages. Font: Nunito for book content.
+**Design system:** Ente-aligned — accent green `#08C225`, charcoal editor and preview with white book pages. Shared interface colors live in `src/theme/colors.ts`. Fonts: Fontsource Inter for UI, page captions, and custom text; Fontsource Outfit only for cover titles and empty-page center titles; Fontsource Gochi Hand for the photobook logo.
 
 ## Key Conventions
 
 - All slot/text positions use **percentage coordinates** (0-100) relative to page dimensions, not pixels
-- A5 portrait format: 148mm × 210mm, aspect ratio ~0.705
+- The only supported format is 210 × 210 mm square for both hardcover and softcover
 - Pages are always kept in even count (for spreads) — blank page appended if needed
 - Photos stored as blobs in IndexedDB; object URLs created at runtime and tracked in `photoUrls`/`thumbnailUrls` Maps
 - Thumbnails are capped at 1080px for performance

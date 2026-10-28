@@ -1,31 +1,14 @@
 import type { Metadata } from "next";
-import { Manrope, Nunito, Sora } from "next/font/google";
+import "@fontsource/gochi-hand";
+import "@fontsource-variable/inter";
+import "@fontsource-variable/outfit";
 import { AppRouterCacheProvider } from "@mui/material-nextjs/v15-appRouter";
 import { ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
 import theme from "@/theme/theme";
+import { BookProvider } from "@/context/BookContext";
+import { PhotoImportProvider } from "@/hooks/usePhotoImport";
 import "./globals.css";
-
-const manrope = Manrope({
-  subsets: ["latin"],
-  weight: ["400", "500", "700", "800"],
-  display: "swap",
-  variable: "--font-manrope",
-});
-
-const nunito = Nunito({
-  subsets: ["latin"],
-  weight: ["400", "700"],
-  display: "swap",
-  variable: "--font-nunito",
-});
-
-const sora = Sora({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  display: "swap",
-  variable: "--font-sora",
-});
 
 export const metadata: Metadata = {
   title: "Ente Photobook",
@@ -43,11 +26,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${manrope.variable} ${nunito.variable} ${sora.variable}`}>
+      <body>
         <AppRouterCacheProvider>
           <ThemeProvider theme={theme}>
             <CssBaseline />
-            {children}
+            <BookProvider><PhotoImportProvider>{children}</PhotoImportProvider></BookProvider>
           </ThemeProvider>
         </AppRouterCacheProvider>
       </body>

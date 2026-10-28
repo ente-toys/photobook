@@ -20,12 +20,6 @@ import type {
   TextBlock,
 } from "@/lib/types";
 import {
-  DEFAULT_BOOK_FORMAT_ID,
-  getBookFormat,
-  type BookFormat,
-  type BookFormatId,
-} from "@/lib/bookFormats";
-import {
   saveBookState,
   getBookState,
   savePhotos,
@@ -39,7 +33,10 @@ import {
   getAppView,
   clearAll,
 } from "@/lib/db";
-import { generateAutoLayout, chooseBestLayout, chooseBestVariantKey, defaultVariantKeyForCount, applyVariant, getDefaultPadding, getVariantsForCount } from "@/lib/layouts";
+import { generateAutoLayout, chooseBestLayout, chooseBestVariantKey, applyVariant, getVariantsForCount, getVariantPreview } from "@/lib/layouts";
+import { isBlankPage, isRequiredBlankPage, makeBlankPage, normalizeBookPages } from "@/lib/bookPages";
+import { availablePhotoSpaces, normalizeFrontCover, photoDestinationError, placeImportedPhotos, type AddPhotosOptions } from "@/lib/photoPlacement";
+import { constrainTextBlock } from "@/lib/printLayout";
 import {
   extractExifDate,
   createThumbnail,
@@ -47,20 +44,12 @@ import {
 } from "@/lib/images";
 import { clearImageCache } from "@/lib/imageCache";
 import type { EnteCredentials, EnteFileDescriptor } from "@/lib/ente/types";
-import {
-  prepareEnteAlbum,
-  fetchAndDecryptThumbnail,
-  fetchAndDecryptOriginal,
-  extractRenderableImage,
-} from "@/lib/ente/import";
 
 interface BookContextValue {
   // App state
   appView: AppView;
   setAppView: (view: AppView) => void;
   loading: boolean;
-  restored: boolean;
-  setRestored: (v: boolean) => void;
 
   // Photos
   photos: Photo[];
@@ -69,12 +58,11 @@ interface BookContextValue {
   loadPreviews: (photoIds: string[]) => void;
   addPhotos: (
     files: File[],
-    options?: { replace?: boolean; formatId?: BookFormatId },
-  ) => Promise<void>;
+    options?: AddPhotosOptions,
+  ) => Promise<string | undefined>;
   addEntePhotos: (
     albumUrl: string,
     requestPassword: () => Promise<string | null>,
-    options?: { formatId?: BookFormatId },
   ) => Promise<void>;
   processingPhotos: boolean;
   processingProgress: number;
@@ -97,9 +85,7 @@ interface BookContextValue {
 
   // Book state
   book: BookState;
-  bookFormat: BookFormat;
   setBook: React.Dispatch<React.SetStateAction<BookState>>;
-  setBookFormat: (formatId: BookFormatId) => void;
   currentSpreadIndex: number;
   setCurrentSpreadIndex: (idx: number) => void;
 
@@ -110,7 +96,7 @@ interface BookContextValue {
   canRedo: boolean;
 
   // Page operations
-  addPage: (afterIndex?: number) => void;
+  addPage: (afterIndex?: number) => string;
   removePage: (pageId: string) => void;
   reorderPages: (fromIndex: number, toIndex: number) => void;
   updatePage: (pageId: string, updates: Partial<BookPage>) => void;
@@ -132,7 +118,6 @@ interface BookContextValue {
     toPageId: string
   ) => void;
   setPageLayout: (pageId: string, variantKey: string) => void;
-  setPagePadding: (pageId: string, paddingH: number, paddingV: number) => void;
   addTextBlock: (pageId: string) => TextBlock;
   updateTextBlock: (
     pageId: string,
@@ -141,12 +126,8 @@ interface BookContextValue {
   ) => void;
   removeTextBlock: (pageId: string, blockId: string) => void;
 
-  // UI state
-  showPageStrip: boolean;
-  setShowPageStrip: React.Dispatch<React.SetStateAction<boolean>>;
-
   // Session
-  startOver: () => void;
+  startOver: () => Promise<void>;
 }
 
 const BookContext = createContext<BookContextValue | null>(null);
@@ -158,7 +139,6 @@ export function useBook() {
 }
 
 const emptyBook: BookState = {
-  formatId: DEFAULT_BOOK_FORMAT_ID,
   pages: [],
   currentSpreadIndex: 0,
 };
@@ -173,128 +153,41 @@ function pagePhotoIds(page: BookPage): string[] {
     .filter((id): id is string => id !== null);
 }
 
-function applyPreviousCrops(
-  previousSlots: PhotoSlot[],
-  nextSlots: PhotoSlot[],
-): PhotoSlot[] {
-  const cropsByPhotoId = new Map<
-    string,
-    Array<Pick<PhotoSlot, "id" | "cropX" | "cropY" | "cropZoom">>
-  >();
-
-  for (const slot of previousSlots) {
-    if (!slot.photoId) continue;
-    const crops = cropsByPhotoId.get(slot.photoId) ?? [];
-    crops.push({
-      id: slot.id,
-      cropX: slot.cropX,
-      cropY: slot.cropY,
-      cropZoom: slot.cropZoom,
-    });
-    cropsByPhotoId.set(slot.photoId, crops);
-  }
-
-  return nextSlots.map((slot, index) => {
-    const photoCrops = slot.photoId ? cropsByPhotoId.get(slot.photoId) : null;
-    const crop = photoCrops?.shift();
-    const fallback = previousSlots[index];
-
-    return {
-      ...slot,
-      id: crop?.id ?? fallback?.id ?? slot.id,
-      cropX: crop?.cropX ?? fallback?.cropX ?? slot.cropX,
-      cropY: crop?.cropY ?? fallback?.cropY ?? slot.cropY,
-      cropZoom: crop?.cropZoom ?? fallback?.cropZoom ?? slot.cropZoom,
-    };
-  });
-}
-
-function relayoutPageForFormat(
-  page: BookPage,
-  pageIndex: number,
-  totalPages: number,
-  formatId: BookFormatId,
-): BookPage {
-  const photoIds = pagePhotoIds(page);
-  if (photoIds.length === 0) return page;
-
-  const isCover = pageIndex === 0;
-  const isBackCover = pageIndex === totalPages - 1 && totalPages > 1;
-  let variantKey =
-    page.layoutVariant ?? defaultVariantKeyForCount(photoIds.length);
-  let paddingH = page.paddingH ?? 0;
-  let paddingV = page.paddingV ?? 0;
-
-  if (photoIds.length === 1 && isCover) {
-    variantKey = "1-full";
-    paddingH = 0;
-    paddingV = 0;
-  } else if (photoIds.length === 1 && isBackCover) {
-    variantKey = "1-padded";
-    paddingH = 0;
-    paddingV = 0;
-  } else if (page.paddingH === undefined || page.paddingV === undefined) {
-    const defaults = getDefaultPadding(variantKey);
-    paddingH = page.paddingH ?? defaults.h;
-    paddingV = page.paddingV ?? defaults.v;
-  }
-
-  const slots = applyVariant(variantKey, photoIds, paddingH, paddingV, formatId);
-  if (slots.length === 0) return page;
-
-  return {
-    ...page,
-    slots: applyPreviousCrops(page.slots, slots),
-    layoutVariant: variantKey,
-    paddingH,
-    paddingV,
-  };
-}
-
 /**
- * Force the covers to their canonical single-photo layouts:
- *   front cover → 1-full (full-bleed)
- *   back cover  → 1-padded (inset, leaves room for the ente branding)
+ * Restore saved front-cover choices, defaulting older layouts to full-bleed:
+ *   front cover → chosen single-photo layout, or 1-full
+ *   back cover  → photo-free, with any former cover photo moved inside
  * Migrates older sessions saved before these rules existed.
  */
 function normalizeCoverLayout(state: BookState): BookState {
   if (state.pages.length === 0) return state;
-  let pages = state.pages;
+  let pages = normalizeFrontCover(state.pages);
 
   const cover = pages[0];
   const coverIds = pagePhotoIds(cover);
-  if (coverIds.length === 1 && cover.layoutVariant !== "1-full") {
+  const hasCoverLayout = getVariantsForCount(1, true).some(
+    (variant) => variant.key === cover.layoutVariant,
+  );
+  if (coverIds.length === 1 && !hasCoverLayout) {
     pages = pages.map((p, i) =>
       i === 0
         ? {
             ...p,
-            slots: applyVariant("1-full", coverIds, 0, 0, state.formatId),
+            slots: cover.slots.filter((slot) => slot.photoId).map((slot) => ({
+              ...slot,
+              ...getVariantPreview("1-full")[0],
+            })),
             layoutVariant: "1-full",
-            paddingH: 0,
-            paddingV: 0,
           }
         : p
     );
   }
 
-  if (pages.length > 1) {
-    const backIdx = pages.length - 1;
-    const back = pages[backIdx];
-    const backIds = pagePhotoIds(back);
-    if (backIds.length === 1 && back.layoutVariant !== "1-padded") {
-      pages = pages.map((p, i) =>
-        i === backIdx
-          ? {
-            ...p,
-              slots: applyVariant("1-padded", backIds, 0, 0, state.formatId),
-              layoutVariant: "1-padded",
-              paddingH: 0,
-              paddingV: 0,
-            }
-          : p
-      );
-    }
-  }
+  pages = normalizeBookPages(pages);
+  pages = pages.map((page) => {
+    const textBlocks = page.textBlocks.map(constrainTextBlock);
+    return textBlocks.some((block, i) => block !== page.textBlocks[i]) ? { ...page, textBlocks } : page;
+  });
 
   return pages === state.pages ? state : { ...state, pages };
 }
@@ -331,9 +224,8 @@ function buildEnteOriginalDownloadJob(photo: Photo):
 }
 
 export function BookProvider({ children }: { children: React.ReactNode }) {
-  const [appView, setAppViewState] = useState<AppView>("start");
+  const [appView, setAppViewState] = useState<AppView>("edit");
   const [loading, setLoading] = useState(true);
-  const [restored, setRestored] = useState(false);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const photosRef = useRef<Photo[]>(photos);
   photosRef.current = photos;
@@ -348,8 +240,11 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
   const previewUrlsRef = useRef<Map<string, string>>(previewUrls);
   previewUrlsRef.current = previewUrls;
   const [book, setBookRaw] = useState<BookState>(emptyBook);
-  const bookFormat = useMemo(() => getBookFormat(book.formatId), [book.formatId]);
   const [currentSpreadIndex, setCurrentSpreadIndex] = useState(0);
+  const resettingRef = useRef(false);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autosaveRef = useRef<Promise<unknown>>(Promise.resolve());
+  const originalWritesRef = useRef<Set<Promise<unknown>>>(new Set());
 
   // Revoke all object URLs on unmount to prevent memory leaks
   useEffect(() => {
@@ -374,7 +269,9 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
           prev,
         ];
         redoStackRef.current = [];
-        return typeof action === "function" ? action(prev) : action;
+        const next = typeof action === "function" ? action(prev) : action;
+        const pages = normalizeBookPages(normalizeFrontCover(next.pages));
+        return pages === next.pages ? next : { ...next, pages };
       });
       setCanUndo(true);
       setCanRedo(false);
@@ -389,7 +286,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
       redoStackRef.current = [...redoStackRef.current, current];
       setCanUndo(undoStackRef.current.length > 0);
       setCanRedo(true);
-      return prev;
+      return normalizeCoverLayout(prev);
     });
   }, []);
 
@@ -400,7 +297,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
       undoStackRef.current = [...undoStackRef.current, current];
       setCanUndo(true);
       setCanRedo(redoStackRef.current.length > 0);
-      return next;
+      return normalizeCoverLayout(next);
     });
   }, []);
   // Merged URL map: preview (1080px) if loaded, else thumbnail (256px).
@@ -443,6 +340,12 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
       })
     );
 
+    for (const [id, url] of loaded) {
+      if (!photosRef.current.some((photo) => photo.id === id)) {
+        URL.revokeObjectURL(url);
+        loaded.delete(id);
+      }
+    }
     if (loaded.size > 0) {
       setPreviewUrls((prev) => {
         const next = new Map(prev);
@@ -452,11 +355,6 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const [showPageStrip, setShowPageStrip] = useState(
-    () =>
-      typeof window === "undefined" ||
-      !window.matchMedia("(max-width: 640px)").matches,
-  );
   const [processingPhotos, setProcessingPhotos] = useState(false);
   const [processingProgress, setProcessingProgress] = useState(0);
   const [processingMessage, setProcessingMessage] = useState(
@@ -485,12 +383,16 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
   >(new Map());
   // Persist on changes (debounced)
   useEffect(() => {
-    if (loading || processingPhotos) return;
+    if (loading || processingPhotos || resettingRef.current) return;
     const saveTimeout = setTimeout(() => {
-      void saveBookState({ ...book, currentSpreadIndex });
-      void savePhotos(photos);
-      void saveAppView(appView);
+      saveTimeoutRef.current = null;
+      autosaveRef.current = autosaveRef.current.then(() => Promise.all([
+        saveBookState({ ...book, currentSpreadIndex }),
+        savePhotos(photos),
+        saveAppView(appView),
+      ])).catch((error) => console.error("Failed to save photobook", error));
     }, 500);
+    saveTimeoutRef.current = saveTimeout;
 
     return () => clearTimeout(saveTimeout);
   }, [book, photos, appView, currentSpreadIndex, loading, processingPhotos]);
@@ -505,7 +407,11 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
           getBookState(),
         ]);
 
-        if (savedPhotos && savedPhotos.length > 0 && savedBook) {
+        if (savedBook?.pages.length === 0 && savedView === "edit") {
+          setBookRaw(emptyBook);
+          setAppViewState("edit");
+        } else if (savedPhotos && savedPhotos.length > 0 && savedBook) {
+          await document.fonts.ready;
           // Restore thumbnail URLs from IndexedDB (full-res loaded on demand for export)
           const thumbUrls = new Map<string, string>();
 
@@ -534,7 +440,6 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
 
           if (savedView === "edit" || savedView === "results") {
             setAppViewState(savedView as AppView);
-            setRestored(true);
           }
         }
       } catch (e) {
@@ -555,180 +460,151 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
   const addPhotos = useCallback(
     async (
       files: File[],
-      options: { replace?: boolean; formatId?: BookFormatId } = {},
+      options: AddPhotosOptions = {},
     ) => {
       const replace = options.replace ?? false;
-      const formatId = options.formatId ?? DEFAULT_BOOK_FORMAT_ID;
+      const destination = options.destination ?? { kind: "end" as const };
+      if (!replace) {
+        const error = photoDestinationError(book.pages, destination, files.length);
+        if (error) throw new Error(error);
+      }
       setProcessingPhotos(true);
       progressRef.current = 0;
       setProcessingProgress(0);
       setProcessingMessage("Processing your photos...");
 
-      if (replace) {
-        // Clear previous session when starting fresh from start page
-        thumbnailUrls.forEach((url) => URL.revokeObjectURL(url));
-        previewUrls.forEach((url) => URL.revokeObjectURL(url));
-        clearImageCache();
-        await clearAll();
-      }
-
-      const newPhotos: Photo[] = [];
-      const newThumbUrls = replace ? new Map<string, string>() : new Map(thumbnailUrls);
-      const newPreviewUrls = replace ? new Map<string, string>() : new Map(previewUrls);
-
-      // Flush progress to state only on animation frames
-      const scheduleProgressUpdate = (value: number) => {
-        progressRef.current = value;
-        if (!rafRef.current) {
-          rafRef.current = requestAnimationFrame(() => {
-            rafRef.current = 0;
-            setProcessingProgress(progressRef.current);
-          });
-        }
-      };
-
-      // Process each photo: HEIC conversion, dimensions, thumbnail, IndexedDB save
-      type PhotoResult = { photo: Photo; thumbUrl: string; previewUrl: string };
-      const results: (PhotoResult | null)[] = new Array(files.length).fill(null);
-      let completed = 0;
-
-      const processPhoto = async (file: File, index: number) => {
-        let blob: Blob;
-        try {
-          blob = await normalizeImportedImageBlob(file, file.name);
-        } catch (e) {
-          console.warn("HEIC conversion failed for", file.name, e);
-          completed++;
-          scheduleProgressUpdate(Math.round((completed / files.length) * 100));
-          return;
+      try {
+        if (replace) {
+          // Clear previous session when starting fresh from start page
+          thumbnailUrls.forEach((url) => URL.revokeObjectURL(url));
+          previewUrls.forEach((url) => URL.revokeObjectURL(url));
+          clearImageCache();
+          await clearAll();
         }
 
-        // Get dimensions (temporary URL, revoked after use to save memory)
-        const tempUrl = URL.createObjectURL(blob);
-        const img = await loadImage(tempUrl);
-        URL.revokeObjectURL(tempUrl);
-        const dateTaken = await extractExifDate(file);
-        const thumb = await createThumbnail(img, 256);
-        const preview = await createThumbnail(img, 1080);
+        const newPhotos: Photo[] = [];
+        const newThumbUrls = replace ? new Map<string, string>() : new Map(thumbnailUrls);
+        const newPreviewUrls = replace ? new Map<string, string>() : new Map(previewUrls);
 
-        const photo: Photo = {
-          id: uuid(),
-          fileName: file.name,
-          width: img.naturalWidth,
-          height: img.naturalHeight,
-          dateTaken: dateTaken || file.lastModified || Date.now(),
-          source: "local",
-          originalStatus: "ready",
+        // Flush progress to state only on animation frames
+        const scheduleProgressUpdate = (value: number) => {
+          progressRef.current = value;
+          if (!rafRef.current) {
+            rafRef.current = requestAnimationFrame(() => {
+              rafRef.current = 0;
+              setProcessingProgress(progressRef.current);
+            });
+          }
         };
 
-        // Save to IndexedDB
-        await savePhotoBlob(photo.id, blob);
-        await saveThumbnail(photo.id, thumb);
-        await savePreview(photo.id, preview);
+        // Process each photo: HEIC conversion, dimensions, thumbnail, IndexedDB save
+        type PhotoResult = { photo: Photo; thumbUrl: string; previewUrl: string };
+        const results: (PhotoResult | null)[] = new Array(files.length).fill(null);
+        let completed = 0;
 
-        const thumbUrl = URL.createObjectURL(thumb);
-        const previewUrl = URL.createObjectURL(preview);
-        results[index] = { photo, thumbUrl, previewUrl };
-        completed++;
-        scheduleProgressUpdate(Math.round((completed / files.length) * 100));
-      };
-
-      // Run with concurrency limit of 6
-      const CONCURRENCY = 6;
-      const taskQueue = files.map((f, i) => () => processPhoto(f, i));
-      const workers = Array.from(
-        { length: Math.min(CONCURRENCY, files.length) },
-        async () => {
-          while (taskQueue.length > 0) {
-            const task = taskQueue.shift()!;
-            await task();
-          }
-        }
-      );
-      await Promise.all(workers);
-
-      // Collect results in original file order
-      for (const result of results) {
-        if (result) {
-          newThumbUrls.set(result.photo.id, result.thumbUrl);
-          newPreviewUrls.set(result.photo.id, result.previewUrl);
-          newPhotos.push(result.photo);
-        }
-      }
-
-      // Cancel any pending frame and flush final progress
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = 0;
-      }
-      setProcessingProgress(100);
-
-      const allPhotos = replace ? newPhotos : [...photos, ...newPhotos];
-      setPhotos(allPhotos);
-      setThumbnailUrls(newThumbUrls);
-      setPreviewUrls(newPreviewUrls);
-
-      if (replace) {
-        // Fresh session: generate auto layout from scratch (bypass undo tracking)
-        const pages = generateAutoLayout(allPhotos, formatId);
-        setBookRaw({ formatId, pages, currentSpreadIndex: 0 });
-        undoStackRef.current = [];
-        redoStackRef.current = [];
-        setCanUndo(false);
-        setCanRedo(false);
-        setCurrentSpreadIndex(0);
-      } else if (newPhotos.length > 0) {
-        // Add-to-existing: insert each new photo as its own new page at the
-        // chronologically correct position, leaving existing pages untouched
-        // so the user's layout edits are preserved.
-        const photoMap = new Map(allPhotos.map((p) => [p.id, p]));
-        const sortedNew = [...newPhotos].sort(
-          (a, b) => a.dateTaken - b.dateTaken
-        );
-
-        setBook((prev) => {
-          const pages = [...prev.pages];
-          const pageDates: (number | null)[] = pages.map((page) => {
-            let max: number | null = null;
-            for (const slot of page.slots) {
-              if (!slot.photoId) continue;
-              const ph = photoMap.get(slot.photoId);
-              if (ph && (max === null || ph.dateTaken > max)) max = ph.dateTaken;
+        const processPhoto = async (file: File, index: number) => {
+          try {
+            const blob = await normalizeImportedImageBlob(file, file.name);
+            const tempUrl = URL.createObjectURL(blob);
+            let img: HTMLImageElement;
+            try {
+              img = await loadImage(tempUrl);
+            } finally {
+              URL.revokeObjectURL(tempUrl);
             }
-            return max;
-          });
-
-          for (const photo of sortedNew) {
-            // Find last non-blank page whose latest photo date <= new photo's date
-            let insertAfter = -1;
-            for (let i = 0; i < pages.length; i++) {
-              const d = pageDates[i];
-              if (d !== null && d <= photo.dateTaken) insertAfter = i;
-            }
-            // If the new photo predates everything, still insert after the
-            // cover (page 0) so the cover stays put.
-            const idx =
-              insertAfter >= 0 ? insertAfter + 1 : Math.min(1, pages.length);
-            const newPage: BookPage = {
+            const dateTaken = await extractExifDate(file);
+            const thumb = await createThumbnail(img, 256);
+            const preview = await createThumbnail(img, 1080);
+            const photo: Photo = {
               id: uuid(),
-              slots: chooseBestLayout([photo], prev.formatId),
-              layoutVariant: chooseBestVariantKey([photo]),
-              textBlocks: [],
-              topCaption: "",
-              bottomCaption: "",
+              fileName: file.name,
+              width: img.naturalWidth,
+              height: img.naturalHeight,
+              dateTaken: dateTaken || file.lastModified || Date.now(),
+              source: "local",
+              originalStatus: "ready",
             };
-            pages.splice(idx, 0, newPage);
-            pageDates.splice(idx, 0, photo.dateTaken);
+            await savePhotoBlob(photo.id, blob);
+            await saveThumbnail(photo.id, thumb);
+            await savePreview(photo.id, preview);
+            results[index] = { photo, thumbUrl: URL.createObjectURL(thumb), previewUrl: URL.createObjectURL(preview) };
+          } catch (error) {
+            console.warn("Photo import failed for", file.name, error);
+          } finally {
+            completed++;
+            scheduleProgressUpdate(Math.round((completed / files.length) * 100));
           }
+        };
 
-          return { ...prev, pages };
-        });
+        // Run with concurrency limit of 6
+        const CONCURRENCY = 6;
+        const taskQueue = files.map((f, i) => () => processPhoto(f, i));
+        const workers = Array.from(
+          { length: Math.min(CONCURRENCY, files.length) },
+          async () => {
+            while (taskQueue.length > 0) {
+              const task = taskQueue.shift()!;
+              await task();
+            }
+          }
+        );
+        await Promise.all(workers);
+
+        // Collect results in original file order
+        for (const result of results) {
+          if (result) {
+            newThumbUrls.set(result.photo.id, result.thumbUrl);
+            newPreviewUrls.set(result.photo.id, result.previewUrl);
+            newPhotos.push(result.photo);
+          }
+        }
+
+        // Cancel any pending frame and flush final progress
+        if (rafRef.current) {
+          cancelAnimationFrame(rafRef.current);
+          rafRef.current = 0;
+        }
+        setProcessingProgress(100);
+
+        if (!replace && newPhotos.length === 0) {
+          throw new Error("These photos couldn't be read. Please choose different image files.");
+        }
+        const skipped = files.length - newPhotos.length;
+        if (skipped > 0) setImportNotice(`${skipped} photo${skipped === 1 ? "" : "s"} couldn't be imported.`);
+
+        const allPhotos = replace ? newPhotos : [...photos, ...newPhotos];
+        const nextPages = replace ? generateAutoLayout(allPhotos) : placeImportedPhotos(book.pages, allPhotos, newPhotos, destination);
+        const destinationIndex = replace ? 0 : destination.kind === "page"
+          ? nextPages.findIndex((page) => page.id === destination.pageId)
+          : Math.max(0, book.pages.length - 1);
+        setPhotos(allPhotos);
+        setThumbnailUrls(newThumbUrls);
+        setPreviewUrls(newPreviewUrls);
+
+        if (replace) {
+          // Fresh session: generate auto layout from scratch (bypass undo tracking)
+          setBookRaw({ pages: nextPages, currentSpreadIndex: 0 });
+          undoStackRef.current = [];
+          redoStackRef.current = [];
+          setCanUndo(false);
+          setCanRedo(false);
+          setCurrentSpreadIndex(0);
+        } else if (newPhotos.length > 0) {
+          setBook((prev) => ({ ...prev, pages: nextPages }));
+          setCurrentSpreadIndex(destinationIndex);
+        }
+
+        setAppViewState("edit");
+        return nextPages[destinationIndex]?.id;
+      } finally {
+        if (rafRef.current) {
+          cancelAnimationFrame(rafRef.current);
+          rafRef.current = 0;
+        }
+        setProcessingPhotos(false);
       }
-
-      setProcessingPhotos(false);
-      setAppViewState("edit");
     },
-    [photos, thumbnailUrls, previewUrls]
+    [book.pages, photos, thumbnailUrls, previewUrls]
   );
 
   const markEnteOriginalDone = useCallback((
@@ -800,6 +676,8 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
             const i = cursor++;
             const { photoId, fileName, credentials, descriptor } = entries[i]!;
             try {
+              if (resettingRef.current || !photosRef.current.some((photo) => photo.id === photoId)) continue;
+              const { fetchAndDecryptOriginal, extractRenderableImage } = await import("@/lib/ente/import");
               const blob = await fetchAndDecryptOriginal(
                 credentials,
                 descriptor,
@@ -823,13 +701,20 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
               const currentPhoto = photosRef.current.find(
                 (candidate) => candidate.id === photoId,
               );
-              if (!currentPhoto || !isPendingEnteOriginal(currentPhoto)) {
+              if (resettingRef.current || !currentPhoto || !isPendingEnteOriginal(currentPhoto)) {
                 continue;
               }
-              await Promise.all([
+              const write = Promise.all([
                 savePhotoBlob(photoId, normalizedBlob),
                 savePreview(photoId, previewBlob),
               ]);
+              originalWritesRef.current.add(write);
+              try {
+                await write;
+              } finally {
+                originalWritesRef.current.delete(write);
+              }
+              if (resettingRef.current || !photosRef.current.some((photo) => photo.id === photoId)) continue;
               const previewUrl = URL.createObjectURL(previewBlob);
               setPreviewUrls((prev) => {
                 const next = new Map(prev);
@@ -845,7 +730,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
               const currentPhoto = photosRef.current.find(
                 (candidate) => candidate.id === photoId,
               );
-              if (currentPhoto && isPendingEnteOriginal(currentPhoto)) {
+              if (!resettingRef.current && currentPhoto && isPendingEnteOriginal(currentPhoto)) {
                 const message =
                   e instanceof Error
                     ? e.message
@@ -871,26 +756,28 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
     async (
       albumUrl: string,
       requestPassword: () => Promise<string | null>,
-      options: { formatId?: BookFormatId } = {},
     ) => {
-      const formatId = options.formatId ?? DEFAULT_BOOK_FORMAT_ID;
       setProcessingPhotos(true);
       progressRef.current = 0;
       setProcessingProgress(0);
       setProcessingMessage("Importing your photos...");
 
-      // Ente import always replaces the current session (same convention as
-      // the file picker from StartPage).
-      thumbnailUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
-      previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
-      clearImageCache();
-      await clearAll();
-      activeEnteOriginalDownloadsRef.current.clear();
-      enteOriginalWaitersRef.current = new Map();
-
       let preparation;
+      let fetchAndDecryptThumbnail: typeof import("@/lib/ente/import")["fetchAndDecryptThumbnail"];
       try {
-        preparation = await prepareEnteAlbum(albumUrl, requestPassword);
+        // Keep loading visible while browser-only cryptography is fetched.
+        const enteImport = await import("@/lib/ente/import");
+        fetchAndDecryptThumbnail = enteImport.fetchAndDecryptThumbnail;
+        preparation = await enteImport.prepareEnteAlbum(albumUrl, requestPassword);
+        if (preparation.files.length === 0) throw new Error("This album has no photos we can import.");
+
+        // A bad link or a cancelled password prompt must leave the existing book intact.
+        thumbnailUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+        previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+        clearImageCache();
+        await clearAll();
+        activeEnteOriginalDownloadsRef.current.clear();
+        enteOriginalWaitersRef.current = new Map();
       } catch (e) {
         setProcessingPhotos(false);
         setProcessingMessage("Processing your photos...");
@@ -904,12 +791,6 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
         setImportNotice(
           `This album has ${files.length} photos. We imported the first ${MAX_PHOTOS}.`,
         );
-      }
-
-      if (limited.length === 0) {
-        setProcessingPhotos(false);
-        setProcessingMessage("Processing your photos...");
-        throw new Error("This album has no photos we can import.");
       }
 
       // Keep the same message throughout.
@@ -1042,11 +923,11 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
         newPreviewUrls.set(r.photo.id, r.previewUrl);
       }
 
-      const pages = generateAutoLayout(newPhotos, formatId);
+      const pages = generateAutoLayout(newPhotos);
       setPhotos(newPhotos);
       setThumbnailUrls(newThumbUrls);
       setPreviewUrls(newPreviewUrls);
-      setBookRaw({ formatId, pages, currentSpreadIndex: 0 });
+      setBookRaw({ pages, currentSpreadIndex: 0 });
       undoStackRef.current = [];
       redoStackRef.current = [];
       setCanUndo(false);
@@ -1115,51 +996,40 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
 
   const addPage = useCallback(
     (afterIndex?: number) => {
-      const newPage: BookPage = {
-        id: uuid(),
-        slots: [],
-        textBlocks: [],
-        topCaption: "",
-        bottomCaption: "",
-      };
+      const newPage = makeBlankPage();
       setBook((prev) => {
         const pages = [...prev.pages];
-        const idx =
-          afterIndex !== undefined ? afterIndex + 1 : pages.length;
+        const lastIndex = pages.length - 1;
+        const requestedIndex = afterIndex !== undefined ? afterIndex + 1 : lastIndex;
+        const idx = pages.length > 1
+          ? Math.max(1, Math.min(requestedIndex, lastIndex))
+          : pages.length;
         pages.splice(idx, 0, newPage);
         return { ...prev, pages };
       });
+      return newPage.id;
     },
     []
   );
 
   const removePage = useCallback((pageId: string) => {
     setBook((prev) => {
+      if (pageId === prev.pages[0]?.id || pageId === prev.pages.at(-1)?.id) return prev;
+      if (isRequiredBlankPage(prev.pages, pageId)) return prev;
       const filtered = prev.pages.filter((p) => p.id !== pageId);
       // Prevent deleting below 2 pages
       if (filtered.length < 2) return prev;
       // Ensure even page count for spreads
       if (filtered.length % 2 !== 0) {
-        // Check if there's already an empty interior page we can remove instead of appending
-        const isBlank = (p: typeof filtered[number]) =>
-          p.slots.length === 0 &&
-          p.textBlocks.length === 0 &&
-          !p.topCaption &&
-          !p.bottomCaption;
-        // Look for a blank interior page (not cover or back cover)
+        // Remove another blank interior page if possible; otherwise pad before
+        // the existing back cover so its identity and position stay intact.
         const blankIdx = filtered.findIndex(
-          (p, i) => i > 0 && i < filtered.length - 1 && isBlank(p)
+          (p, i) => i > 0 && i < filtered.length - 1 && isBlankPage(p)
         );
         if (blankIdx !== -1 && filtered.length - 1 >= 2) {
           filtered.splice(blankIdx, 1);
         } else {
-          filtered.push({
-            id: uuid(),
-            slots: [],
-            textBlocks: [],
-            topCaption: "",
-            bottomCaption: "",
-          });
+          filtered.splice(filtered.length - 1, 0, makeBlankPage());
         }
       }
       return { ...prev, pages: filtered };
@@ -1168,6 +1038,8 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
 
   const reorderPages = useCallback((fromIndex: number, toIndex: number) => {
     setBook((prev) => {
+      const lastIndex = prev.pages.length - 1;
+      if (fromIndex <= 0 || fromIndex >= lastIndex || toIndex <= 0 || toIndex >= lastIndex) return prev;
       const pages = [...prev.pages];
       const [moved] = pages.splice(fromIndex, 1);
       pages.splice(toIndex, 0, moved);
@@ -1226,17 +1098,10 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
         }
 
         const isCoverPage = prev.pages[0]?.id === pageId;
-        const isBackCoverPage =
-          prev.pages.length > 1 &&
-          prev.pages[prev.pages.length - 1]?.id === pageId;
-
-        // Covers with one photo have canonical layouts: full-bleed on the
-        // front cover, 1-padded on the back cover (to sit above the branding).
+        // A front cover reduced to one photo defaults to full-bleed.
         let variantKey: string | undefined;
         if (remainingPhotos.length === 1 && isCoverPage) {
           variantKey = "1-full";
-        } else if (remainingPhotos.length === 1 && isBackCoverPage) {
-          variantKey = "1-padded";
         } else {
           variantKey = getVariantsForCount(remainingPhotos.length)[0]?.key;
         }
@@ -1251,22 +1116,16 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
           };
         }
 
-        const defaults = getDefaultPadding(variantKey);
-        const paddingH = defaults.h || (page.paddingH ?? 0);
-        const paddingV = defaults.v || (page.paddingV ?? 0);
         const newSlots = applyVariant(
           variantKey,
           remainingPhotos,
-          paddingH,
-          paddingV,
-          prev.formatId,
         );
 
         return {
           ...prev,
           pages: prev.pages.map((p) =>
             p.id === pageId
-              ? { ...p, slots: newSlots, layoutVariant: variantKey, paddingH, paddingV }
+              ? { ...p, slots: newSlots, layoutVariant: variantKey }
               : p
           ),
         };
@@ -1283,6 +1142,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
       toSlotId: string
     ) => {
       setBook((prev) => {
+        if (toPageId === prev.pages.at(-1)?.id || fromPageId === prev.pages.at(-1)?.id) return prev;
         const pages = prev.pages.map((p) => ({
           ...p,
           slots: p.slots.map((s) => {
@@ -1322,9 +1182,11 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
   const movePhotoToPage = useCallback(
     (fromPageId: string, fromSlotId: string, toPageId: string) => {
       setBook((prev) => {
+        if (toPageId === prev.pages.at(-1)?.id) return prev;
         const fromPage = prev.pages.find((p) => p.id === fromPageId);
         const toPage = prev.pages.find((p) => p.id === toPageId);
-        if (!fromPage || !toPage) return prev;
+        if (!fromPage || !toPage || fromPageId === toPageId) return prev;
+        if (availablePhotoSpaces(toPage, prev.pages[0]?.id === toPageId) === 0) return prev;
 
         const fromSlot = fromPage.slots.find((s) => s.id === fromSlotId);
         if (!fromSlot || !fromSlot.photoId) return prev;
@@ -1350,15 +1212,9 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
           return photo || { id: photoId, fileName: "", width: 1, height: 1, dateTaken: 0 };
         };
 
-        const lastIdx = prev.pages.length - 1;
         const newPages = prev.pages.map((p, pIdx) => {
           const isCover = pIdx === 0;
-          const isBackCover = pIdx === lastIdx && lastIdx > 0;
-          const coverSingleKey = isCover
-            ? "1-full"
-            : isBackCover
-              ? "1-padded"
-              : null;
+          const coverSingleKey = isCover ? "1-full" : null;
           if (p.id === fromPageId) {
             if (sourcePhotoIds.length === 0) {
               return { ...p, slots: [], layoutVariant: undefined };
@@ -1369,9 +1225,6 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
                 slots: applyVariant(
                   coverSingleKey,
                   sourcePhotoIds,
-                  0,
-                  0,
-                  prev.formatId,
                 ),
                 layoutVariant: coverSingleKey,
               };
@@ -1379,7 +1232,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
             const srcPhotos = sourcePhotoIds.map(makePhotoStub);
             return {
               ...p,
-              slots: chooseBestLayout(srcPhotos, prev.formatId),
+              slots: chooseBestLayout(srcPhotos),
               layoutVariant: chooseBestVariantKey(srcPhotos),
             };
           }
@@ -1390,9 +1243,6 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
                 slots: applyVariant(
                   coverSingleKey,
                   targetPhotoIds,
-                  0,
-                  0,
-                  prev.formatId,
                 ),
                 layoutVariant: coverSingleKey,
               };
@@ -1400,7 +1250,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
             const tgtPhotos = targetPhotoIds.map(makePhotoStub);
             return {
               ...p,
-              slots: chooseBestLayout(tgtPhotos, prev.formatId),
+              slots: chooseBestLayout(tgtPhotos),
               layoutVariant: chooseBestVariantKey(tgtPhotos),
             };
           }
@@ -1416,63 +1266,23 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
   const setPageLayout = useCallback(
     (pageId: string, variantKey: string) => {
       setBook((prev) => {
+        if (pageId === prev.pages.at(-1)?.id) return prev;
         const page = prev.pages.find((p) => p.id === pageId);
         if (!page) return prev;
         const photoIds = page.slots
           .map((s) => s.photoId)
           .filter((id): id is string => id !== null);
-        const defaults = getDefaultPadding(variantKey);
-        const paddingH = defaults.h || (page.paddingH ?? 0);
-        const paddingV = defaults.v || (page.paddingV ?? 0);
+        if (pageId === prev.pages[0]?.id && getVariantPreview(variantKey).length !== 1) return prev;
         const newSlots = applyVariant(
           variantKey,
           photoIds,
-          paddingH,
-          paddingV,
-          prev.formatId,
         );
         if (newSlots.length === 0) return prev;
         return {
           ...prev,
           pages: prev.pages.map((p) =>
             p.id === pageId
-              ? { ...p, slots: newSlots, layoutVariant: variantKey, paddingH, paddingV }
-              : p
-          ),
-        };
-      });
-    },
-    []
-  );
-
-  const setPagePadding = useCallback(
-    (pageId: string, paddingH: number, paddingV: number) => {
-      setBook((prev) => {
-        const page = prev.pages.find((p) => p.id === pageId);
-        if (!page) return prev;
-        const photoIds = page.slots
-          .map((s) => s.photoId)
-          .filter((id): id is string => id !== null);
-        if (photoIds.length === 0) return prev;
-        // Fall back to a default variant key if the page doesn't have one
-        // yet (e.g. auto-laid-out pages from older sessions). Without this,
-        // the padding buttons silently do nothing until the user clicks a
-        // layout thumbnail first.
-        const variantKey =
-          page.layoutVariant ?? defaultVariantKeyForCount(photoIds.length);
-        const newSlots = applyVariant(
-          variantKey,
-          photoIds,
-          paddingH,
-          paddingV,
-          prev.formatId,
-        );
-        if (newSlots.length === 0) return prev;
-        return {
-          ...prev,
-          pages: prev.pages.map((p) =>
-            p.id === pageId
-              ? { ...p, slots: newSlots, layoutVariant: variantKey, paddingH, paddingV }
+              ? { ...p, slots: newSlots, layoutVariant: variantKey }
               : p
           ),
         };
@@ -1482,7 +1292,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
   );
 
   const addTextBlock = useCallback((pageId: string): TextBlock => {
-    const block: TextBlock = {
+    const block: TextBlock = constrainTextBlock({
       id: uuid(),
       text: "",
       x: 50,
@@ -1494,7 +1304,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
       color: "#555555",
       rotation: 0,
       fontSize: 2.5,
-    };
+    });
     setBook((prev) => ({
       ...prev,
       pages: prev.pages.map((p) =>
@@ -1515,7 +1325,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
             ? {
                 ...p,
                 textBlocks: p.textBlocks.map((t) =>
-                  t.id === blockId ? { ...t, ...updates } : t
+                  t.id === blockId ? constrainTextBlock({ ...t, ...updates }) : t
                 ),
               }
             : p
@@ -1536,39 +1346,40 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
     }));
   }, []);
 
-  const setBookFormat = useCallback((formatId: BookFormatId) => {
-    setBook((prev) => {
-      if (prev.formatId === formatId) return prev;
-      return {
-        ...prev,
-        formatId,
-        pages: prev.pages.map((page, pageIndex) =>
-          relayoutPageForFormat(page, pageIndex, prev.pages.length, formatId),
-        ),
-      };
-    });
-  }, [setBook]);
-
   const startOver = useCallback(async () => {
-    // Revoke all URLs
-    thumbnailUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
-    previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
-    clearImageCache();
+    resettingRef.current = true;
+    if (saveTimeoutRef.current !== null) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = null;
+    try {
+      // Finish writes already in flight before clearing the browser's book.
+      await Promise.allSettled([autosaveRef.current, ...originalWritesRef.current]);
+      await clearAll();
+      thumbnailUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      clearImageCache();
 
-    await clearAll();
-    setPhotos([]);
-    setThumbnailUrls(new Map());
-    setPreviewUrls(new Map());
-    setBookRaw(emptyBook);
-    undoStackRef.current = [];
-    redoStackRef.current = [];
-    setCanUndo(false);
-    setCanRedo(false);
-    setCurrentSpreadIndex(0);
-    setAppViewState("start");
-    setRestored(false);
-    activeEnteOriginalDownloadsRef.current.clear();
-    enteOriginalWaitersRef.current = new Map();
+      photosRef.current = [];
+      pendingEnteOriginalsRef.current = new Set();
+      setPhotos([]);
+      setThumbnailUrls(new Map());
+      setPreviewUrls(new Map());
+      setBookRaw(emptyBook);
+      undoStackRef.current = [];
+      redoStackRef.current = [];
+      setCanUndo(false);
+      setCanRedo(false);
+      setCurrentSpreadIndex(0);
+      setImportNotice(null);
+      setAppViewState("edit");
+      activeEnteOriginalDownloadsRef.current.clear();
+      enteOriginalWaitersRef.current.forEach((waiters) => waiters.forEach((resolve) => resolve()));
+      enteOriginalWaitersRef.current = new Map();
+    } catch (error) {
+      setPhotos((current) => [...current]);
+      throw error;
+    } finally {
+      resettingRef.current = false;
+    }
   }, []);
 
   return (
@@ -1577,8 +1388,6 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
         appView,
         setAppView,
         loading,
-        restored,
-        setRestored,
         photos,
         thumbnailUrls,
         photoUrls,
@@ -1593,9 +1402,7 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
         pendingEnteOriginals,
         waitForEnteOriginals,
         book,
-        bookFormat,
         setBook,
-        setBookFormat,
         currentSpreadIndex,
         setCurrentSpreadIndex,
         addPage,
@@ -1607,7 +1414,6 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
         swapPhotos,
         movePhotoToPage,
         setPageLayout,
-        setPagePadding,
         addTextBlock,
         updateTextBlock,
         removeTextBlock,
@@ -1615,8 +1421,6 @@ export function BookProvider({ children }: { children: React.ReactNode }) {
         redo,
         canUndo,
         canRedo,
-        showPageStrip,
-        setShowPageStrip,
         startOver,
       }}
     >

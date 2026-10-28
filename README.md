@@ -12,9 +12,9 @@ Every photobook service out there requires you to upload your personal photos to
 - **Smart auto-layout** that arranges photos across pages based on orientation, varying layouts (1–4 photos per page) to keep things interesting
 - **Interactive editor** — reorder pages, reposition and crop photos within their slots, add captions and text blocks
 - **Multiple export formats:**
-  - PDF with A5 portrait pages
-  - PDF with A4 landscape spreads (two pages per sheet, ready for home printing)
-  - ZIP of numbered PNG images
+  - Print-ready PDF with 210 × 210 mm square pages
+  - ZIP of numbered square PNG pages
+- **Print product selection** — choose hardcover or softcover and paper stock; PDF and PNG downloads check the product's page limits, counting covers and even-page padding
 - **Persistent state** — your book is saved locally in your browser so you can come back to it
 
 ## Getting started

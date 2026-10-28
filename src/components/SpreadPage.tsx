@@ -1,15 +1,20 @@
 "use client";
 
+import { bookPageShadow, uiColors } from "@/theme/colors";
+
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { Box, IconButton, Typography } from "@mui/material";
-import CloseIcon from "@mui/icons-material/Close";
+import { Box, Button, Typography } from "@mui/material";
+import { AddPhotosIcon, DeleteIcon, ZoomOutIcon, ZoomInIcon } from "./icons";
 import { Stage, Layer } from "react-konva";
 import { useBook } from "@/context/BookContext";
 import PageCanvas from "./PageCanvas";
 import LayoutPicker from "./LayoutPicker";
 import TextToolbar from "./TextToolbar";
+import PageMenu, { type PageInsertPosition } from "./PageMenu";
+import styles from "./SpreadPage.module.css";
 import type { BookPage, TextBlock } from "@/lib/types";
-import { getCaptionZones } from "@/lib/layouts";
+import { isRequiredBlankPage } from "@/lib/bookPages";
+import { CAPTION_FONT_WEIGHT, CENTER_TEXT_FONT_WEIGHT, getCaptionLayout, getCenterTextLayout, getTextBlockLayout, TEXT_LINE_HEIGHT } from "@/lib/printLayout";
 import type { CaptionPosition } from "./PageCanvas";
 import type { DragInfo } from "@/hooks/usePhotoDrag";
 
@@ -19,14 +24,12 @@ function SlotControls({
   slot,
   pageWidth,
   pageHeight,
-  visible,
 }: {
   pageId: string;
   slotId: string;
   slot: { x: number; y: number; width: number; height: number; cropZoom: number };
   pageWidth: number;
   pageHeight: number;
-  visible: boolean;
 }) {
   const { updateSlot, removeSlot } = useBook();
 
@@ -67,6 +70,7 @@ function SlotControls({
     >
       {/* Delete — top right */}
       <div
+        className={styles.hoverControl}
         onClick={handleDelete}
         style={{
           position: "absolute",
@@ -81,9 +85,6 @@ function SlotControls({
           alignItems: "center",
           justifyContent: "center",
           cursor: "pointer",
-          opacity: visible ? 1 : 0,
-          transition: "opacity 0.15s ease",
-          pointerEvents: visible ? "auto" : "none",
         }}
         onMouseEnter={(e) => {
           (e.currentTarget as HTMLDivElement).style.background = "rgba(186,26,26,0.7)";
@@ -92,16 +93,12 @@ function SlotControls({
           (e.currentTarget as HTMLDivElement).style.background = "rgba(0,0,0,0.45)";
         }}
       >
-        <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none">
-          <path
-            d="M7 4V2h10v2h5v2h-2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6H2V4h5zm2 4v10h2V8H9zm4 0v10h2V8h-2z"
-            fill="rgba(255,255,255,0.9)"
-          />
-        </svg>
+        <DeleteIcon sx={{ fontSize: iconSize, color: "rgba(255,255,255,0.9)" }} />
       </div>
 
       {/* Zoom controls — bottom right */}
       <div
+        className={styles.hoverControl}
         style={{
           position: "absolute",
           bottom: padding,
@@ -112,9 +109,6 @@ function SlotControls({
           background: "rgba(0,0,0,0.45)",
           backdropFilter: "blur(8px)",
           padding: 2,
-          opacity: visible ? 1 : 0,
-          transition: "opacity 0.15s ease",
-          pointerEvents: visible ? "auto" : "none",
         }}
       >
         <div
@@ -136,11 +130,7 @@ function SlotControls({
             (e.currentTarget as HTMLDivElement).style.background = "transparent";
           }}
         >
-          <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none">
-            <circle cx="11" cy="11" r="7" stroke="rgba(255,255,255,0.9)" strokeWidth="2" />
-            <path d="M8 11h6" stroke="rgba(255,255,255,0.9)" strokeWidth="2" strokeLinecap="round" />
-            <path d="M16.5 16.5L21 21" stroke="rgba(255,255,255,0.9)" strokeWidth="2" strokeLinecap="round" />
-          </svg>
+          <ZoomOutIcon sx={{ fontSize: iconSize, color: "rgba(255,255,255,0.9)" }} />
         </div>
         <div
           onClick={handleZoomIn}
@@ -161,11 +151,7 @@ function SlotControls({
             (e.currentTarget as HTMLDivElement).style.background = "transparent";
           }}
         >
-          <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none">
-            <circle cx="11" cy="11" r="7" stroke="rgba(255,255,255,0.9)" strokeWidth="2" />
-            <path d="M11 8v6M8 11h6" stroke="rgba(255,255,255,0.9)" strokeWidth="2" strokeLinecap="round" />
-            <path d="M16.5 16.5L21 21" stroke="rgba(255,255,255,0.9)" strokeWidth="2" strokeLinecap="round" />
-          </svg>
+          <ZoomInIcon sx={{ fontSize: iconSize, color: "rgba(255,255,255,0.9)" }} />
         </div>
       </div>
     </div>
@@ -192,10 +178,9 @@ interface SpreadPageProps {
   onTextUpdate: (pageId: string, blockId: string, updates: Partial<TextBlock>) => void;
   onTextDelete: (pageId: string, blockId: string) => void;
   onTextEditEnd: () => void;
-  onStageClick: (e: any) => void;
-  // Hover
-  isHovered: boolean;
-  onHoverChange: (pageId: string | null) => void;
+  onClearSelection: () => void;
+  onInsertPage: (pageIndex: number, position: PageInsertPosition) => void;
+  onAddPhotos: (pageId: string) => void;
   // Photo drag
   dragSourceInfo: DragInfo | null;
   dragOverInfo: DragInfo | null;
@@ -246,9 +231,9 @@ export default function SpreadPage({
   onTextUpdate,
   onTextDelete,
   onTextEditEnd,
-  onStageClick,
-  isHovered,
-  onHoverChange,
+  onClearSelection,
+  onInsertPage,
+  onAddPhotos,
   dragSourceInfo,
   dragOverInfo,
   dragOverPageId,
@@ -266,7 +251,7 @@ export default function SpreadPage({
   onPageDropOnPage,
   onPageDragEndCleanup,
 }: SpreadPageProps) {
-  const { bookFormat, thumbnailUrls, photoUrls, loadPreviews, removePage, setPageLayout, setPagePadding, updatePage, updateSlot, photos } = useBook();
+  const { book, thumbnailUrls, photoUrls, loadPreviews, removePage, setPageLayout, updatePage, updateSlot, photos, processingPhotos } = useBook();
 
   // Trigger lazy-loading of 1080px previews for this page's photos
   const pagePhotoIds = useMemo(
@@ -280,37 +265,20 @@ export default function SpreadPage({
   // Caption editing
   const [editingCaption, setEditingCaption] = useState<CaptionPosition | null>(null);
   const [captionValue, setCaptionValue] = useState("");
-  const [topCaptionHovered, setTopCaptionHovered] = useState(false);
-  const [bottomCaptionHovered, setBottomCaptionHovered] = useState(false);
   const captionInputRef = useRef<HTMLInputElement>(null);
+  const [editingCenterText, setEditingCenterText] = useState(false);
+  const [centerTextDraft, setCenterTextDraft] = useState("");
+  const [textDraft, setTextDraft] = useState<{ id: string; value: string } | null>(null);
 
-  const hasTopSpace =
-    page.slots.length === 0 || page.slots.every((s) => s.y > 0);
-  const hasBottomSpace =
-    page.slots.length === 0 || page.slots.every((s) => s.y + s.height < 100);
+  useEffect(() => {
+    if (!editingTextId) setTextDraft(null);
+  }, [editingTextId]);
 
   const isBackCover = pageIndex === totalPages - 1;
   const isFrontCover = pageIndex === 0;
 
-  // Front-cover captions act as a title — much larger than interior captions.
-  const captionFontSize = Math.round(pageHeight * (isFrontCover ? 0.05 : 0.016));
-  // Caption zones span the actual empty band between the page edge and the
-  // nearest photo, so captions stay centered even when the user adds extra
-  // vertical padding (or on the back cover with its larger inset).
-  const captionZones = getCaptionZones(page, bookFormat.id);
-  const topCaptionZoneHeight = pageHeight * (captionZones.topPct / 100);
-  const bottomCaptionZoneHeight = pageHeight * (captionZones.bottomPct / 100);
-  const captionInputHeight = captionFontSize * 1.6;
-  const topCaptionInputOffset = Math.max(
-    0,
-    (topCaptionZoneHeight - captionInputHeight) / 2
-  );
-  const bottomCaptionInputOffset = Math.max(
-    0,
-    (bottomCaptionZoneHeight - captionInputHeight) / 2
-  );
-
   const handleCaptionClick = (position: CaptionPosition) => {
+    onClearSelection();
     const val = position === "top" ? page.topCaption : page.bottomCaption;
     setCaptionValue(val);
     setEditingCaption(position);
@@ -339,21 +307,27 @@ export default function SpreadPage({
   const isDragTarget = pageDragTarget === pageIndex && pageDragSource !== null;
   const isDragSource = pageDragSource === pageIndex;
   const photoCount = page.slots.filter((s) => s.photoId !== null).length;
-  // The back cover sits above the Ente branding strip — its layout is
-  // canonical, so hide the picker. The front cover defaults to full-bleed
-  // but the user is free to pick a different single-photo layout.
-  const hideLayoutPicker = isBackCover && photoCount === 1;
+  const showEmptyPageAddPhotos = isInterior && photoCount === 0 && page.textBlocks.length === 0
+    && !(editingCenterText ? centerTextDraft : page.centerText ?? "").trim();
+  useEffect(() => {
+    if (photoCount > 0) setEditingCenterText(false);
+    else setEditingCaption(null);
+  }, [photoCount]);
+  // The photo-free back cover has no photo layout choices.
+  const hideLayoutPicker = isBackCover;
   const hasSelectedSlotOnPage =
     selectedPageId === page.id && selectedSlotId !== null;
 
   const pageBlock = (
     <Box>
       <Box
+        data-book-page={page.id}
         sx={{
           position: "relative",
+          bgcolor: uiColors.paper,
           boxShadow: isDragTarget
-            ? "0 0 0 3px #08C225, 0px 12px 32px rgba(0, 0, 0, 0.3)"
-            : "0px 12px 32px rgba(0, 0, 0, 0.3)",
+            ? `0 0 0 3px #08C225, ${bookPageShadow}`
+            : bookPageShadow,
           borderRadius: 0.5,
           overflow: "hidden",
           opacity: isDragSource ? 0.4 : 1,
@@ -363,7 +337,12 @@ export default function SpreadPage({
         <Stage
           width={pageWidth}
           height={pageHeight}
-          onClick={onStageClick}
+          onClick={(e) => {
+            if (e.target === e.target.getStage()) onClearSelection();
+          }}
+          onTap={(e) => {
+            if (e.target === e.target.getStage()) onClearSelection();
+          }}
         >
           <Layer>
             <PageCanvas
@@ -385,6 +364,7 @@ export default function SpreadPage({
               }
               editingCaption={editingCaption}
               hideCaptions
+              hideCenterText
               dragOverSlotId={
                 dragOverInfo?.pageId === page.id ? dragOverInfo.slotId : null
               }
@@ -402,6 +382,7 @@ export default function SpreadPage({
         {/* Page-level drop zone / page drag handle */}
         <div
           draggable={isInterior}
+          onClick={onClearSelection}
           onDragStart={(e) => {
             if (!isInterior) {
               e.preventDefault();
@@ -467,6 +448,7 @@ export default function SpreadPage({
           return (
             <div
               key={slot.id}
+              tabIndex={-1}
               draggable={!!slot.photoId && !isSelected}
               onDragStart={(e) => {
                 if (slot.photoId) {
@@ -479,7 +461,10 @@ export default function SpreadPage({
               onDragOver={(e) => onSlotDragOver(e, page.id, slot.id)}
               onDrop={(e) => onPhotoDrop(e, page.id, slot.id)}
               onDragEnd={onPhotoDragEnd}
-              onClick={() => onSlotClick(page.id, slot.id)}
+              onClick={(event) => {
+                event.currentTarget.focus({ preventScroll: true });
+                onSlotClick(page.id, slot.id);
+              }}
               onMouseDown={
                 canPanCrop
                   ? (e) => {
@@ -567,11 +552,12 @@ export default function SpreadPage({
           const isTextEditing = selectedPageId === page.id && editingTextId === block.id;
           if (isTextEditing) return null;
           const isTextSelected = selectedPageId === page.id && selectedTextId === block.id;
-          const bx = (block.x / 100) * pageWidth;
-          const by = (block.y / 100) * pageHeight;
-          const bw = (block.width / 100) * pageWidth;
-          const fontSize = pageHeight * ((block.fontSize ?? 2.5) / 100);
-          const rotation = block.rotation ?? 0;
+          const layout = getTextBlockLayout(block);
+          const bx = (layout.x / 100) * pageWidth;
+          const by = (layout.y / 100) * pageHeight;
+          const bw = (layout.width / 100) * pageWidth;
+          const bh = (layout.height / 100) * pageHeight;
+          const rotation = layout.rotation;
           return (
             <div
               key={`text-overlay-${block.id}`}
@@ -588,14 +574,14 @@ export default function SpreadPage({
                 e.preventDefault();
                 const startX = e.clientX;
                 const startY = e.clientY;
-                const origX = block.x;
-                const origY = block.y;
+                const origX = layout.x;
+                const origY = layout.y;
                 const onMove = (ev: MouseEvent) => {
                   const dx = ((ev.clientX - startX) / pageWidth) * 100;
                   const dy = ((ev.clientY - startY) / pageHeight) * 100;
                   onTextUpdate(page.id, block.id, {
-                    x: Math.max(-block.width + 5, Math.min(95, origX + dx)),
-                    y: Math.max(-5, Math.min(95, origY + dy)),
+                    x: origX + dx,
+                    y: origY + dy,
                   });
                 };
                 const onUp = () => {
@@ -610,7 +596,7 @@ export default function SpreadPage({
                 left: bx - 4,
                 top: by - 4,
                 width: bw + 8,
-                height: fontSize * 1.6 + 8,
+                height: bh + 8,
                 zIndex: 6,
                 cursor: isTextSelected ? "grab" : "pointer",
                 transform: rotation ? `rotate(${rotation}deg)` : undefined,
@@ -633,7 +619,6 @@ export default function SpreadPage({
               slot={slot}
               pageWidth={pageWidth}
               pageHeight={pageHeight}
-              visible={isHovered}
             />
           );
         })}
@@ -641,10 +626,12 @@ export default function SpreadPage({
         {selectedPageId === page.id && editingTextId && (() => {
           const block = page.textBlocks.find((t) => t.id === editingTextId);
           if (!block) return null;
-          const bx = (block.x / 100) * pageWidth;
-          const by = (block.y / 100) * pageHeight;
-          const bw = (block.width / 100) * pageWidth;
-          const fontSize = pageHeight * ((block.fontSize ?? 2.5) / 100);
+          const value = textDraft?.id === block.id ? textDraft.value : block.text;
+          const layout = getTextBlockLayout({ ...block, text: value });
+          const bx = (layout.x / 100) * pageWidth;
+          const by = (layout.y / 100) * pageHeight;
+          const bw = (layout.width / 100) * pageWidth;
+          const fontSize = pageHeight * (layout.fontSize / 100);
           const color = block.color ?? "#555555";
           const rotation = block.rotation ?? 0;
           return (
@@ -652,7 +639,8 @@ export default function SpreadPage({
               key={`edit-${block.id}`}
               type="text"
               autoFocus
-              defaultValue={block.text}
+              value={value}
+              onChange={(e) => setTextDraft({ id: block.id, value: e.target.value })}
               placeholder="Type here"
               onBlur={(e) => {
                 onTextUpdate(page.id, block.id, { text: e.currentTarget.value });
@@ -670,40 +658,26 @@ export default function SpreadPage({
               }}
               style={{
                 position: "absolute",
-                left: bx + bw / 2,
+                left: bx,
                 top: by,
-                transform: `translateX(-50%)${rotation ? ` rotate(${rotation}deg)` : ""}`,
-                transformOrigin: "center top",
-                width: "auto",
-                minWidth: fontSize * 6,
+                transform: rotation ? `rotate(${rotation}deg)` : undefined,
+                transformOrigin: "top left",
+                width: bw,
+                boxSizing: "border-box",
                 zIndex: 15,
                 border: "none",
                 borderBottom: "1.5px solid rgba(8, 194, 37, 0.5)",
                 outline: "none",
                 borderRadius: 4,
                 background: "rgba(255,255,255,0.85)",
-                fontFamily: "var(--font-nunito), sans-serif",
+                fontFamily: "var(--font-inter), sans-serif",
                 fontSize: fontSize,
                 fontWeight: 700,
                 color: color,
-                textAlign: "center" as const,
-                padding: "2px 6px",
-                lineHeight: 1.3,
+                textAlign: "left" as const,
+                padding: `0 ${layout.padding / 100 * pageWidth}px`,
+                lineHeight: TEXT_LINE_HEIGHT,
                 caretColor: "#08C225",
-              }}
-              onInput={(e) => {
-                const el = e.currentTarget;
-                el.style.width = "0";
-                el.style.width = Math.max(fontSize * 6, el.scrollWidth + 4) + "px";
-              }}
-              ref={(el) => {
-                if (el) {
-                  // Auto-size to content on mount
-                  requestAnimationFrame(() => {
-                    el.style.width = "0";
-                    el.style.width = Math.max(fontSize * 6, el.scrollWidth + 4) + "px";
-                  });
-                }
               }}
             />
           );
@@ -714,7 +688,7 @@ export default function SpreadPage({
           if (!block) return null;
           return (
             <TextToolbar
-              block={block}
+              block={getTextBlockLayout(block)}
               pageWidth={pageWidth}
               pageHeight={pageHeight}
               onUpdate={(updates) => onTextUpdate(page.id, block.id, updates)}
@@ -723,207 +697,175 @@ export default function SpreadPage({
             />
           );
         })()}
-        {/* Caption zones */}
-        {hasTopSpace && (
-          editingCaption === "top" ? (
-            <input
-              ref={captionInputRef}
-              value={captionValue}
-              onChange={(e) => setCaptionValue(e.target.value)}
-              onBlur={handleCaptionSave}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleCaptionSave();
-                if (e.key === "Escape") handleCaptionCancel();
+        {/* Empty pages offer a centered text area instead of photo captions. */}
+        {photoCount === 0 && (page.centerText || (!isBackCover && page.textBlocks.length === 0)) && (() => {
+          const value = editingCenterText ? centerTextDraft : page.centerText ?? "";
+          const layout = getCenterTextLayout({ ...page, centerText: value });
+          if (!layout) return null;
+          const style: React.CSSProperties = {
+            position: "absolute",
+            left: layout.x / 100 * pageWidth,
+            top: layout.y / 100 * pageHeight,
+            width: layout.width / 100 * pageWidth,
+            height: layout.height / 100 * pageHeight,
+            boxSizing: "border-box",
+            zIndex: 4,
+            padding: `0 ${layout.padding / 100 * pageWidth}px`,
+            border: "none",
+            background: "transparent",
+            fontFamily: "var(--font-outfit), sans-serif",
+            fontSize: layout.fontSize / 100 * pageHeight,
+            fontWeight: CENTER_TEXT_FONT_WEIGHT,
+            lineHeight: layout.lineHeight,
+            textAlign: "center",
+            color: page.centerText ? "#2a2a2a" : "#aaa",
+            pointerEvents: dragSourceInfo || pageDragSource !== null ? "none" : "auto",
+          };
+          return editingCenterText ? (
+            <textarea
+              autoFocus
+              aria-label="Page text"
+              placeholder="Add text..."
+              value={value}
+              wrap="soft"
+              onChange={(event) => setCenterTextDraft(event.target.value)}
+              onBlur={(event) => {
+                if (event.currentTarget.value !== (page.centerText ?? "")) {
+                  updatePage(page.id, { centerText: event.currentTarget.value });
+                }
+                setEditingCenterText(false);
               }}
-              style={{
-                position: "absolute",
-                top: topCaptionInputOffset,
-                left: pageWidth * 0.05,
-                width: pageWidth * 0.9,
-                height: captionInputHeight,
-                zIndex: 5,
-                border: "none",
-                outline: "none",
-                background: "white",
-                fontFamily: "var(--font-nunito), sans-serif",
-                fontSize: captionFontSize,
-                fontWeight: 400,
-                color: "#2a2a2a",
-                textAlign: "center" as const,
-                padding: 0,
-                borderRadius: 2,
+              onKeyDown={(event) => {
+                if (!event.nativeEvent.isComposing && (event.key === "Escape" || (event.key === "Enter" && (event.metaKey || event.ctrlKey)))) {
+                  event.preventDefault();
+                  event.currentTarget.blur();
+                }
               }}
+              style={{ ...style, color: "#2a2a2a", outline: "none", resize: "none", overflow: "hidden", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}
             />
           ) : (
-            <div
-              onClick={(e) => {
-                e.stopPropagation();
-                handleCaptionClick("top");
+            <button
+              type="button"
+              aria-label={page.centerText ? "Edit page text" : "Add text..."}
+              onClick={(event) => {
+                event.stopPropagation();
+                onClearSelection();
+                setCenterTextDraft(page.centerText ?? "");
+                setEditingCenterText(true);
               }}
-              onMouseEnter={() => setTopCaptionHovered(true)}
-              onMouseLeave={() => setTopCaptionHovered(false)}
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: pageWidth,
-                height: topCaptionZoneHeight,
-                zIndex: 4,
-                cursor: "text",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                pointerEvents: dragSourceInfo ? "none" : "auto",
-              }}
+              style={{ ...style, cursor: "text", whiteSpace: "pre", overflow: "hidden" }}
             >
-              {page.topCaption ? (
-                <span
-                  style={{
-                    maxWidth: pageWidth * 0.9,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    fontFamily: "var(--font-nunito), sans-serif",
-                    fontSize: captionFontSize,
-                    fontWeight: 400,
-                    color: "#2a2a2a",
-                    pointerEvents: "none",
-                  }}
-                >
-                  {page.topCaption}
-                </span>
-              ) : topCaptionHovered ? (
-                <span
-                  style={{
-                    fontFamily: "var(--font-nunito), sans-serif",
-                    fontSize: captionFontSize,
-                    fontWeight: 400,
-                    color: "#aaa",
-                    pointerEvents: "none",
-                  }}
-                >
-                  Add caption...
-                </span>
-              ) : null}
-            </div>
-          )
-        )}
-        {hasBottomSpace && !isBackCover && (
-          editingCaption === "bottom" ? (
-            <input
-              ref={captionInputRef}
-              value={captionValue}
-              onChange={(e) => setCaptionValue(e.target.value)}
-              onBlur={handleCaptionSave}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleCaptionSave();
-                if (e.key === "Escape") handleCaptionCancel();
-              }}
-              style={{
-                position: "absolute",
-                bottom: bottomCaptionInputOffset,
-                left: pageWidth * 0.05,
-                width: pageWidth * 0.9,
-                height: captionInputHeight,
-                zIndex: 5,
-                border: "none",
-                outline: "none",
-                background: "white",
-                fontFamily: "var(--font-nunito), sans-serif",
-                fontSize: captionFontSize,
-                fontWeight: 400,
-                color: "#2a2a2a",
-                textAlign: "center" as const,
-                padding: 0,
-                borderRadius: 2,
-              }}
-            />
-          ) : (
-            <div
-              onClick={(e) => {
-                e.stopPropagation();
-                handleCaptionClick("bottom");
-              }}
-              onMouseEnter={() => setBottomCaptionHovered(true)}
-              onMouseLeave={() => setBottomCaptionHovered(false)}
-              style={{
-                position: "absolute",
-                bottom: 0,
-                left: 0,
-                width: pageWidth,
-                height: bottomCaptionZoneHeight,
-                zIndex: 4,
-                cursor: "text",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                pointerEvents: dragSourceInfo ? "none" : "auto",
-              }}
-            >
-              {page.bottomCaption ? (
-                <span
-                  style={{
-                    maxWidth: pageWidth * 0.9,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    fontFamily: "var(--font-nunito), sans-serif",
-                    fontSize: captionFontSize,
-                    fontWeight: 400,
-                    color: "#2a2a2a",
-                    pointerEvents: "none",
-                  }}
-                >
-                  {page.bottomCaption}
-                </span>
-              ) : bottomCaptionHovered ? (
-                <span
-                  style={{
-                    fontFamily: "var(--font-nunito), sans-serif",
-                    fontSize: captionFontSize,
-                    fontWeight: 400,
-                    color: "#aaa",
-                    pointerEvents: "none",
-                  }}
-                >
-                  Add caption...
-                </span>
-              ) : null}
-            </div>
-          )
-        )}
-        {/* Delete button on hover */}
-        {totalPages > 2 && isInterior && (
-          <IconButton
-            size="small"
-            onClick={(e) => {
-              e.stopPropagation();
-              removePage(page.id);
-              onHoverChange(null);
+              {layout.lines.join("\n")}
+            </button>
+          );
+        })()}
+        {showEmptyPageAddPhotos && (
+          <Button
+            type="button"
+            aria-label={`Add photos to page ${pageIndex}`}
+            startIcon={<AddPhotosIcon />}
+            disabled={processingPhotos}
+            disableRipple
+            onClick={(event) => {
+              event.stopPropagation();
+              onClearSelection();
+              onAddPhotos(page.id);
             }}
             sx={{
               position: "absolute",
-              top: 6,
-              ...(pageIndex % 2 === 1 ? { left: 6 } : { right: 6 }),
-              zIndex: 10,
-              bgcolor: "rgba(0,0,0,0.35)",
-              color: "rgba(255,255,255,0.8)",
-              width: 24,
-              height: 24,
-              opacity: isHovered ? 1 : 0,
-              transition: "opacity 0.2s, background-color 0.2s",
-              pointerEvents: isHovered ? "auto" : "none",
-              "&:hover": { bgcolor: "rgba(0,0,0,0.6)", color: "white" },
+              left: "50%",
+              bottom: Math.max(16, pageHeight * 0.07),
+              transform: "translateX(-50%)",
+              zIndex: 4,
+              minWidth: 0,
+              maxWidth: "calc(100% - 24px)",
+              height: 36,
+              px: "14px",
+              borderRadius: "999px",
+              bgcolor: "#F1F3F2",
+              color: "#59635D",
+              fontFamily: "var(--font-inter), sans-serif",
+              fontSize: 13,
+              fontWeight: 500,
+              textTransform: "none",
+              whiteSpace: "nowrap",
+              boxShadow: "none",
+              pointerEvents: dragSourceInfo || pageDragSource !== null ? "none" : "auto",
+              transition: "background-color 120ms ease, color 120ms ease",
+              "& .MuiButton-startIcon": { ml: 0, mr: "6px" },
+              "& .MuiSvgIcon-root": { fontSize: 17 },
+              "&:hover": { bgcolor: "#E4F1E7", color: "#246B37" },
+              "&:focus-visible": { bgcolor: "#E4F1E7", color: "#246B37", outline: "2px solid #08C225", outlineOffset: 2 },
             }}
           >
-            <CloseIcon sx={{ fontSize: 14 }} />
-          </IconButton>
+            Add photos
+          </Button>
         )}
+        {/* Caption editing uses the same safe rectangles as the canvas and export. */}
+        {(["top", "bottom"] as const).map((position) => {
+          if (position === "bottom" && isBackCover) return null;
+          const key = position === "top" ? "topCaption" : "bottomCaption";
+          const isEditing = editingCaption === position;
+          const captionPage = isEditing ? { ...page, [key]: captionValue } : page;
+          const layout = getCaptionLayout(captionPage, position, isFrontCover);
+          if (!layout) return null;
+          const style: React.CSSProperties = {
+            position: "absolute",
+            left: layout.x / 100 * pageWidth,
+            top: layout.y / 100 * pageHeight,
+            width: layout.width / 100 * pageWidth,
+            height: layout.height / 100 * pageHeight,
+            fontFamily: isFrontCover ? "var(--font-outfit), sans-serif" : "var(--font-inter), sans-serif",
+            fontSize: layout.fontSize / 100 * pageHeight,
+            fontWeight: isFrontCover ? CENTER_TEXT_FONT_WEIGHT : CAPTION_FONT_WEIGHT,
+            lineHeight: TEXT_LINE_HEIGHT,
+            color: "#2a2a2a",
+            textAlign: "center",
+            boxSizing: "border-box",
+          };
+          return isEditing ? (
+            <input
+              key={position}
+              ref={captionInputRef}
+              value={captionValue}
+              onChange={(e) => setCaptionValue(e.target.value)}
+              onBlur={handleCaptionSave}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleCaptionSave();
+                if (e.key === "Escape") handleCaptionCancel();
+              }}
+              style={{ ...style, zIndex: 5, border: "none", outline: "none", background: "white", padding: 0 }}
+            />
+          ) : (
+            <div
+              key={position}
+              onClick={(e) => { e.stopPropagation(); handleCaptionClick(position); }}
+              style={{
+                ...style,
+                zIndex: 4,
+                cursor: "text",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                overflow: "hidden",
+                whiteSpace: "nowrap",
+                pointerEvents: dragSourceInfo ? "none" : "auto",
+              }}
+            >
+              <span
+                style={{ color: page[key] ? "#2a2a2a" : "#aaa", pointerEvents: "none" }}
+              >
+                {page[key] || (isFrontCover ? "Add title..." : "Add caption...")}
+              </span>
+            </div>
+          );
+        })}
       </Box>
       <Typography
         sx={{
-          fontSize: "0.85rem",
-          color: "#aaa",
+          fontSize: { xs: 12, sm: 14 },
+          lineHeight: { xs: "16px", sm: "18px" },
+          color: uiColors.muted,
           fontWeight: 600,
           textAlign: "center",
           mt: 0.5,
@@ -947,35 +889,47 @@ export default function SpreadPage({
     <Box
       sx={{
         width: PICKER_WIDTH,
+        height: pageHeight,
         flexShrink: 0,
         display: "flex",
-        alignItems: "center",
-        justifyContent: pickerSide === "left" ? "flex-end" : "flex-start",
-        opacity: isHovered && showPicker ? 1 : 0,
-        transition: "opacity 0.2s",
-        pointerEvents: isHovered && showPicker ? "auto" : "none",
+        flexDirection: "column",
+        alignItems: pickerSide === "left" ? "flex-end" : "flex-start",
+        ...(pickerSide === "left" ? { pr: 1 } : { pl: 1 }),
+        gap: 1,
       }}
     >
       {showPicker && (
-        <LayoutPicker
-          photoCount={photoCount}
-          currentVariant={page.layoutVariant}
-          thumbnailUrls={slotThumbnails}
-          onSelect={(key) => setPageLayout(page.id, key)}
-          paddingH={page.paddingH ?? 0}
-          paddingV={page.paddingV ?? 0}
-          onPaddingChange={(h, v) => setPagePadding(page.id, h, v)}
-          side={pickerSide}
-          excludeFullScreen={isBackCover}
-        />
+        <Box className={styles.hoverControl} sx={{ minHeight: 0, overflowY: "auto", p: "2px", m: "-2px" }}>
+          <LayoutPicker
+            photoCount={photoCount}
+            currentVariant={page.layoutVariant}
+            thumbnailUrls={slotThumbnails}
+            onSelect={(key) => setPageLayout(page.id, key)}
+            isFrontCover={isFrontCover}
+          />
+        </Box>
       )}
+      <PageMenu
+        key={page.id}
+        pageId={page.id}
+        pageIndex={pageIndex}
+        totalPages={totalPages}
+        side={pickerSide}
+        photoCount={photoCount}
+        requiredBlank={isRequiredBlankPage(book.pages, page.id)}
+        onAddPhotos={() => onAddPhotos(page.id)}
+        onInsert={(position) => onInsertPage(pageIndex, position)}
+        onDelete={() => {
+          onClearSelection();
+          removePage(page.id);
+        }}
+      />
     </Box>
   );
 
   return (
     <Box
-      onMouseEnter={() => onHoverChange(page.id)}
-      onMouseLeave={() => onHoverChange(null)}
+      className={styles.page}
       sx={{
         display: "flex",
         flexDirection: "row",

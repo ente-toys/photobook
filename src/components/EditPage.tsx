@@ -1,19 +1,29 @@
 "use client";
 
-import React, { useState, useRef, useCallback, useMemo, useEffect, type RefCallback } from "react";
-import { Box, IconButton } from "@mui/material";
-import CloseIcon from "@mui/icons-material/Close";
+import { toolbarColors, uiColors } from "@/theme/colors";
+
+import React, { useState, useRef, useCallback, useMemo, useEffect, useLayoutEffect, type RefCallback } from "react";
+import { Alert, Backdrop, Box, CircularProgress, Snackbar, Typography } from "@mui/material";
 import { useBook } from "@/context/BookContext";
 import PageStrip from "./PageStrip";
-import Toolbar from "./Toolbar";
+import EmptyBookState from "./EmptyBookState";
+import EditorActions, { EditorPreviewButton } from "./EditorActions";
+import BookHeader from "./BookHeader";
+import BookBindingSelect from "./BookBindingSelect";
+import AddPageDialog from "./AddPageDialog";
+import AddPhotosDialog from "./AddPhotosDialog";
 import SpreadPage, { PICKER_WIDTH } from "./SpreadPage";
+import PrinterBlankPage from "./PrinterBlankPage";
+import type { PageInsertPosition } from "./PageMenu";
+import { EDITOR_CANVAS_PADDING, EDITOR_PANEL_BOTTOM_INSET, EDITOR_PANEL_INSET, EDITOR_PANEL_SX, EDITOR_SCROLLBAR_SX, EDITOR_SIDEBAR_WIDTH } from "./editorLayout";
 
 import { useAutoScroll } from "@/hooks/useAutoScroll";
 import { usePhotoDrag } from "@/hooks/usePhotoDrag";
 import { usePageDrag } from "@/hooks/usePageDrag";
 import { useSpreads } from "@/hooks/useSpreads";
 import type { TextBlock } from "@/lib/types";
-import { getBookFormatAspect } from "@/lib/bookFormats";
+import { getSpreadPageIndices } from "@/lib/spreads";
+import type { PhotoDestination } from "@/lib/photoPlacement";
 
 const PAGE_GAP = 2;
 // Spreads within this many rows of the current row are always mounted, on
@@ -25,17 +35,17 @@ const NEIGHBORHOOD_RADIUS = 4;
 export default function EditPage() {
   const {
     book,
-    bookFormat,
     currentSpreadIndex,
     setCurrentSpreadIndex,
+    addPage,
     addPhotos,
+    removeSlot,
     updateTextBlock,
     removeTextBlock,
-    addTextBlock,
-    showPageStrip,
-    setShowPageStrip,
     undo,
     redo,
+    processingPhotos,
+    processingProgress,
   } = useBook();
 
   // Selection state
@@ -45,21 +55,32 @@ export default function EditPage() {
 
   // Inline text editing state
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
+  const [insertedPageId, setInsertedPageId] = useState<string | null>(null);
+  const [addPageDialogOpen, setAddPageDialogOpen] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<File[] | null>(null);
+  const [photoImportError, setPhotoImportError] = useState<string | null>(null);
+  const [showPhotoImportProgress, setShowPhotoImportProgress] = useState(false);
+  const pagePhotoImportBusy = processingPhotos && !pendingFiles && book.pages.length > 0;
 
-  // Hover & UI state
-  const [hoveredPageId, setHoveredPageId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!pagePhotoImportBusy) {
+      setShowPhotoImportProgress(false);
+      return;
+    }
+    // Most page imports finish quickly; avoid flashing a loading panel for them.
+    const timeout = window.setTimeout(() => setShowPhotoImportProgress(true), 300);
+    return () => window.clearTimeout(timeout);
+  }, [pagePhotoImportBusy]);
 
   // Refs
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const sidebarScrollRef = useRef<HTMLDivElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const photoDestinationRef = useRef<string | undefined>(undefined);
 
-  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+  const [containerWidth, setContainerWidth] = useState(0);
 
   const pages = book.pages;
-  const leftPage = pages[currentSpreadIndex];
   const totalPages = pages.length;
-  const pageAspect = getBookFormatAspect(bookFormat);
 
   // Drag hooks
   const autoScroll = useAutoScroll(containerRef);
@@ -134,9 +155,23 @@ export default function EditPage() {
     []
   );
 
-  // Keyboard shortcuts for undo/redo
+  // Keyboard shortcuts for photo deletion and undo/redo.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target;
+      if (e.defaultPrevented || e.isComposing || processingPhotos || (target instanceof HTMLElement && (target.isContentEditable || target.closest('input, textarea, select, [role="textbox"], [role="dialog"], [role="menu"], [role="listbox"], [role="combobox"]')))) return;
+      if ((e.key === "Delete" || e.key === "Backspace") && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.repeat) {
+        const slot = pages.find((page) => page.id === selectedPageId)?.slots.find((slot) => slot.id === selectedSlotId);
+        if (selectedPageId && slot?.photoId) {
+          e.preventDefault();
+          removeSlot(selectedPageId, slot.id);
+          setSelectedSlotId(null);
+          setSelectedPageId(null);
+          setSelectedTextId(null);
+          setEditingTextId(null);
+        }
+        return;
+      }
       if ((e.metaKey || e.ctrlKey) && e.key === "z") {
         e.preventDefault();
         if (e.shiftKey) {
@@ -148,67 +183,52 @@ export default function EditPage() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [undo, redo]);
+  }, [undo, redo, processingPhotos, pages, selectedPageId, selectedSlotId, removeSlot]);
 
-  // Observe container size for responsive layout
-  useEffect(() => {
+  // Measure before the first paint so restored books never show fallback-sized pages.
+  useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const observer = new ResizeObserver((entries) => {
-      const { width, height } = entries[0].contentRect;
-      setContainerSize({ width, height });
-    });
+    const measureWidth = () => setContainerWidth(el.clientWidth);
+    measureWidth();
+    const observer = new ResizeObserver(measureWidth);
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
 
   // Calculate page dimensions based on container width (height is scrollable)
   const { pageWidth, pageHeight } = useMemo(() => {
-    const availW = containerSize.width - 128 - PAGE_GAP - PICKER_WIDTH * 2;
+    const availW = containerWidth - EDITOR_CANVAS_PADDING * 2 - PAGE_GAP - PICKER_WIDTH * 2;
+    const size = Math.round(Math.max(200, Math.min(availW / 2, 500)));
 
-    if (availW <= 0) {
-      return { pageWidth: 380, pageHeight: Math.round(380 / pageAspect) };
-    }
+    return { pageWidth: size, pageHeight: size };
+  }, [containerWidth]);
 
-    let pw = Math.max(200, Math.min(availW / 2, 500));
-    const ph = Math.round(pw / pageAspect);
-
-    return { pageWidth: Math.round(pw), pageHeight: ph };
-  }, [containerSize.width, pageAspect]);
-
-  // Sync sidebar scroll with main area scroll.
-  // Coalesced into a single rAF per frame so that raw scroll events (which
-  // browsers fire at a higher cadence than repaints) don't do layout work
-  // repeatedly, and the boundary-cross `setCurrentSpreadIndex` update —
-  // which triggers a context-wide re-render cascade through every mounted
-  // SpreadPage — fires at most once per animation frame.
+  // Track the current spread at most once per animation frame.
   const scrollRafRef = useRef<number | null>(null);
   const handleMainScroll = useCallback(() => {
     if (scrollRafRef.current !== null) return;
     scrollRafRef.current = requestAnimationFrame(() => {
       scrollRafRef.current = null;
       const main = containerRef.current;
-      const sidebar = sidebarScrollRef.current;
-      if (!main || !sidebar) return;
+      if (!main) return;
 
       const maxMainScroll = main.scrollHeight - main.clientHeight;
       if (maxMainScroll <= 0) return;
 
       const fraction = main.scrollTop / maxMainScroll;
-      const maxSidebarScroll = sidebar.scrollHeight - sidebar.clientHeight;
-      sidebar.scrollTop = fraction * maxSidebarScroll;
 
       // Update currentSpreadIndex based on visible spread
       const visibleIdx = Math.round(fraction * Math.max(0, spreads.length - 1));
       const spread = spreads[visibleIdx];
       if (spread) {
-        const newIndex = spread.left ?? spread.right ?? 0;
+        const newIndex = getSpreadPageIndices(spread)[0] ?? (visibleIdx < spreads.length / 2 ? 0 : pages.length - 1);
         if (newIndex !== currentSpreadIndex) {
           setCurrentSpreadIndex(newIndex);
         }
       }
     });
-  }, [spreads, currentSpreadIndex, setCurrentSpreadIndex]);
+  }, [spreads, currentSpreadIndex, setCurrentSpreadIndex, pages.length]);
 
   // Cancel any pending scroll-handler frame on unmount.
   useEffect(() => {
@@ -258,25 +278,51 @@ export default function EditPage() {
     []
   );
 
-  const handleStageClick = useCallback((e: any) => {
-    if (e.target === e.target.getStage()) {
-      setSelectedSlotId(null);
-      setSelectedPageId(null);
-      setSelectedTextId(null);
-      setEditingTextId(null);
-    }
+  const clearSelection = useCallback(() => {
+    setSelectedSlotId(null);
+    setSelectedPageId(null);
+    setSelectedTextId(null);
+    setEditingTextId(null);
   }, []);
 
-  // Toolbar actions
-  const handleAddText = useCallback(() => {
-    const pageId = selectedPageId || leftPage?.id;
-    if (!pageId) return;
-    const block = addTextBlock(pageId);
-    setSelectedTextId(block.id);
-    setSelectedPageId(pageId);
-    setSelectedSlotId(null);
-    setEditingTextId(block.id);
-  }, [selectedPageId, leftPage?.id, addTextBlock]);
+  const handleWorkspaceClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    // Pages handle their own photo, text, control and background clicks.
+    if (!(e.target as Element).closest("[data-book-page]")) clearSelection();
+  }, [clearSelection]);
+
+  const handleInsertPage = useCallback((pageIndex: number, position: PageInsertPosition) => {
+    clearSelection();
+    const pageId = addPage(position === "before" ? pageIndex - 1 : pageIndex);
+    setInsertedPageId(pageId);
+  }, [addPage, clearSelection]);
+
+  const handleAddPhotos = useCallback((pageId?: string) => {
+    const input = photoInputRef.current;
+    if (!input || processingPhotos) return;
+    setPhotoImportError(null);
+    photoDestinationRef.current = pageId;
+    input.multiple = !pageId || pageId !== pages[0]?.id;
+    input.click();
+  }, [pages, processingPhotos]);
+
+  const importPhotos = useCallback(async (files: File[], destination: PhotoDestination) => {
+    const pageId = await addPhotos(files, { replace: pages.length === 0, destination });
+    clearSelection();
+    if (pageId) setInsertedPageId(pageId);
+  }, [addPhotos, pages.length, clearSelection]);
+
+  useEffect(() => {
+    if (!insertedPageId) return;
+    const pageIndex = pages.findIndex((page) => page.id === insertedPageId);
+    if (pageIndex < 0) return;
+    const spreadIndex = spreads.findIndex((spread) => spread.left === pageIndex || spread.right === pageIndex);
+    // Spread rows stay mounted even when their page canvases are virtualized.
+    const row = containerRef.current?.querySelector(`[data-spread-index="${spreadIndex}"]`);
+    if (!row) return;
+    setCurrentSpreadIndex(pageIndex);
+    row.scrollIntoView({ behavior: "smooth", block: "center" });
+    setInsertedPageId(null);
+  }, [insertedPageId, pages, spreads, setCurrentSpreadIndex]);
 
   const handleTextUpdate = useCallback(
     (pageId: string, blockId: string, updates: Partial<TextBlock>) => {
@@ -298,49 +344,71 @@ export default function EditPage() {
     setEditingTextId(null);
   }, []);
 
-  const handleAddPhotos = useCallback(() => {
-    fileInputRef.current?.click();
-  }, []);
-
-  const handleFileChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (e.target.files) {
-        addPhotos(Array.from(e.target.files));
-      }
-    },
-    [addPhotos]
-  );
-
   return (
-    <Box sx={{ display: "flex", height: "100vh", pt: "64px" }}>
-      {/* Left Toolbar */}
-      <Toolbar
-        onAddPhotos={handleAddPhotos}
-        onAddText={handleAddText}
-      />
+    <Box sx={{ display: "flex", flexDirection: "column", height: "100dvh", px: EDITOR_PANEL_INSET, bgcolor: uiColors.background }}>
+      <BookHeader showBookControls={pages.length > 0}><BookBindingSelect /><EditorPreviewButton /></BookHeader>
 
-      {/* Main Canvas Area - scrollable */}
+      <Box sx={{ display: "flex", flex: 1, minHeight: 0, gap: EDITOR_PANEL_INSET, mb: EDITOR_PANEL_BOTTOM_INSET }}>
+      <Box
+        component="aside"
+        id="book-pages-sidebar"
+        aria-label="Book pages"
+        sx={{
+          ...EDITOR_PANEL_SX,
+          borderRadius: "20px",
+          width: EDITOR_SIDEBAR_WIDTH,
+          display: pages.length > 0 ? "flex" : "none",
+          flexDirection: "column",
+          flexShrink: 0,
+          overflow: "hidden",
+        }}
+      >
+        <PageStrip
+          onSpreadClick={handleSidebarSpreadClick}
+        />
+      </Box>
+
+      {/* Clip the scroll container to the island's rounded corners. */}
+      <Box
+        component="main"
+        aria-label="Photobook editor"
+        sx={{
+          ...EDITOR_PANEL_SX,
+          bgcolor: pages.length > 0 ? EDITOR_PANEL_SX.bgcolor : "transparent",
+          borderRadius: "20px",
+          flex: 1,
+          minWidth: 0,
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}
+      >
       <Box
         ref={containerRef}
         onScroll={handleMainScroll}
-        onDragOver={photoDrag.handleContainerDragOver}
+        onClick={handleWorkspaceClick}
+        onDragOver={pages.length > 0 ? photoDrag.handleContainerDragOver : undefined}
         onDragEnd={photoDrag.handleDragEnd}
         sx={{
           flex: 1,
+          minWidth: 0,
+          minHeight: 0,
           display: "flex",
           flexDirection: "column",
-          bgcolor: "#1a1c1d",
           overflow: "auto",
+          scrollbarGutter: pages.length > 0 ? "stable" : "auto",
+          ...EDITOR_SCROLLBAR_SX,
         }}
       >
-        <Box
+        {pages.length === 0 ? <EmptyBookState /> : containerWidth > 0 && <Box
           sx={{
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            px: 4,
-            py: 4,
-            gap: 4,
+            px: `${EDITOR_CANVAS_PADDING}px`,
+            pt: 4,
+            pb: { xs: "calc(144px + env(safe-area-inset-bottom))", sm: "calc(96px + env(safe-area-inset-bottom))" },
+            gap: 3,
           }}
         >
           {/* Spreads (virtualized: only visible spreads render full content) */}
@@ -352,8 +420,10 @@ export default function EditPage() {
             const isVisible =
               visibleSpreads.has(spreadIdx) ||
               Math.abs(spreadIdx - currentSpreadRow) <= NEIGHBORHOOD_RADIUS;
-            const lp = spread.left !== null ? pages[spread.left] : null;
-            const rp = spread.right !== null ? pages[spread.right] : null;
+            const leftIndex = typeof spread.left === "number" ? spread.left : null;
+            const rightIndex = typeof spread.right === "number" ? spread.right : null;
+            const lp = leftIndex !== null ? pages[leftIndex] : null;
+            const rp = rightIndex !== null ? pages[rightIndex] : null;
 
             return (
               <Box
@@ -365,14 +435,19 @@ export default function EditPage() {
                   gap: `${PAGE_GAP}px`,
                   alignItems: "start",
                   width: PICKER_WIDTH + pageWidth * 2 + PAGE_GAP + PICKER_WIDTH,
-                  justifyContent: lp ? "flex-start" : "flex-end",
+                  justifyContent: spread.left !== null ? "flex-start" : "flex-end",
                   minHeight: pageHeight,
                 }}
               >
+                {isVisible && spread.left === "printer-blank" && (
+                  <Box sx={{ pl: `${PICKER_WIDTH}px` }}>
+                    <PrinterBlankPage width={pageWidth} height={pageHeight} showLabel />
+                  </Box>
+                )}
                 {isVisible && lp && (
                   <SpreadPage
                     page={lp}
-                    pageIndex={spread.left!}
+                    pageIndex={leftIndex!}
                     pickerSide="left"
                     pageWidth={pageWidth}
                     pageHeight={pageHeight}
@@ -387,9 +462,9 @@ export default function EditPage() {
                     onTextUpdate={handleTextUpdate}
                     onTextDelete={handleTextDelete}
                     onTextEditEnd={handleTextEditEnd}
-                    onStageClick={handleStageClick}
-                    isHovered={hoveredPageId === lp.id}
-                    onHoverChange={setHoveredPageId}
+                    onClearSelection={clearSelection}
+                    onInsertPage={handleInsertPage}
+                    onAddPhotos={handleAddPhotos}
                     dragSourceInfo={photoDrag.dragSourceInfo}
                     dragOverInfo={photoDrag.dragOverInfo}
                     dragOverPageId={photoDrag.dragOverPageId}
@@ -411,7 +486,7 @@ export default function EditPage() {
                 {isVisible && rp && (
                   <SpreadPage
                     page={rp}
-                    pageIndex={spread.right!}
+                    pageIndex={rightIndex!}
                     pickerSide="right"
                     pageWidth={pageWidth}
                     pageHeight={pageHeight}
@@ -426,9 +501,9 @@ export default function EditPage() {
                     onTextUpdate={handleTextUpdate}
                     onTextDelete={handleTextDelete}
                     onTextEditEnd={handleTextEditEnd}
-                    onStageClick={handleStageClick}
-                    isHovered={hoveredPageId === rp.id}
-                    onHoverChange={setHoveredPageId}
+                    onClearSelection={clearSelection}
+                    onInsertPage={handleInsertPage}
+                    onAddPhotos={handleAddPhotos}
                     dragSourceInfo={photoDrag.dragSourceInfo}
                     dragOverInfo={photoDrag.dragOverInfo}
                     dragOverPageId={photoDrag.dragOverPageId}
@@ -447,55 +522,101 @@ export default function EditPage() {
                     onPageDragEndCleanup={pageDrag.handlePageDragEndCleanup}
                   />
                 )}
+                {isVisible && spread.right === "printer-blank" && (
+                  <Box sx={{ pr: `${PICKER_WIDTH}px` }}>
+                    <PrinterBlankPage width={pageWidth} height={pageHeight} showLabel />
+                  </Box>
+                )}
               </Box>
             );
           })}
-        </Box>
+        </Box>}
+      </Box>
       </Box>
 
-      {/* Right Sidebar - Page Strip */}
-      {showPageStrip && (
-        <Box sx={{ position: "relative", display: "flex", flexDirection: "column" }}>
-          <Box
-            sx={{
-              display: "flex",
-              justifyContent: "flex-end",
-              bgcolor: "#141617",
-              borderLeft: "1px solid rgba(255,255,255,0.06)",
-              px: 0.5,
-              pt: 0.5,
-            }}
-          >
-            <IconButton
-              onClick={() => setShowPageStrip(false)}
-              size="small"
-              sx={{
-                color: "rgba(255,255,255,0.45)",
-                "&:hover": { color: "rgba(255,255,255,0.8)" },
-              }}
-            >
-              <CloseIcon fontSize="small" />
-            </IconButton>
-          </Box>
-          <PageStrip
-            scrollContainerRef={sidebarScrollRef}
-            onSpreadClick={handleSidebarSpreadClick}
-          />
-        </Box>
-      )}
+      </Box>
 
-      {/* Offscreen canvas for drag ghost */}
-      <canvas ref={photoDrag.dragGhostRef} style={{ position: "fixed", left: -9999 }} />
+      {/* Keep mounted so the Reset dialog can finish closing after the book is emptied. */}
+      <Box
+        component="nav"
+        aria-label="Photobook tools"
+        sx={{
+          ...EDITOR_PANEL_SX,
+          "--toolbar-radius": "20px",
+          "--toolbar-inset": "6px",
+          bgcolor: toolbarColors.background,
+          display: pages.length > 0 ? "block" : "none",
+          position: "fixed",
+          left: "50%",
+          bottom: "calc(20px + env(safe-area-inset-bottom))",
+          transform: "translateX(-50%)",
+          width: "max-content",
+          maxWidth: "calc(100% - 32px)",
+          p: "var(--toolbar-inset)",
+          borderRadius: "var(--toolbar-radius)",
+          zIndex: 1200,
+          boxShadow: `inset 0 0 0 1px ${toolbarColors.border}, 0 8px 24px rgba(0,0,0,0.3)`,
+        }}
+      >
+        <EditorActions onAddPage={() => setAddPageDialogOpen(true)} onAddPhotos={() => handleAddPhotos()} />
+      </Box>
 
-      {/* Hidden file input */}
       <input
-        ref={fileInputRef}
+        ref={photoInputRef}
         type="file"
         accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
         multiple
         style={{ display: "none" }}
-        onChange={handleFileChange}
+        onChange={async (event) => {
+          const files = Array.from(event.currentTarget.files ?? []);
+          const pageId = photoDestinationRef.current;
+          event.currentTarget.value = "";
+          if (files.length === 0) return;
+          if (!pageId) {
+            setPendingFiles(files);
+            return;
+          }
+          try {
+            await importPhotos(files, { kind: "page", pageId });
+          } catch (error) {
+            setPhotoImportError(error instanceof Error ? error.message : "Couldn't add these photos. Please try again.");
+          }
+        }}
       />
+      {pendingFiles && (
+        <AddPhotosDialog
+          pages={pages}
+          photoCount={pendingFiles.length}
+          busy={processingPhotos}
+          progress={processingProgress}
+          onClose={() => setPendingFiles(null)}
+          onAdd={(destination) => importPhotos(pendingFiles, destination)}
+        />
+      )}
+      <Backdrop open={pagePhotoImportBusy} invisible={!showPhotoImportProgress} transitionDuration={0} sx={{ zIndex: (theme) => theme.zIndex.modal + 1 }}>
+        {pagePhotoImportBusy && showPhotoImportProgress && (
+          <Box role="status" aria-live="polite" sx={{ display: "flex", alignItems: "center", gap: 2, bgcolor: uiColors.surface, color: uiColors.text, p: 3, borderRadius: 3 }}>
+            <CircularProgress size={24} sx={{ color: "#08C225" }} />
+            <Typography>Adding photos… {processingProgress}%</Typography>
+          </Box>
+        )}
+      </Backdrop>
+      <Snackbar open={!!photoImportError} onClose={() => setPhotoImportError(null)} anchorOrigin={{ vertical: "top", horizontal: "center" }}>
+        <Alert severity="error" onClose={() => setPhotoImportError(null)}>{photoImportError}</Alert>
+      </Snackbar>
+
+      {addPageDialogOpen && (
+        <AddPageDialog
+          pages={pages}
+          initialPageId={selectedPageId ?? pages[currentSpreadIndex]?.id}
+          disabled={processingPhotos}
+          onClose={() => setAddPageDialogOpen(false)}
+          onInsert={handleInsertPage}
+        />
+      )}
+
+      {/* Offscreen canvas for drag ghost */}
+      <canvas ref={photoDrag.dragGhostRef} style={{ position: "fixed", left: -9999 }} />
 
     </Box>
   );

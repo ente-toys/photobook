@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from "react";
 import { useBook } from "@/context/BookContext";
 import type { useAutoScroll } from "./useAutoScroll";
+import { availablePhotoSpaces } from "@/lib/photoPlacement";
 
 export interface DragInfo {
   pageId: string;
@@ -126,7 +127,10 @@ export function usePhotoDrag(
   const handlePageDragOver = useCallback(
     (e: React.DragEvent, pageId: string) => {
       e.preventDefault();
-      e.dataTransfer.dropEffect = "move";
+      const isBackCover = pages.at(-1)?.id === pageId;
+      const toPage = pages.find((p) => p.id === pageId);
+      const hasRoom = !isBackCover && toPage && availablePhotoSpaces(toPage, pages[0]?.id === pageId) > 0;
+      e.dataTransfer.dropEffect = hasRoom ? "move" : "none";
       // Clear slot-level highlight when hovering page background
       const cur = dragOverRef.current;
       if (cur !== null) {
@@ -135,11 +139,8 @@ export function usePhotoDrag(
       }
       // Set page-level highlight (only for cross-page drops on pages with room)
       const source = dragSourceRef.current;
-      if (source && source.pageId !== pageId) {
-        const toPage = pages.find((p) => p.id === pageId);
-        const filledSlots =
-          toPage?.slots.filter((s) => s.photoId !== null).length ?? 0;
-        if (filledSlots < 4) {
+      if (source && source.pageId !== pageId && !isBackCover) {
+        if (hasRoom) {
           if (dragOverPageRef.current !== pageId) {
             dragOverPageRef.current = pageId;
             setDragOverPageId(pageId);
@@ -167,12 +168,10 @@ export function usePhotoDrag(
       const source = dragSourceRef.current;
       if (source) {
         const { pageId: fromPageId, slotId: fromSlotId } = source;
-        if (fromPageId !== toPageId) {
+        if (fromPageId !== toPageId && toPageId !== pages.at(-1)?.id) {
           // Cross-page drop on empty area: move photo to target page
           const toPage = pages.find((p) => p.id === toPageId);
-          const filledSlots =
-            toPage?.slots.filter((s) => s.photoId !== null).length ?? 0;
-          if (filledSlots < 4) {
+          if (toPage && availablePhotoSpaces(toPage, pages[0]?.id === toPageId) > 0) {
             movePhotoToPage(fromPageId, fromSlotId, toPageId);
           }
         }

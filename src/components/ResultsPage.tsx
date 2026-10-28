@@ -1,5 +1,7 @@
 "use client";
 
+import { uiColors, toolbarColors, popupShadow } from "@/theme/colors";
+
 import React, {
   useState,
   useCallback,
@@ -10,136 +12,55 @@ import React, {
 import {
   Box,
   Button,
-  ButtonGroup,
   Typography,
-  IconButton,
   CircularProgress,
   LinearProgress,
   Dialog,
-  DialogContent,
-  Menu,
-  MenuItem,
   Snackbar,
   Alert,
 } from "@mui/material";
-import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
-import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
-import EditIcon from "@mui/icons-material/Edit";
-import DownloadIcon from "@mui/icons-material/Download";
-import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
-import FolderZipIcon from "@mui/icons-material/FolderZip";
+import { EditIcon, DownloadIcon } from "./icons";
 import { useBook } from "@/context/BookContext";
 import BookViewer, { type BookViewerHandle } from "./BookViewer";
 import {
   exportPdfX4Pages,
-  exportPdfX4Spreads,
-  exportPngPagesZip,
-  exportPngSpreadsZip,
   downloadBlob,
 } from "@/lib/export";
-import type { ExportOptionId } from "@/lib/bookFormats";
-
-type ExportType = ExportOptionId;
+import { useSpreads } from "@/hooks/useSpreads";
+import { getSpreadLabel } from "@/lib/spreads";
+import { normalizeBookPages } from "@/lib/bookPages";
+import { getBindingPrintSelection, getPrintBinding, getPrintExportError, PrintExportValidationError } from "@/lib/printProducts";
+import BookHeader from "./BookHeader";
+import BookBindingSelect from "./BookBindingSelect";
+import { headerButtonSx } from "@/theme/buttons";
+import { EDITOR_PANEL_BOTTOM_INSET, EDITOR_PANEL_INSET, EDITOR_PANEL_SX } from "./editorLayout";
 
 export default function ResultsPage() {
-  const { book, bookFormat, photos, setAppView, waitForEnteOriginals } = useBook();
+  const { book, photos, setAppView, waitForEnteOriginals } = useBook();
   const viewerRef = useRef<BookViewerHandle>(null);
-  // pageIndex is the 0-based page-flip index of the current left-most visible page
-  const [pageIndex, setPageIndex] = useState(0);
-  const [exporting, setExporting] = useState(false);
+  const [spreadIndex, setSpreadIndex] = useState(0);
+  const [downloadPhase, setDownloadPhase] = useState<"idle" | "originals" | "exporting">("idle");
+  const downloadInProgress = useRef(false);
   const [exportProgress, setExportProgress] = useState(0);
-  const [downloadAnchor, setDownloadAnchor] = useState<null | HTMLElement>(
-    null,
-  );
   const [exportError, setExportError] = useState<string | null>(null);
-  const [waitingForOriginals, setWaitingForOriginals] = useState(false);
+  const waitingForOriginals = downloadPhase === "originals";
   const [originalsProgress, setOriginalsProgress] = useState({
     done: 0,
     total: 0,
   });
   const pages = book.pages;
+  const binding = getPrintBinding(book.printSelection);
+  const printSelection = useMemo(() => getBindingPrintSelection(binding), [binding]);
+  const exportPages = useMemo(() => normalizeBookPages(pages), [pages]);
+  const busy = downloadPhase !== "idle";
   const totalPages = pages.length;
+  const spreads = useSpreads(totalPages);
   const photosRef = useRef(photos);
   photosRef.current = photos;
 
-  // With showCover: true, page-flip treats page 0 as front cover (single),
-  // last page as back cover (single), and everything in between as spreads.
-  // The flip event gives us the 0-based index of the page being shown.
-  //
-  // Page display logic:
-  //   index 0          → "Cover"
-  //   index 1          → "1-2"        (first interior spread, counting from 1 after cover)
-  //   index 3          → "3-4"
-  //   index N-1        → "Back cover"
-  const pageLabel = useMemo(() => {
-    if (totalPages === 0) return "";
-    if (pageIndex === 0) return "Cover";
-    if (pageIndex >= totalPages - 1) return "Back cover";
-    // Interior spread: pages count from 1 after the cover
-    return `${pageIndex}-${pageIndex + 1}`;
-  }, [pageIndex, totalPages]);
-
-  const exportOptions = useMemo(
-    () =>
-      bookFormat.exportOptions.map((type) => {
-        switch (type) {
-          case "page-pdf":
-            return {
-              type,
-              label: "Print-ready PDF",
-              detail:
-                bookFormat.id === "square-210"
-                  ? "Square pages (210 x 210 mm)"
-                  : `${bookFormat.shortLabel} pages`,
-              desc: "PDF/X-4, FOGRA39 CMYK",
-              icon: <PictureAsPdfIcon sx={{ fontSize: 20 }} />,
-            };
-          case "page-pdf-large":
-            return {
-              type,
-              label: "Print-ready PDF",
-              detail: "Square pages (294 x 294 mm)",
-              desc: "PDF/X-4, FOGRA39 CMYK",
-              icon: <PictureAsPdfIcon sx={{ fontSize: 20 }} />,
-            };
-          case "spread-pdf":
-            return {
-              type,
-              label: "Print-ready PDF",
-              detail:
-                bookFormat.id === "a5-portrait"
-                  ? "A4 spreads"
-                  : `${bookFormat.shortLabel} spreads`,
-              desc: "PDF/X-4, FOGRA39 CMYK",
-              icon: <PictureAsPdfIcon sx={{ fontSize: 20 }} />,
-            };
-          case "page-png":
-            return {
-              type,
-              label: "ZIP",
-              detail: `${bookFormat.shortLabel} PNGs`,
-              desc: "High-res PNG per page",
-              icon: <FolderZipIcon sx={{ fontSize: 20 }} />,
-            };
-          case "spread-png":
-            return {
-              type,
-              label: "ZIP",
-              detail:
-                bookFormat.id === "a5-portrait"
-                  ? "A4 spread PNGs"
-                  : `${bookFormat.shortLabel} spread PNGs`,
-              desc: "Two pages per image",
-              icon: <FolderZipIcon sx={{ fontSize: 20 }} />,
-            };
-        }
-      }),
-    [bookFormat],
-  );
-
-  const isAtStart = pageIndex === 0;
-  const isAtEnd = pageIndex >= totalPages - 1;
+  const pageLabel = getSpreadLabel(spreads[spreadIndex], totalPages);
+  const isAtStart = spreadIndex === 0;
+  const isAtEnd = spreadIndex >= spreads.length - 1;
 
   const usedPhotoIds = useMemo(() => {
     const ids = new Set<string>();
@@ -153,8 +74,8 @@ export default function ResultsPage() {
     return ids;
   }, [pages]);
 
-  const handlePageChange = useCallback((idx: number) => {
-    setPageIndex(idx);
+  const handleSpreadChange = useCallback((idx: number) => {
+    setSpreadIndex(idx);
   }, []);
 
   const getBlockedEntePhotos = useCallback(() => {
@@ -169,18 +90,18 @@ export default function ResultsPage() {
   // Keyboard navigation: left/right arrows flip pages
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return;
       // Ignore if the user is typing into an input/textarea or a menu is open
       const target = e.target as HTMLElement | null;
       if (
         target &&
         (target.tagName === "INPUT" ||
           target.tagName === "TEXTAREA" ||
-          target.isContentEditable)
+          target.isContentEditable ||
+          target.closest('[role="combobox"], [role="listbox"], [role="option"]'))
       ) {
         return;
       }
-      if (downloadAnchor) return;
-
       if (e.key === "ArrowLeft" && !isAtStart) {
         e.preventDefault();
         viewerRef.current?.flipPrev();
@@ -191,396 +112,110 @@ export default function ResultsPage() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isAtStart, isAtEnd, downloadAnchor]);
+  }, [isAtStart, isAtEnd]);
 
   const handleExport = useCallback(
-    async (type: ExportType) => {
-      setDownloadAnchor(null);
+    async () => {
+      if (downloadInProgress.current) return;
+      const validationError = getPrintExportError(printSelection, exportPages.length);
+      if (validationError) {
+        setExportError(validationError);
+        return;
+      }
 
       const initiallyBlocked = getBlockedEntePhotos();
       const pendingIds = initiallyBlocked
         .filter((photo) => photo.originalStatus === "pending")
         .map((photo) => photo.id);
 
-      if (pendingIds.length > 0) {
-        setWaitingForOriginals(true);
-        setOriginalsProgress({ done: 0, total: pendingIds.length });
-        try {
-          await waitForEnteOriginals(pendingIds, (done, total) => {
-            setOriginalsProgress({ done, total });
-          });
-        } finally {
-          setWaitingForOriginals(false);
-        }
-      }
-
-      const remainingBlocked = getBlockedEntePhotos();
-      if (remainingBlocked.length > 0) {
-        const failedCount = remainingBlocked.filter(
-          (photo) => photo.originalStatus === "failed",
-        ).length;
-        setExportError(
-          failedCount > 0
-            ? "Some Ente photos failed to prepare. Re-import the album before exporting."
-            : "Ente originals are still being prepared. Please wait a moment and try again.",
-        );
-        return;
-      }
-
-      setExporting(true);
+      downloadInProgress.current = true;
+      setExportError(null);
       setExportProgress(0);
+      setDownloadPhase(pendingIds.length > 0 ? "originals" : "exporting");
+      const preparationShare = pendingIds.length > 0 ? 10 : 0;
 
       try {
-        let blob: Blob;
-        let filename: string;
-
-        switch (type) {
-          case "page-pdf":
-            blob = await exportPdfX4Pages(pages, bookFormat, setExportProgress);
-            filename = `photobook-${bookFormat.fileSlug}-PDFX4-FOGRA39.pdf`;
-            break;
-          case "page-pdf-large":
-            blob = await exportPdfX4Pages(pages, bookFormat, setExportProgress, {
-              widthMm: 294,
-              heightMm: 294,
-            });
-            filename = `photobook-square-294-PDFX4-FOGRA39.pdf`;
-            break;
-          case "spread-pdf":
-            blob = await exportPdfX4Spreads(pages, bookFormat, setExportProgress);
-            filename = `photobook-${
-              bookFormat.id === "a5-portrait" ? "A4" : bookFormat.fileSlug
-            }-spreads-PDFX4-FOGRA39.pdf`;
-            break;
-          case "page-png":
-            blob = await exportPngPagesZip(pages, bookFormat, setExportProgress);
-            filename = `photobook-${bookFormat.fileSlug}-pages.zip`;
-            break;
-          case "spread-png":
-            blob = await exportPngSpreadsZip(pages, bookFormat, setExportProgress);
-            filename = `photobook-${
-              bookFormat.id === "a5-portrait" ? "A4" : bookFormat.fileSlug
-            }-spreads.zip`;
-            break;
+        if (pendingIds.length > 0) {
+          setOriginalsProgress({ done: 0, total: pendingIds.length });
+          await waitForEnteOriginals(pendingIds, (done, total) => {
+            setOriginalsProgress({ done, total });
+            setExportProgress(total ? Math.round((done / total) * preparationShare) : 0);
+          });
         }
+
+        const remainingBlocked = getBlockedEntePhotos();
+        if (remainingBlocked.length > 0) {
+          const failedCount = remainingBlocked.filter(
+            (photo) => photo.originalStatus === "failed",
+          ).length;
+          setExportError(
+            failedCount > 0
+              ? "Some Ente photos failed to prepare. Re-import the album before exporting."
+              : "Ente originals are still being prepared. Please wait a moment and try again.",
+          );
+          return;
+        }
+
+        setDownloadPhase("exporting");
+        // Paint the persistent spinner before starting the canvas/WASM work.
+        await new Promise<void>((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+        const blob = await exportPdfX4Pages(exportPages, printSelection, (progress) => {
+          setExportProgress(preparationShare + Math.round(progress * (100 - preparationShare) / 100));
+        });
+        const filename = `photobook-${printSelection.sizeMm}mm.pdf`;
 
         downloadBlob(blob, filename);
       } catch (e) {
         console.error("Export failed:", e);
-        setExportError("Export failed. Please try again.");
+        setExportError(e instanceof PrintExportValidationError ? e.message : "Export failed. Please try again.");
       } finally {
-        setExporting(false);
+        downloadInProgress.current = false;
+        setDownloadPhase("idle");
       }
     },
-    [bookFormat, getBlockedEntePhotos, pages, waitForEnteOriginals],
+    [getBlockedEntePhotos, exportPages, printSelection, waitForEnteOriginals],
   );
 
   return (
-    <Box sx={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-      {/* Dark viewer area */}
+    <Box sx={{ height: "100dvh", display: "flex", flexDirection: "column", px: EDITOR_PANEL_INSET, bgcolor: uiColors.background }}>
+      <BookHeader>
+        <BookBindingSelect disabled={busy} />
+        <Button
+          aria-label="Edit" startIcon={<EditIcon />} onClick={() => setAppView("edit")} disabled={busy}
+          sx={{
+            ...headerButtonSx,
+            color: toolbarColors.text,
+            bgcolor: toolbarColors.control,
+            "&:hover": { bgcolor: toolbarColors.hover },
+            "&:active": { bgcolor: toolbarColors.active },
+          }}
+        >
+          <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>Edit</Box>
+        </Button>
+        <Button
+          id="download-button" variant="contained" aria-label={busy ? `Downloading, ${exportProgress}%` : "Download"} aria-busy={busy}
+          startIcon={
+            <Box component="span" sx={{ display: "grid", width: 18, height: 18, flexShrink: 0 }}>
+              <DownloadIcon strokeWidth={2.2} sx={{ gridArea: "1 / 1", visibility: busy ? "hidden" : "visible" }} />
+              <CircularProgress disableShrink size={18} thickness={4} color="inherit" aria-hidden="true" sx={{ gridArea: "1 / 1", visibility: busy ? "visible" : "hidden", willChange: "transform", "& circle": { strokeLinecap: "round" } }} />
+            </Box>
+          }
+          disabled={busy || pages.length === 0}
+          onClick={handleExport}
+          sx={{ ...headerButtonSx, fontWeight: 700, gap: { xs: busy ? "6px" : 0, sm: "8px" }, ...(busy && { "&.Mui-disabled": { opacity: 1 } }) }}
+        >
+          <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
+            {busy ? "Downloading" : "Download"}
+          </Box>
+          {busy && <Box component="span" sx={{ display: "inline-flex", justifyContent: "center", alignItems: "center", flexShrink: 0, width: "4.5ch", py: 0.5, borderRadius: "7px", bgcolor: "rgba(0,0,0,0.12)", fontSize: 12, lineHeight: "16px", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{exportProgress}%</Box>}
+        </Button>
+      </BookHeader>
+
       <Box
-        sx={{
-          flex: 1,
-          pt: "64px",
-          bgcolor: "#1a1c1d",
-          display: "flex",
-          flexDirection: "column",
-          position: "relative",
-          overflow: "hidden",
-        }}
+        component="main" aria-label={`Photobook preview: ${pageLabel}`}
+        sx={{ ...EDITOR_PANEL_SX, flex: 1, minHeight: 0, mb: EDITOR_PANEL_BOTTOM_INSET, borderRadius: "20px", display: "flex", position: "relative", overflow: "hidden", px: { xs: 1, sm: 4 } }}
       >
-        {/* Navigation arrows + viewer */}
-        <Box
-          sx={{
-            flex: 1,
-            display: "flex",
-            alignItems: "stretch",
-            justifyContent: "center",
-            px: 4,
-            py: 1,
-            position: "relative",
-            minHeight: 0,
-          }}
-        >
-          {/* Left arrow */}
-          <IconButton
-            onClick={() => viewerRef.current?.flipPrev()}
-            disabled={isAtStart}
-            sx={{
-              position: "absolute",
-              left: 24,
-              top: "50%",
-              transform: "translateY(-50%)",
-              zIndex: 10,
-              width: 48,
-              height: 48,
-              color: "white",
-              bgcolor: "rgba(226, 226, 228, 0.15)",
-              backdropFilter: "blur(10px)",
-              "&:hover": { bgcolor: "rgba(226, 226, 228, 0.3)" },
-              "&.Mui-disabled": { opacity: 0.3 },
-            }}
-          >
-            <ChevronLeftIcon sx={{ fontSize: 32 }} />
-          </IconButton>
-
-          {/* Book viewer */}
-          <BookViewer
-            ref={viewerRef}
-            pages={pages}
-            onPageChange={handlePageChange}
-          />
-
-          {/* Right arrow */}
-          <IconButton
-            onClick={() => viewerRef.current?.flipNext()}
-            disabled={isAtEnd}
-            sx={{
-              position: "absolute",
-              right: 24,
-              top: "50%",
-              transform: "translateY(-50%)",
-              zIndex: 10,
-              width: 48,
-              height: 48,
-              color: "white",
-              bgcolor: "rgba(226, 226, 228, 0.15)",
-              backdropFilter: "blur(10px)",
-              "&:hover": { bgcolor: "rgba(226, 226, 228, 0.3)" },
-              "&.Mui-disabled": { opacity: 0.3 },
-            }}
-          >
-            <ChevronRightIcon sx={{ fontSize: 32 }} />
-          </IconButton>
-        </Box>
-
-        {/* Bottom controls */}
-        <Box
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 1.5,
-            pb: 2,
-          }}
-        >
-          {/* Page indicator */}
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 1.5,
-              bgcolor: "rgba(226, 226, 228, 0.1)",
-              backdropFilter: "blur(20px)",
-              border: "1px solid rgba(255,255,255,0.05)",
-              px: 3,
-              py: 1,
-              borderRadius: 999,
-              minWidth: 180,
-              minHeight: 56,
-            }}
-          >
-            <Typography
-              sx={{
-                color: "rgba(255,255,255,0.4)",
-                fontSize: "0.7rem",
-                textTransform: "uppercase",
-                letterSpacing: "0.2em",
-                fontWeight: 500,
-              }}
-            >
-              Page
-            </Typography>
-            <Typography
-              sx={{ color: "#08C225", fontWeight: 700, fontSize: "0.85rem" }}
-            >
-              {pageLabel}
-            </Typography>
-            {pageIndex > 0 && pageIndex < totalPages - 1 && (
-              <>
-                <Typography sx={{ color: "rgba(255,255,255,0.2)" }}>
-                  /
-                </Typography>
-                <Typography
-                  sx={{
-                    color: "rgba(255,255,255,0.6)",
-                    fontWeight: 500,
-                    fontSize: "0.85rem",
-                  }}
-                >
-                  {totalPages - 2}
-                </Typography>
-              </>
-            )}
-          </Box>
-
-          {/* Action buttons */}
-          <Box sx={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <Button
-              startIcon={<EditIcon />}
-              onClick={() => setAppView("edit")}
-              sx={{
-                color: "rgba(255,255,255,0.7)",
-                fontWeight: 500,
-                textTransform: "uppercase",
-                fontSize: "0.8rem",
-                letterSpacing: "0.05em",
-                "&:hover": { color: "white" },
-              }}
-            >
-              Edit photobook
-            </Button>
-
-            <ButtonGroup
-              variant="contained"
-              sx={{
-                borderRadius: 999,
-                background: "linear-gradient(135deg, #006E0F 0%, #08C225 100%)",
-                boxShadow: "none",
-                overflow: "hidden",
-                "& .MuiButtonGroup-grouped": {
-                  borderColor: "rgba(255,255,255,0.16)",
-                  borderRadius: 0,
-                  minWidth: 0,
-                },
-                "& .MuiButton-root": {
-                  background: "transparent",
-                  fontWeight: 700,
-                  boxShadow: "none",
-                  "&:hover": {
-                    background: "rgba(0,0,0,0.08)",
-                    boxShadow: "none",
-                  },
-                  "&.Mui-disabled": {
-                    color: "rgba(255,255,255,0.7)",
-                    background: "transparent",
-                    opacity: 0.65,
-                  },
-                },
-              }}
-            >
-              <Button
-                startIcon={
-                  exporting ? (
-                    <CircularProgress size={18} sx={{ color: "white" }} />
-                  ) : (
-                    <DownloadIcon />
-                  )
-                }
-                disabled={exporting}
-                onClick={() => handleExport(bookFormat.defaultExportOption)}
-                sx={{
-                  px: 4,
-                  py: 1.5,
-                  fontSize: "1rem",
-                  lineHeight: 1.25,
-                }}
-              >
-                {exporting ? `Exporting ${exportProgress}%` : "Download"}
-              </Button>
-              <Button
-                aria-label="Choose download format"
-                disabled={exporting}
-                onClick={(e) => setDownloadAnchor(e.currentTarget)}
-                sx={{
-                  px: 1.25,
-                  py: 1.5,
-                }}
-              >
-                <ArrowDropDownIcon />
-              </Button>
-            </ButtonGroup>
-
-            <Menu
-              anchorEl={downloadAnchor}
-              open={Boolean(downloadAnchor)}
-              onClose={() => setDownloadAnchor(null)}
-              anchorOrigin={{ vertical: "top", horizontal: "center" }}
-              transformOrigin={{ vertical: "bottom", horizontal: "center" }}
-              slotProps={{
-                paper: {
-                  sx: {
-                    bgcolor: "rgba(30, 32, 34, 0.85)",
-                    backdropFilter: "blur(24px)",
-                    border: "1px solid rgba(255,255,255,0.08)",
-                    borderRadius: 3,
-                    boxShadow: "0 16px 48px rgba(0,0,0,0.4)",
-                    p: 1,
-                    minWidth: 300,
-                    mb: 1,
-                  },
-                },
-              }}
-            >
-              {exportOptions.map((opt) => (
-                <MenuItem
-                  key={opt.type}
-                  onClick={() => handleExport(opt.type)}
-                  sx={{
-                    borderRadius: 2,
-                    px: 2,
-                    py: 1.25,
-                    mb: 0.5,
-                    gap: 1.5,
-                    "&:last-child": { mb: 0 },
-                    "&:hover": {
-                      bgcolor: "rgba(255,255,255,0.06)",
-                    },
-                  }}
-                >
-                  <Box
-                    sx={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 1.5,
-                      bgcolor: "rgba(255,255,255,0.06)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "rgba(255,255,255,0.5)",
-                      flexShrink: 0,
-                    }}
-                  >
-                    {opt.icon}
-                  </Box>
-                  <Box sx={{ minWidth: 0 }}>
-                    <Typography
-                      sx={{
-                        color: "rgba(255,255,255,0.92)",
-                        fontSize: "0.85rem",
-                        fontWeight: 600,
-                        lineHeight: 1.3,
-                      }}
-                    >
-                      {opt.label}
-                      <Typography
-                        component="span"
-                        sx={{
-                          color: "rgba(255,255,255,0.45)",
-                          fontWeight: 400,
-                          ml: 0.75,
-                        }}
-                      >
-                        {" - "}
-                        {opt.detail}
-                      </Typography>
-                    </Typography>
-                    <Typography
-                      sx={{
-                        color: "rgba(255,255,255,0.35)",
-                        fontSize: "0.75rem",
-                        lineHeight: 1.3,
-                      }}
-                    >
-                      {opt.desc}
-                    </Typography>
-                  </Box>
-                </MenuItem>
-              ))}
-            </Menu>
-          </Box>
-        </Box>
+        <BookViewer ref={viewerRef} pages={pages} onSpreadChange={handleSpreadChange} />
       </Box>
 
       <Dialog
@@ -591,9 +226,9 @@ export default function ResultsPage() {
         PaperProps={{
           sx: {
             borderRadius: 3,
-            bgcolor: "#fff",
+            bgcolor: uiColors.surface,
             minWidth: 360,
-            boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
+            boxShadow: popupShadow,
           },
         }}
       >
@@ -601,10 +236,10 @@ export default function ResultsPage() {
           <CircularProgress sx={{ color: "#08C225", mb: 2 }} size={36} />
           <Typography
             sx={{
-              fontFamily: "var(--font-nunito), 'Nunito', sans-serif",
+              fontFamily: "var(--font-inter), sans-serif",
               fontWeight: 700,
               fontSize: "1.05rem",
-              color: "#222",
+              color: uiColors.text,
               mb: 0.5,
             }}
           >
@@ -612,8 +247,8 @@ export default function ResultsPage() {
           </Typography>
           <Typography
             sx={{
-              fontFamily: "var(--font-nunito), 'Nunito', sans-serif",
-              color: "#777",
+              fontFamily: "var(--font-inter), sans-serif",
+              color: uiColors.muted,
               fontSize: "0.8rem",
               lineHeight: 1.6,
               mb: 2.5,
@@ -633,17 +268,17 @@ export default function ResultsPage() {
               height: 6,
               borderRadius: 3,
               mb: 1,
-              bgcolor: "#e8e8e8",
+              bgcolor: uiColors.control,
               "& .MuiLinearProgress-bar": {
-                background: "linear-gradient(135deg, #006E0F 0%, #08C225 100%)",
+                background: "#08C225",
                 borderRadius: 3,
               },
             }}
           />
           <Typography
             sx={{
-              fontFamily: "var(--font-nunito), 'Nunito', sans-serif",
-              color: "#999",
+              fontFamily: "var(--font-inter), sans-serif",
+              color: uiColors.muted,
               fontSize: "0.8rem",
             }}
           >

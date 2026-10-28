@@ -1,28 +1,54 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Box, CircularProgress, Snackbar, Alert, Button, Dialog, DialogContent, Typography, IconButton } from "@mui/material";
-import CloseIcon from "@mui/icons-material/Close";
-import { BookProvider, useBook } from "@/context/BookContext";
-import NavBar from "@/components/NavBar";
-import StartPage from "@/components/StartPage";
+import { Box, CircularProgress, Snackbar, Alert, Dialog, DialogContent, Typography, IconButton, Fade, useMediaQuery } from "@mui/material";
+import { CloseIcon } from "./icons";
+import { useBook } from "@/context/BookContext";
+import { usePhotoImport } from "@/hooks/usePhotoImport";
+import ImportProgress from "./ImportProgress";
+import EntePasswordDialog from "./EntePasswordDialog";
 import EditPage from "@/components/EditPage";
 import ResultsPage from "@/components/ResultsPage";
+import { popupShadow, uiColors } from "@/theme/colors";
+import type { AppView } from "@/lib/types";
 
-function AppContent() {
-  const { appView, loading, restored, setRestored, startOver, importNotice, clearImportNotice } = useBook();
+function BookWorkspace({ view }: { view: AppView }) {
+  const [displayedView, setDisplayedView] = useState(view);
+  const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const visible = displayedView === view;
+
+  return (
+    <Fade
+      in={visible}
+      appear={false}
+      timeout={reduceMotion ? 0 : { exit: 120, enter: 220 }}
+      easing={{ exit: "ease-in", enter: "ease-out" }}
+      onExited={() => setDisplayedView(view)}
+    >
+      {/* Keep the outgoing screen intact until it fades out. Only one workspace
+          is mounted, so canvases and keyboard handlers never overlap. */}
+      <Box inert={!visible} data-workspace-view={displayedView}>
+        {displayedView === "results" ? <ResultsPage /> : <EditPage />}
+      </Box>
+    </Fade>
+  );
+}
+
+export default function AppShell() {
+  const { appView, loading, book, importNotice, clearImportNotice } = useBook();
+  const { importActive, enteStage, entePassword, setEntePassword, handleSubmitPassword, handleCancelPassword } = usePhotoImport();
   const [showMobileHint, setShowMobileHint] = useState(false);
 
   useEffect(() => {
     if (
-      appView === "edit" &&
+      !importActive && book.pages.length > 0 && appView === "edit" &&
       typeof window !== "undefined" &&
       window.matchMedia("(max-width: 640px)").matches
     ) {
       const dismissed = sessionStorage.getItem("mobile-hint-dismissed");
       if (!dismissed) setShowMobileHint(true);
     }
-  }, [appView]);
+  }, [appView, importActive, book.pages.length]);
 
   if (loading) {
     return (
@@ -41,40 +67,8 @@ function AppContent() {
 
   return (
     <>
-      <NavBar />
-      {appView === "start" && <StartPage />}
-      {appView === "edit" && <EditPage />}
-      {appView === "results" && <ResultsPage />}
-
-      {/* Session restored banner */}
-      <Snackbar
-        open={restored}
-        autoHideDuration={8000}
-        onClose={() => setRestored(false)}
-        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-      >
-        <Alert
-          severity="success"
-          onClose={() => setRestored(false)}
-          sx={{
-            bgcolor: "white",
-            color: "#1a1c1d",
-            boxShadow: "0px 12px 32px rgba(26, 28, 29, 0.1)",
-            "& .MuiAlert-icon": { color: "#08C225" },
-          }}
-          action={
-            <Button
-              size="small"
-              onClick={startOver}
-              sx={{ color: "#ba1a1a", fontWeight: 600 }}
-            >
-              Start over
-            </Button>
-          }
-        >
-          Welcome back — your book has been restored.
-        </Alert>
-      </Snackbar>
+      {importActive ? <ImportProgress /> : <BookWorkspace view={appView} />}
+      <EntePasswordDialog open={enteStage === "password"} password={entePassword} onPasswordChange={setEntePassword} onSubmit={handleSubmitPassword} onCancel={handleCancelPassword} />
 
       {/* Import truncation notice */}
       <Snackbar
@@ -87,9 +81,9 @@ function AppContent() {
           severity="info"
           onClose={clearImportNotice}
           sx={{
-            bgcolor: "white",
-            color: "#1a1c1d",
-            boxShadow: "0px 12px 32px rgba(26, 28, 29, 0.1)",
+            bgcolor: uiColors.surface,
+            color: uiColors.text,
+            boxShadow: popupShadow,
             "& .MuiAlert-icon": { color: "#08C225" },
           }}
         >
@@ -110,8 +104,8 @@ function AppContent() {
             maxWidth: 300,
             mx: 2,
             p: 0,
-            bgcolor: "#fff",
-            boxShadow: "0px 20px 60px rgba(0,0,0,0.18)",
+            bgcolor: uiColors.surface,
+            boxShadow: popupShadow,
           },
         }}
       >
@@ -126,28 +120,20 @@ function AppContent() {
               position: "absolute",
               top: 6,
               right: 6,
-              color: "rgba(0,0,0,0.3)",
-              "&:hover": { color: "rgba(0,0,0,0.6)" },
+              color: uiColors.muted,
+              "&:hover": { color: uiColors.text },
             }}
           >
             <CloseIcon sx={{ fontSize: 18 }} />
           </IconButton>
-          <Typography variant="subtitle1" sx={{ fontFamily: "var(--font-nunito)", fontWeight: 700, mb: 0.5, color: "#1a1c1d", fontSize: "1rem" }}>
+          <Typography variant="subtitle1" sx={{ fontFamily: "var(--font-inter)", fontWeight: 700, mb: 0.5, color: uiColors.text, fontSize: "1rem" }}>
             Best on desktop
           </Typography>
-          <Typography variant="body2" sx={{ fontFamily: "var(--font-nunito)", color: "rgba(0,0,0,0.5)", lineHeight: 1.55, fontSize: "0.835rem" }}>
+          <Typography variant="body2" sx={{ fontFamily: "var(--font-inter)", color: uiColors.muted, lineHeight: 1.55, fontSize: "0.835rem" }}>
             The photobook editor works best on a larger screen. For the full experience, try it on a desktop or laptop.
           </Typography>
         </DialogContent>
       </Dialog>
     </>
-  );
-}
-
-export default function AppShell() {
-  return (
-    <BookProvider>
-      <AppContent />
-    </BookProvider>
   );
 }
