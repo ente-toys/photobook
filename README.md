@@ -1,3 +1,6 @@
+> [!NOTE]
+> This repo has moved to the Ente [monorepo](https://github.com/ente/ente/tree/main/web/apps/photobook).
+
 # Ente Photobook
 
 A fully private photobook maker that runs entirely in your browser. No uploads, no accounts, no tracking. Just drag in your photos, design your book, and download the result. What you do with it is up to you: print it at home, take it to a local print shop, or order online.
